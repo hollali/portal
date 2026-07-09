@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Image {
+  id                  Int      @id @default(autoincrement())
+  source              String?
+  query               String?
+  url                 String?  @unique
+  localPath           String?  @map("local_path")
+  collectedAt         String?  @map("collected_at")
+  faceDetected        Int?     @default(0) @map("face_detected")
+  faceCount           Int?     @default(0) @map("face_count")
+  faceMatch           Int?     @default(0) @map("face_match")
+  faceMatchScore      Float?   @default(0.0) @map("face_match_score")
+  faceMatchDistance   Float?   @map("face_match_distance")
+  bestReferencePath   String?  @default("") @map("best_reference_path")
+  imageHash           String?  @map("image_hash")
+
+  @@map("images")
+}
+
+model Video {
+  id          Int      @id @default(autoincrement())
+  source      String?
+  platform    String?
+  title       String?
+  url         String?  @unique
+  channel     String?
+  duration    Int?
+  views       Int?
+  collectedAt String?  @map("collected_at")
+  localPath   String?  @map("local_path")
+
+  @@map("videos")
+}
+
+model News {
+  id          Int      @id @default(autoincrement())
+  source      String?
+  query       String?
+  title       String?
+  url         String?  @unique
+  sourceName  String?  @map("source_name")
+  date        String?
+  snippet     String?
+  collectedAt String?  @map("collected_at")
+  localPath   String?  @map("local_path")
+
+  @@map("news")
+}
+
+model Audio {
+  id          Int      @id @default(autoincrement())
+  source      String?
+  query       String?
+  title       String?
+  url         String?  @unique
+  artist      String?
+  duration    String?
+  collectedAt String?  @map("collected_at")
+  localPath   String?  @map("local_path")
+
+  @@map("audio")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String?  @unique
+  password  String
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
