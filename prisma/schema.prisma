@@ -7,6 +7,21 @@ datasource db {
   provider = "postgresql"
 }
 
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  entityType String  @map("entity_type")
+  entityId  Int      @map("entity_id")
+  userId    Int?     @map("user_id")
+  details   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
 model Image {
   id                  Int      @id @default(autoincrement())
   source              String?
@@ -22,6 +37,8 @@ model Image {
   bestReferencePath   String?  @default("") @map("best_reference_path")
   imageHash           String?  @map("image_hash")
 
+  @@index([source])
+  @@index([collectedAt])
   @@map("images")
 }
 
@@ -37,6 +54,9 @@ model Video {
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
 
+  @@index([source])
+  @@index([platform])
+  @@index([collectedAt])
   @@map("videos")
 }
 
@@ -52,6 +72,10 @@ model News {
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
 
+  @@index([source])
+  @@index([sourceName])
+  @@index([date])
+  @@index([collectedAt])
   @@map("news")
 }
 
@@ -66,6 +90,9 @@ model Audio {
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
 
+  @@index([source])
+  @@index([artist])
+  @@index([collectedAt])
   @@map("audio")
 }
 

@@ -1,21 +1,23 @@
 'use client'
 
-import { useEffect, useState, FormEvent } from 'react'
+import { useEffect, useState, useCallback, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { Eye, Trash2, ExternalLink, Plus, Download, Music, Play, FileText, Search, Filter, ChevronDown } from 'lucide-react'
+import { Modal, AnimBtn, AnimLink, Toast, SkeletonTable, EmptyState } from '@/components/ui'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface AdminData {
-  images: { items: any[]; total: number }
-  videos: { items: any[]; total: number }
-  news: { items: any[]; total: number }
-  audio: { items: any[]; total: number }
-  isAdmin: boolean
+  items: any[]
+  total: number
+  page: number
+  perPage: number
+  sources: string[]
 }
 
 function getMediaUrl(item: { localPath?: string | null; url?: string | null }): string | null {
   if (item.localPath) {
-    const rel = item.localPath.replace('/home/hollali/Projects/WebScrapper/osint_bagbin_enhanced', '')
-    return `/api/media${rel}`
+    const rel = item.localPath.replace('/home/hollali/Projects/portal/public', '')
+    return rel
   }
   return item.url || null
 }
@@ -24,14 +26,39 @@ function isYouTubeUrl(url: string): boolean {
   return /(youtube\.com|youtu\.be)/i.test(url)
 }
 
+function getYouTubeEmbedUrl(url: string): string {
+  const match = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+  return match ? `https://www.youtube.com/embed/${match[1]}` : url
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const [data, setData] = useState<AdminData | null>(null)
   const [tab, setTab] = useState<'images' | 'videos' | 'news' | 'audio'>('images')
-  const [pages, setPages] = useState<Record<string, number>>({ images: 1, videos: 1, news: 1, audio: 1 })
+  const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
-  const [message, setMessage] = useState('')
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [viewItem, setViewItem] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [search, setSearch] = useState('')
+  const [source, setSource] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [sort, setSort] = useState('id')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams({
+      type: tab, page: String(page), perPage: '20',
+      search, source, sort, dir: sortDir,
+    })
+    const res = await fetch(`/api/admin/${tab}?${params}`)
+    const d = await res.json()
+    setData(d)
+    setLoading(false)
+  }, [tab, page, search, source, sort, sortDir])
 
   useEffect(() => {
     fetch('/api/me').then(r => r.json()).then(d => {
@@ -41,14 +68,60 @@ export default function AdminPage() {
   }, [router])
 
   useEffect(() => {
-    if (!isAdmin) return
-    fetch(`/api/admin/${tab}?page=${pages[tab]}`).then(r => r.json()).then(d => {
-      setData(prev => prev ? { ...prev, [tab]: d } : {
-        images: { items: [], total: 0 }, videos: { items: [], total: 0 },
-        news: { items: [], total: 0 }, audio: { items: [], total: 0 }, isAdmin: true, [tab]: d
-      })
+    if (isAdmin) fetchData()
+  }, [isAdmin, fetchData])
+
+  useEffect(() => {
+    setPage(1)
+    setSelected(new Set())
+  }, [tab, search, source])
+
+  const toggleSelect = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
-  }, [tab, pages, isAdmin])
+  }
+
+  const toggleSelectAll = () => {
+    if (!data) return
+    const currentIds = data.items.map((i: any) => i.id)
+    const allSelected = currentIds.every((id: number) => selected.has(id))
+    if (allSelected) {
+      setSelected(prev => {
+        const next = new Set(prev)
+        currentIds.forEach((id: number) => next.delete(id))
+        return next
+      })
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev)
+        currentIds.forEach((id: number) => next.add(id))
+        return next
+      })
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selected.size === 0) return
+    if (!confirm(`Delete ${selected.size} selected item(s)?`)) return
+    setDeleting(true)
+    const formData = new FormData()
+    formData.set('action', 'delete_image')
+    formData.set('pks', Array.from(selected).join(','))
+    formData.set('type', tab)
+    const res = await fetch(`/api/admin/${tab}`, { method: 'POST', body: formData })
+    setDeleting(false)
+    if (res.ok) {
+      setToast({ message: `Deleted ${selected.size} item(s)` })
+      setSelected(new Set())
+      fetchData()
+    } else {
+      setToast({ message: 'Failed to delete', type: 'error' })
+    }
+  }
 
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this item?')) return
@@ -58,10 +131,10 @@ export default function AdminPage() {
     formData.set('type', tab)
     const res = await fetch(`/api/admin/${tab}`, { method: 'POST', body: formData })
     if (res.ok) {
-      setMessage('Item deleted')
-      setPages(p => ({ ...p, [tab]: p[tab] }))
+      setToast({ message: 'Item deleted' })
+      fetchData()
     } else {
-      setMessage('Failed to delete')
+      setToast({ message: 'Failed to delete', type: 'error' })
     }
   }
 
@@ -73,259 +146,218 @@ export default function AdminPage() {
     formData.set('type', tab)
     const res = await fetch(`/api/admin/${tab}`, { method: 'POST', body: formData })
     if (res.ok) {
-      setMessage('Item added')
+      setToast({ message: 'Item added' })
       setShowAdd(false)
-      setPages(p => ({ ...p, [tab]: p[tab] }))
+      fetchData()
     } else {
-      setMessage('Failed to add')
+      setToast({ message: 'Failed to add', type: 'error' })
     }
   }
 
-  const refreshPage = (p: number) => setPages(prev => ({ ...prev, [tab]: p }))
+  const handleExport = (format: 'json' | 'csv') => {
+    const params = new URLSearchParams({ type: tab, export: format, search, source })
+    window.open(`/api/admin/${tab}?${params}`, '_blank')
+  }
 
-  if (!isAdmin) return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>Loading...</div>
+  const handleSort = (field: string) => {
+    if (sort === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSort(field)
+      setSortDir('desc')
+    }
+  }
 
-  const currentData = data?.[tab]
-  const tabs = ['images', 'videos', 'news', 'audio'] as const
-  const totalPages = currentData ? Math.ceil(currentData.total / 10) : 1
+  const allIds = data?.items.map((i: any) => i.id) || []
+  const allSelected = allIds.length > 0 && allIds.every((id: number) => selected.has(id))
+  const totalPages = data ? Math.ceil(data.total / 20) : 1
+
+  if (!isAdmin) return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <SkeletonTable rows={5} cols={5} />
+    </div>
+  )
 
   return (
-    <div>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Admin Panel</h1>
-      <p style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', marginBottom: '1rem' }}>
-        Manage all collected media — view, preview, add, and delete records.
-      </p>
-
-      {message && (
-        <div style={{
-          padding: '0.75rem 1rem', background: 'var(--success)', color: 'white',
-          borderRadius: '0.375rem', marginBottom: '1rem', fontSize: '0.875rem',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-        }}>
-          <span>{message}</span>
-          <button onClick={() => setMessage('')} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 700 }}>✕</button>
+    <div className="page-enter">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-xl font-bold mb-1">Admin Panel</h1>
+          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+            Manage all collected media — view, preview, add, and delete records.
+          </p>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <AnimBtn onClick={() => handleExport('json')} style={{ padding: '0.5rem 0.75rem', background: 'var(--card)', border: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, gap: '0.25rem' }}>
+            <Download size={12} /> JSON
+          </AnimBtn>
+          <AnimBtn onClick={() => handleExport('csv')} style={{ padding: '0.5rem 0.75rem', background: 'var(--card)', border: '1px solid var(--border)', fontSize: '0.75rem', fontWeight: 600, gap: '0.25rem' }}>
+            <Download size={12} /> CSV
+          </AnimBtn>
+        </div>
+      </div>
 
-      <div style={{
-        display: 'flex', gap: '0.5rem', marginBottom: '1.5rem',
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexWrap: 'wrap'
-      }}>
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: '0.5rem 1rem', borderRadius: '0.375rem', cursor: 'pointer', whiteSpace: 'nowrap',
-            background: tab === t ? 'var(--primary)' : 'var(--card)', color: tab === t ? 'white' : 'var(--foreground)',
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {(['images', 'videos', 'news', 'audio'] as const).map(t => (
+          <AnimBtn key={t} onClick={() => setTab(t)} style={{
+            padding: '0.5rem 1rem',
+            background: tab === t ? 'var(--primary)' : 'var(--card)',
+            color: tab === t ? 'white' : 'var(--foreground)',
             fontWeight: 600, fontSize: '0.875rem',
             border: tab === t ? 'none' : '1px solid var(--border)',
           }}>
-            {t.charAt(0).toUpperCase() + t.slice(1)} ({currentData?.total || 0})
-          </button>
+            {t.charAt(0).toUpperCase() + t.slice(1)} ({data?.total || 0})
+          </AnimBtn>
         ))}
-        <button onClick={() => setShowAdd(!showAdd)} style={{
-          padding: '0.5rem 1rem', borderRadius: '0.375rem', border: '1px solid var(--border)',
-          cursor: 'pointer', background: 'var(--card)', fontWeight: 600, fontSize: '0.875rem',
-          color: 'var(--foreground)', whiteSpace: 'nowrap',
-        }}>
-          {showAdd ? 'Cancel' : '+ Add New'}
-        </button>
+        <AnimBtn onClick={() => setShowAdd(true)} style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+          <Plus size={14} /> Add New
+        </AnimBtn>
+        {selected.size > 0 && (
+          <AnimBtn onClick={handleDeleteSelected} disabled={deleting} style={{
+            padding: '0.5rem 1rem', background: 'var(--danger)', color: 'white',
+            fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem',
+          }}>
+            <Trash2 size={14} /> Delete ({selected.size})
+          </AnimBtn>
+        )}
       </div>
 
-      {showAdd && (
-        <form onSubmit={handleAdd} className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-            Add New {tab.slice(0, -1)}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-            {['source', 'query', 'url', ...(tab === 'videos' ? ['platform', 'title', 'channel', 'duration', 'views'] : []),
-              ...(tab === 'news' ? ['title', 'sourceName', 'date', 'snippet'] : []),
-              ...(tab === 'audio' ? ['title', 'artist', 'duration'] : []),
-              ...(tab === 'images' ? [] : []),
-            ].filter((v, i, a) => a.indexOf(v) === i).map(f => (
-              <div key={f}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                  {f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
-                </label>
-                <input name={f} style={{
-                  width: '100%', padding: '0.375rem 0.5rem', border: '1px solid var(--border)',
-                  borderRadius: '0.375rem', background: 'var(--background)', color: 'var(--foreground)', fontSize: '0.875rem'
-                }} />
-              </div>
-            ))}
-          </div>
-          <button type="submit" style={{
-            padding: '0.5rem 1.5rem', background: 'var(--primary)', color: 'white',
-            border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem'
-          }}>
-            Add Item
-          </button>
-        </form>
-      )}
-
-      {currentData && currentData.items.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--muted-foreground)' }}>
-          No {tab} found.
+      {/* Search & Filter */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm transition-colors focus:ring-2 focus:ring-[var(--primary)]"
+            style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+          />
         </div>
-      )}
+        {data?.sources && data.sources.length > 0 && (
+          <div className="relative">
+            <select
+              value={source}
+              onChange={e => setSource(e.target.value)}
+              className="appearance-none rounded-lg border py-2 pl-3 pr-8 text-sm cursor-pointer"
+              style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+            >
+              <option value="">All Sources</option>
+              {data.sources.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+          </div>
+        )}
+      </div>
 
-      {currentData && currentData.items.length > 0 && (
+      {/* Table */}
+      {loading ? (
+        <SkeletonTable rows={8} cols={5} />
+      ) : !data || data.items.length === 0 ? (
+        <EmptyState message={`No ${tab} found.`} icon={<FileText size={48} />} />
+      ) : (
         <>
-          <div className="card" style={{ overflowX: 'auto' }}>
-            <table style={{ minWidth: tab === 'images' ? '700px' : '900px' }}>
+          <div className="card overflow-x-auto">
+            <table style={{ minWidth: tab === 'images' ? '600px' : '800px' }}>
               <thead>
                 <tr>
-                  <th style={{ width: '40px' }}>ID</th>
+                  <th style={{ width: '40px' }}>
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="cursor-pointer" />
+                  </th>
+                  <th style={{ width: '50px' }}>
+                    <button onClick={() => handleSort('id')} className="flex items-center gap-1 hover:underline">
+                      ID {sort === 'id' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </button>
+                  </th>
                   <th style={{ width: '80px' }}>Preview</th>
                   <th>Details</th>
-                  <th style={{ width: '140px', textAlign: 'right' }}>Actions</th>
+                  <th style={{ width: '80px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {currentData.items.map((item: any) => (
-                  <tr key={item.id}>
-                    <td style={{ fontWeight: 600, verticalAlign: 'top' }}>{item.id}</td>
-
-                    {/* Preview column */}
-                    <td style={{ verticalAlign: 'top', paddingTop: '0.5rem' }}>
+                {data.items.map((item: any) => (
+                  <tr key={item.id} className="stagger-item" style={{
+                    background: selected.has(item.id) ? 'rgba(var(--primary-rgb, 21,61,108), 0.08)' : undefined,
+                  }}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} className="cursor-pointer" />
+                    </td>
+                    <td className="font-semibold">{item.id}</td>
+                    <td>
                       {tab === 'images' && (
-                        <div style={{
-                          width: '64px', height: '64px', borderRadius: '0.375rem', overflow: 'hidden',
-                          background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}>
-                          <img
-                            src={getMediaUrl(item) || ''}
-                            alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
+                        <div onClick={() => setViewItem(item)} className="w-16 h-16 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105 hover:shadow-lg" style={{ background: 'var(--muted)' }}>
+                          <img src={getMediaUrl(item) || ''} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                         </div>
                       )}
                       {tab === 'videos' && (
-                        <a href={getMediaUrl(item) || '#'} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: '64px', height: '48px', borderRadius: '0.375rem',
-                            background: 'var(--muted)', textDecoration: 'none', fontSize: '1.5rem'
-                          }} title="Play video">
-                          ▶
-                        </a>
+                        <AnimBtn onClick={() => setViewItem(item)} title="View video" style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}>
+                          <Play size={20} />
+                        </AnimBtn>
                       )}
                       {tab === 'audio' && (
-                        <a href={getMediaUrl(item) || '#'} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: '64px', height: '48px', borderRadius: '0.375rem',
-                            background: 'var(--muted)', textDecoration: 'none', fontSize: '1.5rem'
-                          }} title="Play audio">
-                          ♫
-                        </a>
+                        <AnimBtn onClick={() => setViewItem(item)} title="View audio" style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}>
+                          <Music size={20} />
+                        </AnimBtn>
                       )}
                       {tab === 'news' && (
-                        <a href={getMediaUrl(item) || '#'} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: '64px', height: '48px', borderRadius: '0.375rem',
-                            background: 'var(--muted)', textDecoration: 'none', fontSize: '1rem', color: 'var(--foreground)'
-                          }} title="Open article">
-                          📄
-                        </a>
+                        <AnimBtn onClick={() => setViewItem(item)} title="View article" style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}>
+                          <FileText size={20} />
+                        </AnimBtn>
                       )}
                     </td>
-
-                    {/* Details column */}
-                    <td style={{ verticalAlign: 'top', fontSize: '0.8125rem', lineHeight: 1.5 }}>
+                    <td className="text-sm leading-relaxed">
                       {tab === 'images' && (
-                        <>
-                          <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Source: {item.source || '-'}</div>
-                          <div style={{ color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {item.url ? (
-                              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
-                                {item.url.slice(0, 60)}...
-                              </a>
-                            ) : '-'}
+                        <div>
+                          <div className="font-semibold">Source: {item.source || '-'}</div>
+                          <div className="text-xs truncate max-w-[250px]" style={{ color: 'var(--muted-foreground)' }}>
+                            {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] no-underline">{item.url.slice(0, 60)}...</a> : '-'}
                           </div>
-                          {item.query && <div style={{ color: 'var(--muted-foreground)', marginTop: '0.125rem' }}>Query: {item.query}</div>}
-                        </>
+                          {item.query && <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Query: {item.query}</div>}
+                        </div>
                       )}
                       {tab === 'videos' && (
-                        <>
-                          <div style={{ fontWeight: 600, marginBottom: '0.125rem' }}>
-                            {item.title ? (
-                              <a href={`/videos/${item.id}`} style={{ color: 'var(--foreground)', textDecoration: 'none' }}>
-                                {item.title.slice(0, 80)}
-                              </a>
-                            ) : 'Untitled'}
-                          </div>
+                        <div>
+                          <div className="font-semibold cursor-pointer hover:underline" onClick={() => setViewItem(item)}>{item.title?.slice(0, 80) || 'Untitled'}</div>
                           <div style={{ color: 'var(--muted-foreground)' }}>
                             {item.channel && <span>Channel: {item.channel}</span>}
-                            {item.views !== null && item.views !== undefined && <span> · {item.views.toLocaleString()} views</span>}
-                            {item.duration ? <span> · {Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, '0')}m</span> : ''}
+                            {item.views != null && <span> · {item.views.toLocaleString()} views</span>}
+                            {item.duration ? <span> · {Math.floor(item.duration / 60)}:{String(item.duration % 60).padStart(2, '0')}</span> : ''}
                           </div>
-                          <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', marginTop: '0.125rem' }}>
-                            Platform: {item.platform || '-'} · Source: {item.source || '-'}
-                          </div>
-                        </>
+                        </div>
                       )}
                       {tab === 'news' && (
-                        <>
-                          <div style={{ fontWeight: 600, marginBottom: '0.125rem' }}>
-                            {item.title ? (
-                              <a href={`/news/${item.id}`} style={{ color: 'var(--foreground)', textDecoration: 'none' }}>
-                                {item.title.slice(0, 80)}
-                              </a>
-                            ) : 'Untitled'}
-                          </div>
-                          {item.sourceName && <div style={{ color: 'var(--muted-foreground)' }}>Source: {item.sourceName}</div>}
-                          {item.date && <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem' }}>{item.date}</div>}
-                          {item.snippet && (
-                            <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', maxHeight: '2.5em' }}>
-                              {item.snippet.slice(0, 120)}...
-                            </div>
-                          )}
-                        </>
+                        <div>
+                          <div className="font-semibold cursor-pointer hover:underline" onClick={() => setViewItem(item)}>{item.title?.slice(0, 80) || 'Untitled'}</div>
+                          {item.sourceName && <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{item.sourceName}</div>}
+                          {item.snippet && <div className="text-xs truncate max-w-[250px] mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{item.snippet.replace(/<[^>]*>/g, '').slice(0, 100)}...</div>}
+                        </div>
                       )}
                       {tab === 'audio' && (
-                        <>
-                          <div style={{ fontWeight: 600, marginBottom: '0.125rem' }}>
-                            {item.title ? (
-                              <a href={`/audio/${item.id}`} style={{ color: 'var(--foreground)', textDecoration: 'none' }}>
-                                {item.title.slice(0, 80)}
-                              </a>
-                            ) : 'Untitled'}
-                          </div>
-                          {item.artist && <div style={{ color: 'var(--muted-foreground)' }}>Artist: {item.artist}</div>}
-                          {item.duration && <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem' }}>Duration: {item.duration}s</div>}
-                        </>
+                        <div>
+                          <div className="font-semibold cursor-pointer hover:underline" onClick={() => setViewItem(item)}>{item.title?.slice(0, 80) || 'Untitled'}</div>
+                          {item.artist && <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Artist: {item.artist}</div>}
+                        </div>
                       )}
                     </td>
-
-                    {/* Actions column */}
-                    <td style={{ verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                        <Link href={`/${tab}/${item.id}`} style={{
-                          display: 'inline-block', padding: '0.25rem 0.625rem',
-                          background: 'var(--card)', border: '1px solid var(--border)',
-                          borderRadius: '0.25rem', color: 'var(--foreground)',
-                          textDecoration: 'none', fontSize: '0.75rem', fontWeight: 600,
-                        }}>
-                          View
-                        </Link>
+                    <td>
+                      <div className="flex gap-1 justify-end">
+                        <AnimBtn onClick={() => setViewItem(item)} title="View" style={{ padding: '0.375rem', background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }}>
+                          <Eye size={14} />
+                        </AnimBtn>
                         {item.url && (
-                          <a href={item.url} target="_blank" rel="noopener noreferrer" style={{
-                            display: 'inline-block', padding: '0.25rem 0.625rem',
-                            background: 'var(--card)', border: '1px solid var(--border)',
-                            borderRadius: '0.25rem', color: 'var(--primary)',
-                            textDecoration: 'none', fontSize: '0.75rem', fontWeight: 600,
-                          }}>
-                            Source
-                          </a>
+                          <AnimLink href={item.url} target="_blank" rel="noopener noreferrer" title="Source" style={{ padding: '0.375rem', background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--primary)' }}>
+                            <ExternalLink size={14} />
+                          </AnimLink>
                         )}
-                        <button onClick={() => handleDelete(item.id)} style={{
-                          background: 'var(--danger)', color: 'white', border: 'none',
-                          borderRadius: '0.25rem', padding: '0.25rem 0.625rem',
-                          cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
-                        }}>
-                          Delete
-                        </button>
+                        <AnimBtn onClick={() => handleDelete(item.id)} title="Delete" style={{ padding: '0.375rem', background: 'var(--danger)', color: 'white' }}>
+                          <Trash2 size={14} />
+                        </AnimBtn>
                       </div>
                     </td>
                   </tr>
@@ -333,43 +365,151 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div style={{
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              gap: '0.375rem', marginTop: '1rem', flexWrap: 'wrap'
-            }}>
-              <button onClick={() => refreshPage(Math.max(1, pages[tab] - 1))}
-                disabled={pages[tab] <= 1}
-                style={{ padding: '0.375rem 0.75rem', borderRadius: '0.25rem', border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                ← Prev
-              </button>
-              {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
-                const start = Math.max(1, Math.min(pages[tab] - 4, totalPages - 9))
-                const pageNum = start + i
-                if (pageNum > totalPages) return null
-                return (
-                  <button key={pageNum} onClick={() => refreshPage(pageNum)}
-                    style={{
-                      padding: '0.375rem 0.75rem', borderRadius: '0.25rem', border: '1px solid var(--border)',
-                      background: pageNum === pages[tab] ? 'var(--primary)' : 'var(--card)',
-                      color: pageNum === pages[tab] ? 'white' : 'var(--foreground)',
-                      cursor: 'pointer', fontSize: '0.8125rem', fontWeight: pageNum === pages[tab] ? 700 : 400,
-                    }}>
-                    {pageNum}
-                  </button>
-                )
-              })}
-              <button onClick={() => refreshPage(Math.min(totalPages, pages[tab] + 1))}
-                disabled={pages[tab] >= totalPages}
-                style={{ padding: '0.375rem 0.75rem', borderRadius: '0.25rem', border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                Next →
-              </button>
-            </div>
-          )}
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}
+
+      {/* Add Modal */}
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} maxWidth="600px">
+        <div className="p-6">
+          <h2 className="text-lg font-bold mb-4">Add New {tab.slice(0, -1)}</h2>
+          <form onSubmit={handleAdd}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {['source', 'query', 'url', ...(tab === 'videos' ? ['platform', 'title', 'channel', 'duration', 'views'] : []),
+                ...(tab === 'news' ? ['title', 'sourceName', 'date', 'snippet'] : []),
+                ...(tab === 'audio' ? ['title', 'artist', 'duration'] : []),
+                ...(tab === 'images' ? [] : []),
+              ].filter((v, i, a) => a.indexOf(v) === i).map(f => (
+                <div key={f}>
+                  <label className="block text-xs font-semibold mb-1">{f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</label>
+                  <input name={f} className="w-full rounded-lg border px-3 py-2 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <AnimBtn onClick={() => setShowAdd(false)} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--border)', fontWeight: 600, fontSize: '0.875rem' }}>
+                Cancel
+              </AnimBtn>
+              <button type="submit" className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: 'var(--primary)', cursor: 'pointer', border: 'none' }}>
+                <Plus size={14} /> Add Item
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      {/* View Modal */}
+      <Modal open={!!viewItem} onClose={() => setViewItem(null)} maxWidth="900px">
+        {viewItem && (
+          <div>
+            {tab === 'images' && (
+              <div>
+                <div className="flex items-center justify-center min-h-[300px]" style={{ background: 'var(--muted)' }}>
+                  <img src={getMediaUrl(viewItem) || ''} alt="" className="w-full max-h-[60vh] object-contain" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                </div>
+                <div className="p-6">
+                  <h2 className="text-lg font-bold mb-3">Image Details</h2>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><strong>ID:</strong> {viewItem.id}</div>
+                    <div><strong>Source:</strong> {viewItem.source || '-'}</div>
+                    <div className="col-span-2"><strong>URL:</strong> {viewItem.url ? <a href={viewItem.url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)]">{viewItem.url.slice(0, 80)}...</a> : '-'}</div>
+                    {viewItem.query && <div className="col-span-2"><strong>Query:</strong> {viewItem.query}</div>}
+                    {viewItem.collectedAt && <div className="col-span-2"><strong>Collected:</strong> {viewItem.collectedAt}</div>}
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <a href={getMediaUrl(viewItem) || '#'} download className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline" style={{ background: 'var(--primary)' }}>
+                      <Download size={14} /> Download
+                    </a>
+                    <AnimBtn onClick={() => handleDelete(viewItem.id)} style={{ padding: '0.5rem 1rem', background: 'var(--danger)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+                      <Trash2 size={14} /> Delete
+                    </AnimBtn>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === 'videos' && (
+              <div>
+                <div className="w-full aspect-video bg-black flex items-center justify-center">
+                  {getMediaUrl(viewItem) && isYouTubeUrl(getMediaUrl(viewItem) || '') ? (
+                    <iframe src={getYouTubeEmbedUrl(getMediaUrl(viewItem) || '')} className="w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                  ) : getMediaUrl(viewItem) ? (
+                    <video src={getMediaUrl(viewItem) || ''} controls autoPlay className="w-full h-full" />
+                  ) : (
+                    <div className="text-white p-8">No video source available</div>
+                  )}
+                </div>
+                <div className="p-6">
+                  <h2 className="text-lg font-bold mb-2">{viewItem.title || 'Untitled'}</h2>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><strong>ID:</strong> {viewItem.id}</div>
+                    <div><strong>Platform:</strong> {viewItem.platform || '-'}</div>
+                    <div><strong>Channel:</strong> {viewItem.channel || '-'}</div>
+                    <div><strong>Views:</strong> {viewItem.views?.toLocaleString() || '-'}</div>
+                  </div>
+                  <div className="mt-4">
+                    <AnimBtn onClick={() => handleDelete(viewItem.id)} style={{ padding: '0.5rem 1rem', background: 'var(--danger)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+                      <Trash2 size={14} /> Delete
+                    </AnimBtn>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === 'news' && (
+              <div className="p-6">
+                <h2 className="text-lg font-bold mb-1">{viewItem.title || 'Untitled'}</h2>
+                <div className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>{viewItem.sourceName} · {viewItem.date}</div>
+                {viewItem.snippet && (
+                  <div className="p-4 rounded-lg text-sm leading-relaxed mb-4" style={{ background: 'var(--muted)' }} dangerouslySetInnerHTML={{ __html: viewItem.snippet }} />
+                )}
+                <div className="flex gap-2">
+                  {viewItem.url && (
+                    <a href={viewItem.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline" style={{ background: 'var(--primary)' }}>
+                      <ExternalLink size={14} /> Open Article
+                    </a>
+                  )}
+                  <AnimBtn onClick={() => handleDelete(viewItem.id)} style={{ padding: '0.5rem 1rem', background: 'var(--danger)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+                    <Trash2 size={14} /> Delete
+                  </AnimBtn>
+                </div>
+              </div>
+            )}
+
+            {tab === 'audio' && (
+              <div>
+                <div className="flex flex-col items-center justify-center py-12 px-8" style={{ background: 'var(--muted)' }}>
+                  <Music size={48} className="mb-4 opacity-50" />
+                  {getMediaUrl(viewItem) ? (
+                    <audio src={getMediaUrl(viewItem) || ''} controls autoPlay className="w-full max-w-md" />
+                  ) : (
+                    <div style={{ color: 'var(--muted-foreground)' }}>No audio source</div>
+                  )}
+                </div>
+                <div className="p-6">
+                  <h2 className="text-lg font-bold mb-2">{viewItem.title || 'Untitled'}</h2>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><strong>ID:</strong> {viewItem.id}</div>
+                    <div><strong>Artist:</strong> {viewItem.artist || '-'}</div>
+                    <div><strong>Source:</strong> {viewItem.source || '-'}</div>
+                    {viewItem.duration && <div><strong>Duration:</strong> {viewItem.duration}s</div>}
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    {getMediaUrl(viewItem) && (
+                      <a href={getMediaUrl(viewItem) || '#'} download className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline" style={{ background: 'var(--primary)' }}>
+                        <Download size={14} /> Download
+                      </a>
+                    )}
+                    <AnimBtn onClick={() => handleDelete(viewItem.id)} style={{ padding: '0.5rem 1rem', background: 'var(--danger)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+                      <Trash2 size={14} /> Delete
+                    </AnimBtn>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

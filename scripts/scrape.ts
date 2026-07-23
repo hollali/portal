@@ -32,8 +32,8 @@ async function downloadFile(url: string, dest: string): Promise<boolean> {
     })
     const writer = fs.createWriteStream(dest)
     res.data.pipe(writer)
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve)
+    await new Promise<void>((resolve, reject) => {
+      writer.on('finish', () => resolve())
       writer.on('error', reject)
     })
     const size = fs.statSync(dest).size
@@ -198,7 +198,7 @@ async function scrapeNews() {
             if (c.length > snippet.length) snippet = c.slice(0, 300)
           })
           if (!snippet) {
-            snippet = art$.find('p').first().text().slice(0, 300).trim()
+            snippet = art$('p').first().text().slice(0, 300).trim()
           }
         } catch {
           fs.writeFileSync(localPath, JSON.stringify(art, null, 2))

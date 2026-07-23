@@ -17,7 +17,9 @@ import {
   Menu,
   X,
   Activity,
+  ScrollText,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 const navLinks = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -67,7 +69,7 @@ export default function Sidebar() {
 
   const allLinks =
     isAdmin
-      ? [...navLinks, { href: '/admin', label: 'Admin', icon: Shield }]
+      ? [...navLinks, { href: '/admin', label: 'Admin', icon: Shield }, { href: '/audit', label: 'Audit Log', icon: ScrollText }]
       : navLinks
 
   const sidebarVisible = isDesktop || open
@@ -181,10 +183,14 @@ export default function Sidebar() {
             padding: '1rem 1.25rem',
             borderTop: '1px solid var(--border)',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
+            gap: '0.75rem',
           }}
         >
+          <div className="flex justify-center">
+            <ThemeToggle />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {username ? (
             <>
               <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{username}</span>
@@ -223,6 +229,7 @@ export default function Sidebar() {
               <LogIn size={14} /> Login
             </Link>
           )}
+          </div>
         </div>
       </aside>
     </>

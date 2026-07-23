@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,39 +13,107 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type') || 'images'
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-  const perPage = 10
+  const perPage = parseInt(searchParams.get('perPage') || '10')
+  const search = searchParams.get('search') || ''
+  const source = searchParams.get('source') || ''
+  const sort = searchParams.get('sort') || 'id'
+  const dir = searchParams.get('dir') || 'desc'
+  const exportFormat = searchParams.get('export') || ''
 
-  let items, total
-  const orderBy = { id: 'desc' as const }
   const skip = (page - 1) * perPage
+  const orderBy: any = { [sort]: dir }
 
-  switch (type) {
-    case 'images':
-      items = await prisma.image.findMany({ orderBy, skip, take: perPage })
-      total = await prisma.image.count()
-      break
-    case 'videos':
-      items = await prisma.video.findMany({ orderBy, skip, take: perPage })
-      total = await prisma.video.count()
-      break
-    case 'news':
-      items = await prisma.news.findMany({ orderBy, skip, take: perPage })
-      total = await prisma.news.count()
-      break
-    case 'audio':
-      items = await prisma.audio.findMany({ orderBy, skip, take: perPage })
-      total = await prisma.audio.count()
-      break
-    default:
-      return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  const buildWhere = (baseWhere: any = {}) => {
+    const where = { ...baseWhere }
+    if (source) where.source = source
+    if (search) {
+      if (type === 'images') {
+        where.OR = [
+          { url: { contains: search, mode: 'insensitive' } },
+          { query: { contains: search, mode: 'insensitive' } },
+          { source: { contains: search, mode: 'insensitive' } },
+        ]
+      } else if (type === 'videos') {
+        where.OR = [
+          { title: { contains: search, mode: 'insensitive' } },
+          { channel: { contains: search, mode: 'insensitive' } },
+          { source: { contains: search, mode: 'insensitive' } },
+        ]
+      } else if (type === 'news') {
+        where.OR = [
+          { title: { contains: search, mode: 'insensitive' } },
+          { sourceName: { contains: search, mode: 'insensitive' } },
+          { snippet: { contains: search, mode: 'insensitive' } },
+          { source: { contains: search, mode: 'insensitive' } },
+        ]
+      } else if (type === 'audio') {
+        where.OR = [
+          { title: { contains: search, mode: 'insensitive' } },
+          { artist: { contains: search, mode: 'insensitive' } },
+          { source: { contains: search, mode: 'insensitive' } },
+        ]
+      }
+    }
+    return where
   }
 
-  return NextResponse.json({ items, total, page, perPage })
+  let model: any
+  switch (type) {
+    case 'images': model = prisma.image; break
+    case 'videos': model = prisma.video; break
+    case 'news': model = prisma.news; break
+    case 'audio': model = prisma.audio; break
+    default: return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  }
+
+  const where = buildWhere()
+
+  // Export all matching records
+  if (exportFormat === 'json' || exportFormat === 'csv') {
+    const allItems = await model.findMany({ where, orderBy: { id: 'desc' } })
+    const fields = type === 'images' ? ['id', 'source', 'query', 'url', 'collectedAt'] :
+      type === 'videos' ? ['id', 'source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'collectedAt'] :
+      type === 'news' ? ['id', 'source', 'title', 'url', 'sourceName', 'date', 'snippet', 'collectedAt'] :
+      ['id', 'source', 'title', 'url', 'artist', 'duration', 'collectedAt']
+
+    if (exportFormat === 'csv') {
+      const header = fields.join(',')
+      const rows = allItems.map((item: any) =>
+        fields.map(f => `"${String(item[f] ?? '').replace(/"/g, '""')}"`).join(',')
+      )
+      const csv = [header, ...rows].join('\n')
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="${type}_export_${Date.now()}.csv"`,
+        }
+      })
+    }
+
+    return NextResponse.json({ items: allItems, total: allItems.length })
+  }
+
+  const [items, total, sources] = await Promise.all([
+    model.findMany({ where, orderBy, skip, take: perPage }),
+    model.count({ where }),
+    model.findMany({
+      where: buildWhere(),
+      select: { source: true },
+      distinct: ['source'],
+      orderBy: { source: 'asc' },
+    }),
+  ])
+
+  const sourceList = sources.map((s: any) => s.source).filter(Boolean)
+
+  return NextResponse.json({ items, total, page, perPage, sources: sourceList })
 }
 
 export async function POST(request: Request) {
+  let userId: number | undefined
   try {
-    await requireAuth()
+    const session = await requireAuth()
+    userId = (session as any)?.userId
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -70,6 +139,11 @@ export async function POST(request: Request) {
     }
 
     await (model as any).deleteMany({ where: { id: { in: ids } } })
+
+    for (const id of ids) {
+      await logAudit('delete', type, id, userId, `Deleted ${type} #${id}`)
+    }
+
     return NextResponse.json({ success: true, deleted: ids.length })
   }
 
@@ -90,6 +164,8 @@ export async function POST(request: Request) {
     }
 
     const item = await model.create({ data })
+    await logAudit('create', type, item.id, userId, `Created ${type} #${item.id}`)
+
     return NextResponse.json({ success: true, item })
   }
 
