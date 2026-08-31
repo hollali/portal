@@ -10,7 +10,6 @@ import {
   Newspaper,
   Headphones,
   Search,
-  CopyCheck,
   Shield,
   LogOut,
   LogIn,
@@ -28,7 +27,6 @@ const navLinks = [
   { href: '/news', label: 'News', icon: Newspaper },
   { href: '/audio', label: 'Audio', icon: Headphones },
   { href: '/search', label: 'Search', icon: Search },
-  { href: '/duplicates', label: 'Duplicates', icon: CopyCheck },
 ]
 
 export default function Sidebar() {
@@ -69,7 +67,7 @@ export default function Sidebar() {
 
   const allLinks =
     isAdmin
-      ? [...navLinks, { href: '/admin', label: 'Admin', icon: Shield }, { href: '/audit', label: 'Audit Log', icon: ScrollText }]
+      ? [...navLinks, { href: '/admin', label: 'Admin', icon: Shield }, { href: '/admin/audit', label: 'Audit Log', icon: ScrollText }, { href: '/admin/duplicates', label: 'Duplicates', icon: Image }]
       : navLinks
 
   const sidebarVisible = isDesktop || open
@@ -122,7 +120,7 @@ export default function Sidebar() {
           left: 0,
           width: 'var(--sidebar-width)',
           height: '100vh',
-          background: 'var(--card)',
+          background: 'var(--sidebar-bg)',
           borderRight: '1px solid var(--border)',
           zIndex: 50,
           display: 'flex',
@@ -142,8 +140,28 @@ export default function Sidebar() {
             gap: '0.75rem',
           }}
         >
-          <Activity size={24} style={{ color: 'var(--primary)' }} />
-          <span style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--foreground)' }}>
+          <span
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '8px',
+              background: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Activity size={16} style={{ color: 'var(--primary-fg)' }} />
+          </span>
+          <span
+            style={{
+              fontWeight: 700,
+              fontSize: '1.0625rem',
+              letterSpacing: '-0.02em',
+              color: 'var(--foreground)',
+            }}
+          >
             OSINT Portal
           </span>
         </div>
@@ -163,14 +181,14 @@ export default function Sidebar() {
                   alignItems: 'center',
                   gap: '0.75rem',
                   padding: '0.625rem 0.875rem',
-                  borderRadius: '0.5rem',
+                  borderRadius: '8px',
                   fontSize: '0.9rem',
                   fontWeight: active ? 600 : 450,
                   textDecoration: 'none',
-                  color: active ? 'white' : 'var(--foreground)',
+                  color: active ? 'var(--primary-fg)' : 'var(--foreground)',
                 }}
               >
-                <Icon size={18} className="nav-icon" style={{ color: active ? 'white' : 'var(--muted)' }} />
+                <Icon size={18} className="nav-icon" style={{ color: active ? 'var(--primary-fg)' : 'var(--muted)' }} />
                 {label}
               </Link>
             )

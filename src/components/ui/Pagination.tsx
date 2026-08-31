@@ -42,7 +42,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition-all hover:bg-[var(--primary)] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+        className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition-all hover:bg-[var(--primary)] hover:text-[var(--primary-fg)] disabled:opacity-30 disabled:cursor-not-allowed"
         style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
       >
         <ChevronLeft size={14} /> Prev
@@ -59,7 +59,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
             style={{
               background: p === page ? 'var(--primary)' : 'var(--card)',
               borderColor: p === page ? 'var(--primary)' : 'var(--border)',
-              color: p === page ? 'white' : 'var(--foreground)',
+              color: p === page ? 'var(--primary-fg)' : 'var(--foreground)',
               fontWeight: p === page ? 700 : 400,
             }}
           >
@@ -71,7 +71,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition-all hover:bg-[var(--primary)] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+        className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm transition-all hover:bg-[var(--primary)] hover:text-[var(--primary-fg)] disabled:opacity-30 disabled:cursor-not-allowed"
         style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
       >
         Next <ChevronRight size={14} />

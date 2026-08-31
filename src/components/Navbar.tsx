@@ -33,7 +33,6 @@ export default function Navbar() {
     { href: '/news', label: 'News' },
     { href: '/audio', label: 'Audio' },
     { href: '/search', label: 'Search' },
-    { href: '/duplicates', label: 'Duplicates' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
   ]
 

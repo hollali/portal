@@ -103,7 +103,7 @@ export default function ImageListPage() {
             />
             <div style={{ color: 'white', marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
               <span>#{lightboxImg.id} — {lightboxImg.source}</span>
-              <a href={`/images/${lightboxImg.id}`} style={{ color: '#93c5fd' }}>Details &rarr;</a>
+              <a href={`/images/${lightboxImg.id}`} style={{ color: '#55beff' }}>Details &rarr;</a>
             </div>
           </div>
         </div>

@@ -35,10 +35,10 @@ export default function Dashboard() {
   if (!stats) return <div>Loading...</div>
 
   const statCards = [
-    { label: 'Images', count: stats.images, href: '/images', color: '#3b82f6', icon: Image },
-    { label: 'Videos', count: stats.videos, href: '/videos', color: '#22c55e', icon: Video },
-    { label: 'News', count: stats.news, href: '/news', color: '#f59e0b', icon: Newspaper },
-    { label: 'Audio', count: stats.audio, href: '/audio', color: '#ef4444', icon: Headphones },
+    { label: 'Images', count: stats.images, href: '/images', color: '#0084f8', icon: Image },
+    { label: 'Videos', count: stats.videos, href: '/videos', color: '#19d600', icon: Video },
+    { label: 'News', count: stats.news, href: '/news', color: '#ff23fc', icon: Newspaper },
+    { label: 'Audio', count: stats.audio, href: '/audio', color: '#ff560a', icon: Headphones },
   ]
 
   return (

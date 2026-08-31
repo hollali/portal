@@ -11,7 +11,7 @@ export default function DuplicatesPage() {
   const [errored, setErrored] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    fetch(`/api/duplicates?page=${page}`).then(r => r.json()).then(setData)
+    fetch(`/api/admin/duplicates?page=${page}`).then(r => r.json()).then(setData)
   }, [page])
 
   if (!data) return <div>Loading...</div>

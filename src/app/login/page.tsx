@@ -80,7 +80,7 @@ export default function LoginPage() {
             width: '100%',
             padding: '0.625rem',
             background: loading ? 'var(--muted)' : 'var(--primary)',
-            color: 'white',
+            color: loading ? 'var(--background)' : 'var(--primary-fg)',
             border: 'none',
             borderRadius: '0.375rem',
             cursor: loading ? 'not-allowed' : 'pointer',

@@ -2,12 +2,30 @@
 
 import { useEffect, useState, useCallback, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Trash2, ExternalLink, Plus, Download, Music, Play, FileText, Search, Filter, ChevronDown } from 'lucide-react'
+import { Eye, Trash2, ExternalLink, Plus, Download, Music, Play, FileText, Search, ChevronDown } from 'lucide-react'
 import { Modal, AnimBtn, AnimLink, Toast, SkeletonTable, EmptyState } from '@/components/ui'
 import { Pagination } from '@/components/ui/Pagination'
 
+interface MediaItem {
+  id: number
+  source?: string
+  query?: string
+  url?: string
+  localPath?: string | null
+  title?: string
+  channel?: string
+  platform?: string
+  views?: number | null
+  duration?: number | null
+  artist?: string
+  sourceName?: string
+  date?: string
+  snippet?: string
+  collectedAt?: string | null
+}
+
 interface AdminData {
-  items: any[]
+  items: MediaItem[]
   total: number
   page: number
   perPage: number
@@ -40,7 +58,7 @@ export default function AdminPage() {
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [viewItem, setViewItem] = useState<any | null>(null)
+  const [viewItem, setViewItem] = useState<MediaItem | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('')
@@ -48,17 +66,20 @@ export default function AdminPage() {
   const [sort, setSort] = useState('id')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const buildParams = useCallback(
+    () =>
+      new URLSearchParams({
+        type: tab, page: String(page), perPage: '20',
+        search, source, sort, dir: sortDir,
+      }),
+    [tab, page, search, source, sort, sortDir],
+  )
+
   const fetchData = useCallback(async () => {
-    setLoading(true)
-    const params = new URLSearchParams({
-      type: tab, page: String(page), perPage: '20',
-      search, source, sort, dir: sortDir,
-    })
-    const res = await fetch(`/api/admin/${tab}?${params}`)
-    const d = await res.json()
+    const res = await fetch(`/api/admin/${tab}?${buildParams()}`)
+    const d: AdminData = await res.json()
     setData(d)
-    setLoading(false)
-  }, [tab, page, search, source, sort, sortDir])
+  }, [tab, buildParams])
 
   useEffect(() => {
     fetch('/api/me').then(r => r.json()).then(d => {
@@ -68,13 +89,27 @@ export default function AdminPage() {
   }, [router])
 
   useEffect(() => {
-    if (isAdmin) fetchData()
-  }, [isAdmin, fetchData])
+    if (!isAdmin) return
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/${tab}?${buildParams()}`)
+        const d: AdminData = await res.json()
+        if (active) setData(d)
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => { active = false }
+  }, [isAdmin, tab, buildParams])
 
-  useEffect(() => {
+  const filterKey = `${tab}|${search}|${source}`
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey)
     setPage(1)
     setSelected(new Set())
-  }, [tab, search, source])
+  }
 
   const toggleSelect = (id: number) => {
     setSelected(prev => {
@@ -87,7 +122,7 @@ export default function AdminPage() {
 
   const toggleSelectAll = () => {
     if (!data) return
-    const currentIds = data.items.map((i: any) => i.id)
+    const currentIds = data.items.map(i => i.id)
     const allSelected = currentIds.every((id: number) => selected.has(id))
     if (allSelected) {
       setSelected(prev => {
@@ -168,7 +203,7 @@ export default function AdminPage() {
     }
   }
 
-  const allIds = data?.items.map((i: any) => i.id) || []
+  const allIds = data?.items.map(i => i.id) || []
   const allSelected = allIds.length > 0 && allIds.every((id: number) => selected.has(id))
   const totalPages = data ? Math.ceil(data.total / 20) : 1
 
@@ -205,14 +240,14 @@ export default function AdminPage() {
           <AnimBtn key={t} onClick={() => setTab(t)} style={{
             padding: '0.5rem 1rem',
             background: tab === t ? 'var(--primary)' : 'var(--card)',
-            color: tab === t ? 'white' : 'var(--foreground)',
+            color: tab === t ? 'var(--primary-fg)' : 'var(--foreground)',
             fontWeight: 600, fontSize: '0.875rem',
             border: tab === t ? 'none' : '1px solid var(--border)',
           }}>
             {t.charAt(0).toUpperCase() + t.slice(1)} ({data?.total || 0})
           </AnimBtn>
         ))}
-        <AnimBtn onClick={() => setShowAdd(true)} style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+        <AnimBtn onClick={() => setShowAdd(true)} style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: 'var(--primary-fg)', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
           <Plus size={14} /> Add New
         </AnimBtn>
         {selected.size > 0 && (
@@ -227,14 +262,14 @@ export default function AdminPage() {
 
       {/* Search & Filter */}
       <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex-1 min-w-50 max-w-md">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
           <input
             type="text"
             placeholder="Search..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm transition-colors focus:ring-2 focus:ring-[var(--primary)]"
+            className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm transition-colors focus:ring-(--primary)"
             style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
           />
         </div>
@@ -281,7 +316,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((item: any) => (
+                {data.items.map(item => (
                   <tr key={item.id} className="stagger-item" style={{
                     background: selected.has(item.id) ? 'rgba(var(--primary-rgb, 21,61,108), 0.08)' : undefined,
                   }}>
@@ -292,7 +327,7 @@ export default function AdminPage() {
                     <td>
                       {tab === 'images' && (
                         <div onClick={() => setViewItem(item)} className="w-16 h-16 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105 hover:shadow-lg" style={{ background: 'var(--muted)' }}>
-                          <img src={getMediaUrl(item) || ''} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                          <img src={getMediaUrl(item) || ''} alt="" width={64} height={64} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                         </div>
                       )}
                       {tab === 'videos' && (
@@ -315,8 +350,8 @@ export default function AdminPage() {
                       {tab === 'images' && (
                         <div>
                           <div className="font-semibold">Source: {item.source || '-'}</div>
-                          <div className="text-xs truncate max-w-[250px]" style={{ color: 'var(--muted-foreground)' }}>
-                            {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] no-underline">{item.url.slice(0, 60)}...</a> : '-'}
+                          <div className="text-xs truncate max-w-62.5" style={{ color: 'var(--muted-foreground)' }}>
+                            {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-(--primary) no-underline">{item.url.slice(0, 60)}...</a> : '-'}
                           </div>
                           {item.query && <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Query: {item.query}</div>}
                         </div>
@@ -335,7 +370,7 @@ export default function AdminPage() {
                         <div>
                           <div className="font-semibold cursor-pointer hover:underline" onClick={() => setViewItem(item)}>{item.title?.slice(0, 80) || 'Untitled'}</div>
                           {item.sourceName && <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{item.sourceName}</div>}
-                          {item.snippet && <div className="text-xs truncate max-w-[250px] mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{item.snippet.replace(/<[^>]*>/g, '').slice(0, 100)}...</div>}
+                          {item.snippet && <div className="text-xs truncate max-w-62.5 mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{item.snippet.replace(/<[^>]*>/g, '').slice(0, 100)}...</div>}
                         </div>
                       )}
                       {tab === 'audio' && (
@@ -390,7 +425,7 @@ export default function AdminPage() {
               <AnimBtn onClick={() => setShowAdd(false)} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--border)', fontWeight: 600, fontSize: '0.875rem' }}>
                 Cancel
               </AnimBtn>
-              <button type="submit" className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: 'var(--primary)', cursor: 'pointer', border: 'none' }}>
+              <button type="submit" className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', color: 'var(--primary-fg)', cursor: 'pointer', border: 'none' }}>
                 <Plus size={14} /> Add Item
               </button>
             </div>
@@ -404,20 +439,24 @@ export default function AdminPage() {
           <div>
             {tab === 'images' && (
               <div>
-                <div className="flex items-center justify-center min-h-[300px]" style={{ background: 'var(--muted)' }}>
-                  <img src={getMediaUrl(viewItem) || ''} alt="" className="w-full max-h-[60vh] object-contain" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <div className="flex items-center justify-center min-h-75" style={{ background: 'var(--muted)' }}>
+                  {getMediaUrl(viewItem) ? (
+                    <div className="relative w-full max-h-[60vh] h-[60vh]">
+                      <img src={getMediaUrl(viewItem) || ''} alt="" style={{ objectFit: 'contain', width: '100%', height: '100%' }} />
+                    </div>
+                  ) : null}
                 </div>
                 <div className="p-6">
                   <h2 className="text-lg font-bold mb-3">Image Details</h2>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div><strong>ID:</strong> {viewItem.id}</div>
                     <div><strong>Source:</strong> {viewItem.source || '-'}</div>
-                    <div className="col-span-2"><strong>URL:</strong> {viewItem.url ? <a href={viewItem.url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)]">{viewItem.url.slice(0, 80)}...</a> : '-'}</div>
+                    <div className="col-span-2"><strong>URL:</strong> {viewItem.url ? <a href={viewItem.url} target="_blank" rel="noopener noreferrer" className="text-(--primary)">{viewItem.url.slice(0, 80)}...</a> : '-'}</div>
                     {viewItem.query && <div className="col-span-2"><strong>Query:</strong> {viewItem.query}</div>}
                     {viewItem.collectedAt && <div className="col-span-2"><strong>Collected:</strong> {viewItem.collectedAt}</div>}
                   </div>
                   <div className="flex gap-2 mt-4">
-                    <a href={getMediaUrl(viewItem) || '#'} download className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline" style={{ background: 'var(--primary)' }}>
+                    <a href={getMediaUrl(viewItem) || '#'} download className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold no-underline" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}>
                       <Download size={14} /> Download
                     </a>
                     <AnimBtn onClick={() => handleDelete(viewItem.id)} style={{ padding: '0.5rem 1rem', background: 'var(--danger)', color: 'white', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
@@ -465,7 +504,7 @@ export default function AdminPage() {
                 )}
                 <div className="flex gap-2">
                   {viewItem.url && (
-                    <a href={viewItem.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline" style={{ background: 'var(--primary)' }}>
+                    <a href={viewItem.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold no-underline" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}>
                       <ExternalLink size={14} /> Open Article
                     </a>
                   )}
@@ -496,7 +535,7 @@ export default function AdminPage() {
                   </div>
                   <div className="flex gap-2 mt-4">
                     {getMediaUrl(viewItem) && (
-                      <a href={getMediaUrl(viewItem) || '#'} download className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline" style={{ background: 'var(--primary)' }}>
+                      <a href={getMediaUrl(viewItem) || '#'} download className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold no-underline" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}>
                         <Download size={14} /> Download
                       </a>
                     )}
