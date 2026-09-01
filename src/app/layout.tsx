@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Inter_Tight, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -19,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OSINT Portal",
-  description: "OSINT Collection Dashboard",
+  title: "Alban Bagbin Portal",
+  description: "Public profile, media library and news archive for Rt. Hon. Alban S. K. Bagbin",
 };
 
 export default function RootLayout({
@@ -30,20 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${interTight.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full">
-        <Sidebar />
-        <main
-          className="page-enter"
-          style={{
-            marginLeft: 'var(--sidebar-width)',
-            maxWidth: '1280px',
-            padding: '1.5rem 2rem',
-            minHeight: '100vh',
-          }}
-        >
-          {children}
-        </main>
-      </body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

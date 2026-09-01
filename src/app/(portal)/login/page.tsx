@@ -21,7 +21,7 @@ export default function LoginPage() {
       body: JSON.stringify({ username, password }),
     })
     setLoading(false)
-    if (res.ok) router.push('/')
+    if (res.ok) router.push('/dashboard')
     else {
       const data = await res.json()
       setError(data.error || 'Login failed')

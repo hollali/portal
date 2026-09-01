@@ -26,6 +26,24 @@
   --row-hover: rgba(237, 237, 237, 0.04);
   --sidebar-width: 260px;
   color-scheme: dark;
+
+  /* ─── Public landing surface tokens ─── */
+  --p-bg: #0b0b0b;
+  --p-surface: #131313;
+  --p-surface-2: #0d0d0d;
+  --p-surface-3: #0e0e0e;
+  --p-text-1: #ededed;
+  --p-text-2: #b9b9b9;
+  --p-text-3: #797979;
+  --p-text-4: #4a4a4a;
+  --p-border: rgba(255, 255, 255, 0.08);
+  --p-border-2: rgba(255, 255, 255, 0.06);
+  --p-border-3: rgba(255, 255, 255, 0.12);
+  --p-grid-line: rgba(255, 255, 255, 0.035);
+  --p-img-bg: #0b0b0b;
+  --p-cta-bg: linear-gradient(120deg, #1a0e06 0%, #2b1404 45%, #3a1a06 100%);
+  --p-cta-text: #d6b39a;
+  --p-shadow: 0 24px 80px -20px rgba(0, 0, 0, 0.55);
 }
 
 .dark {
@@ -52,6 +70,24 @@
   --warning: #d97706;
   --row-hover: rgba(11, 11, 11, 0.04);
   color-scheme: light;
+
+  /* ─── Public landing surface tokens (light) ─── */
+  --p-bg: #ffffff;
+  --p-surface: #f7f7f6;
+  --p-surface-2: #f2f2f0;
+  --p-surface-3: #fafafa;
+  --p-text-1: #0b0b0b;
+  --p-text-2: #3d3d3d;
+  --p-text-3: #6f6f6f;
+  --p-text-4: #9a9a9a;
+  --p-border: rgba(0, 0, 0, 0.09);
+  --p-border-2: rgba(0, 0, 0, 0.06);
+  --p-border-3: rgba(0, 0, 0, 0.12);
+  --p-grid-line: rgba(0, 0, 0, 0.045);
+  --p-img-bg: #ececea;
+  --p-cta-bg: linear-gradient(120deg, #fff4ea 0%, #ffeadd 45%, #ffe1cc 100%);
+  --p-cta-text: #7a4415;
+  --p-shadow: 0 24px 80px -20px rgba(0, 0, 0, 0.18);
 }
 
 * {
@@ -96,6 +132,98 @@ h1, h2, h3 {
   background: var(--border-strong);
   border-radius: 8px;
   border: 2px solid var(--background);
+}
+
+/* ─── Smooth anchor scrolling ─── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─── Marquee (public landing) ─── */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+.marquee-paused:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* ─── Golden ratio grid backdrop (public landing) ─── */
+.grid-bg {
+  background-image:
+    linear-gradient(var(--p-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--p-grid-line) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* ─── Orange glow orb (public landing) ─── */
+@keyframes floatOrb {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-18px) scale(1.06); }
+}
+.orb {
+  animation: floatOrb 9s ease-in-out infinite;
+}
+
+/* ─── Public landing responsive ─── */
+@media (max-width: 900px) {
+  .p-hero {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .p-header-inner {
+    padding: 0 1rem !important;
+    gap: 0.5rem !important;
+  }
+  .p-brand-word {
+    display: none;
+  }
+  .p-section {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+  .p-eyebrow {
+    font-size: 0.625rem !important;
+    letter-spacing: 0.1em !important;
+    padding: 0.35rem 0.65rem !important;
+  }
+  .p-hero {
+    gap: 2.25rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .p-admin-btn {
+    padding: 0.45rem 0.8rem !important;
+    font-size: 0.75rem !important;
+  }
+  .p-hero-facts {
+    gap: 1.25rem !important;
+    margin-top: 2rem !important;
+  }
+  .p-hero-title {
+    font-size: 2.4rem !important;
+  }
+  .p-cta-buttons {
+    width: 100%;
+  }
+  .p-cta-buttons a {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .p-hero-title {
+    font-size: 2.05rem !important;
+  }
 }
 
 /* ─── Page entrance animation ─── */
@@ -304,6 +432,10 @@ a:hover {
 
   .hide-sm {
     display: none !important;
+  }
+
+  .show-sm {
+    display: flex !important;
   }
 
   .full-sm {
