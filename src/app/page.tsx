@@ -2,16 +2,51 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { localToMediaUrl, getMediaUrl } from '@/lib/media'
+import { localToMediaUrl } from '@/lib/media'
 import { Image, Video, Newspaper, Headphones, Database, Globe } from 'lucide-react'
 
 interface Stats {
   images: number; videos: number; news: number; audio: number; total: number; sources: Record<string, number>
 }
 
+interface RecentImage {
+  id: number
+  url: string | null
+  localPath: string | null
+  source: string | null
+  collectedAt: string | null
+  faceMatch: number | null
+}
+interface RecentVideo {
+  id: number
+  title: string | null
+  source: string | null
+  channel: string | null
+  collectedAt: string | null
+}
+interface RecentNews {
+  id: number
+  title: string | null
+  sourceName: string | null
+  date: string | null
+}
+interface RecentAudio {
+  id: number
+  title: string | null
+  source: string | null
+  artist: string | null
+  collectedAt: string | null
+}
+interface RecentData {
+  images: RecentImage[]
+  videos: RecentVideo[]
+  news: RecentNews[]
+  audio: RecentAudio[]
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
-  const [recent, setRecent] = useState<{ images: any[], videos: any[], news: any[], audio: any[] }>({ images: [], videos: [], news: [], audio: [] })
+  const [recent, setRecent] = useState<RecentData>({ images: [], videos: [], news: [], audio: [] })
   const [errored, setErrored] = useState<Set<number>>(new Set())
   const [animCount, setAnimCount] = useState(false)
 
@@ -46,7 +81,7 @@ export default function Dashboard() {
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Dashboard</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        {statCards.map((c, i) => (
+        {statCards.map(c => (
           <Link key={c.label} href={c.href} style={{ textDecoration: 'none' }}>
             <div className="stat-card stagger-item" style={{ position: 'relative', overflow: 'hidden' }}>
               <c.icon
@@ -110,7 +145,7 @@ export default function Dashboard() {
 
       <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>Recent Items</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
-        {recent.images.slice(0, 4).map((img: any) => {
+        {recent.images.slice(0, 4).map((img: RecentImage) => {
           const src = (!errored.has(img.id) && localToMediaUrl(img.localPath)) || img.url
           return (
             <Link key={img.id} href={`/images/${img.id}`} style={{ textDecoration: 'none' }}>
@@ -132,7 +167,7 @@ export default function Dashboard() {
             </Link>
           )
         })}
-        {recent.videos.slice(0, 4).map((v: any) => (
+        {recent.videos.slice(0, 4).map((v: RecentVideo) => (
           <Link key={v.id} href={`/videos/${v.id}`} style={{ textDecoration: 'none' }}>
             <div className="card stagger-item">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -147,7 +182,7 @@ export default function Dashboard() {
             </div>
           </Link>
         ))}
-        {recent.news.slice(0, 4).map((n: any) => (
+        {recent.news.slice(0, 4).map((n: RecentNews) => (
           <Link key={n.id} href={`/news/${n.id}`} style={{ textDecoration: 'none' }}>
             <div className="card stagger-item">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -162,7 +197,7 @@ export default function Dashboard() {
             </div>
           </Link>
         ))}
-        {recent.audio.slice(0, 4).map((a: any) => (
+        {recent.audio.slice(0, 4).map((a: RecentAudio) => (
           <Link key={a.id} href={`/audio/${a.id}`} style={{ textDecoration: 'none' }}>
             <div className="card stagger-item">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>

@@ -4,7 +4,6 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 
 import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaNeon } from '@prisma/adapter-neon'
-import fs from 'fs'
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
@@ -17,7 +16,6 @@ async function migrateNews() {
   console.log('\n=== Migrating CPA Africa Region Profile as News ===')
 
   const contentPath = path.join(MEDIA_DIR, 'cpa-africa-region-profile.md')
-  const content = fs.readFileSync(contentPath, 'utf-8')
 
   const existing = await prisma.news.findUnique({ where: { url: SOURCE_URL } })
   if (existing) {

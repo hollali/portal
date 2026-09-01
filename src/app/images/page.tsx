@@ -1,15 +1,29 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { localToMediaUrl } from '@/lib/media'
 
+interface ImageRow {
+  id: number
+  url: string | null
+  localPath: string | null
+  source: string | null
+  query: string | null
+  faceMatch: number | null
+}
+
+interface ListData {
+  items: ImageRow[]
+  total: number
+  sources: string[]
+}
+
 export default function ImageListPage() {
-  const [data, setData] = useState<any>({ items: [], total: 0, page: 1, sources: [] })
+  const [data, setData] = useState<ListData>({ items: [], total: 0, sources: [] })
   const [query, setQuery] = useState('')
   const [source, setSource] = useState('')
   const [page, setPage] = useState(1)
-  const [lightboxImg, setLightboxImg] = useState<any>(null)
+  const [lightboxImg, setLightboxImg] = useState<ImageRow | null>(null)
   const [errored, setErrored] = useState<Set<number>>(new Set())
 
   useEffect(() => {
@@ -42,7 +56,7 @@ export default function ImageListPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-        {data.items.map((img: any) => {
+        {data.items.map((img: ImageRow) => {
           const mediaUrl = localToMediaUrl(img.localPath)
           const src = (!errored.has(img.id) && mediaUrl) ? mediaUrl : img.url
           return (
@@ -97,7 +111,7 @@ export default function ImageListPage() {
               &times;
             </button>
             <img
-              src={localToMediaUrl(lightboxImg.localPath) || lightboxImg.url}
+              src={localToMediaUrl(lightboxImg.localPath) || lightboxImg.url || ''}
               alt=""
               style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '0.375rem' }}
             />

@@ -6,7 +6,14 @@ import Link from 'next/link'
 
 export default function NewsDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [item, setItem] = useState<any>(null)
+  interface NewsDetail {
+    id: number
+    error?: string
+    title: string | null
+    snippet: string | null
+    [key: string]: unknown
+  }
+  const [item, setItem] = useState<NewsDetail | null>(null)
 
   useEffect(() => {
     fetch(`/api/news/${id}`).then(r => r.json()).then(setItem)

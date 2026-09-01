@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Check, Trash2, Info, AlertTriangle, XCircle, CheckCircle2, BellOff } from 'lucide-react'
+import { Bell, Check, Trash2, Info, AlertTriangle, XCircle, CheckCircle2, BellOff, type LucideIcon } from 'lucide-react'
 import { AnimBtn, EmptyState, SkeletonTable, Toast } from '@/components/ui'
 
 interface Notification {
@@ -13,7 +13,7 @@ interface Notification {
   createdAt: string
 }
 
-const TYPE_META: Record<string, { icon: any; color: string }> = {
+const TYPE_META: Record<string, { icon: LucideIcon; color: string }> = {
   info: { icon: Info, color: 'var(--primary)' },
   warning: { icon: AlertTriangle, color: 'var(--warning, #f59e0b)' },
   error: { icon: XCircle, color: 'var(--danger)' },

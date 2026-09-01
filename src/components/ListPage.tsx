@@ -3,17 +3,29 @@
 import { useEffect, useState, JSX } from 'react'
 import Link from 'next/link'
 
+interface MediaRow {
+  id: number
+  [key: string]: unknown
+}
+
+interface ListPageData {
+  items: MediaRow[]
+  total: number
+  page: number
+  sources: string[]
+}
+
 interface ListPageProps {
   type: 'images' | 'videos' | 'news' | 'audio'
   apiPath: string
   title: string
-  columns: { key: string; label: string; sortable?: boolean; render?: (item: any) => string | JSX.Element }[]
+  columns: { key: string; label: string; sortable?: boolean; render?: (item: MediaRow) => string | JSX.Element }[]
   searchPlaceholder?: string
   detailPrefix: string
 }
 
 export default function ListPage({ type, apiPath, title, columns, searchPlaceholder, detailPrefix }: ListPageProps) {
-  const [data, setData] = useState<any>({ items: [], total: 0, page: 1, sources: [] })
+  const [data, setData] = useState<ListPageData>({ items: [], total: 0, page: 1, sources: [] })
   const [query, setQuery] = useState('')
   const [source, setSource] = useState('')
   const [sort, setSort] = useState('id')
@@ -98,7 +110,7 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
             </tr>
           </thead>
           <tbody>
-            {data.items.map((item: any, idx: number) => (
+            {data.items.map((item: MediaRow, idx: number) => (
               <tr key={item.id} className="stagger-item" style={{ animationDelay: `${(idx % 10) * 0.03}s` }}>
                 {columns.map(col => (
                   <td key={col.key}>

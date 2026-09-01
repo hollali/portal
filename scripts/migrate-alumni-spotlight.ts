@@ -4,7 +4,6 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 
 import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaNeon } from '@prisma/adapter-neon'
-import fs from 'fs'
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
@@ -51,8 +50,8 @@ async function migrateImages() {
       })
       count++
       console.log(`  Added: ${img.url}`)
-    } catch (err: any) {
-      console.error(`  Error adding ${img.url}: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`  Error adding ${img.url}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
   console.log(`  Done: ${count} new images`)
@@ -61,8 +60,6 @@ async function migrateImages() {
 
 async function migrateNews() {
   console.log('\n=== Migrating Alumni Spotlight as News ===')
-  
-  const content = fs.readFileSync(path.join(MEDIA_DIR, 'alumni-spotlight-content.md'), 'utf-8')
   
   const existing = await prisma.news.findUnique({ where: { url: SOURCE_URL } })
   if (existing) {

@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole, hashPassword } from '@/lib/auth'
+import { requireRole, hashPassword, type Session } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 
 export async function GET() {
-  let session: any
   try {
-    session = await requireRole('admin')
+    await requireRole('admin')
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -19,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let session: any
+  let session: Session
   try {
     session = await requireRole('admin')
   } catch {
@@ -49,7 +48,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  let session: any
+  let session: Session
   try {
     session = await requireRole('admin')
   } catch {
@@ -79,7 +78,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  let session: any
+  let session: Session
   try {
     session = await requireRole('admin')
   } catch {

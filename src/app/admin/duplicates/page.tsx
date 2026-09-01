@@ -6,7 +6,19 @@ import { localToMediaUrl } from '@/lib/media'
 import { Image } from 'lucide-react'
 
 export default function DuplicatesPage() {
-  const [data, setData] = useState<any>(null)
+  interface DuplicateImage {
+    id: number
+    url: string | null
+    localPath: string | null
+    source: string | null
+    collectedAt: string | null
+  }
+  interface DuplicatesData {
+    totalGroups: number
+    totalDuplicates: number
+    groups: DuplicateImage[][]
+  }
+  const [data, setData] = useState<DuplicatesData | null>(null)
   const [page, setPage] = useState(1)
   const [errored, setErrored] = useState<Set<number>>(new Set())
 
@@ -28,7 +40,7 @@ export default function DuplicatesPage() {
         {data.totalGroups} group{data.totalGroups !== 1 ? 's' : ''} with {data.totalDuplicates} duplicate{data.totalDuplicates !== 1 ? 's' : ''}
       </div>
 
-      {data.groups.map((group: any[], i: number) => (
+      {data.groups.map((group: DuplicateImage[], i: number) => (
         <div key={i} className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.75rem' }}>
             Group {i + 1} — {group.length} items
@@ -39,7 +51,7 @@ export default function DuplicatesPage() {
                 <tr><th>Preview</th><th>ID</th><th>Source</th><th>URL</th><th>Collected</th></tr>
               </thead>
               <tbody>
-                {group.map((img: any) => {
+                {group.map((img: DuplicateImage) => {
                   const src = (!errored.has(img.id) && localToMediaUrl(img.localPath)) || img.url
                   return (
                     <tr key={img.id}>
@@ -60,7 +72,7 @@ export default function DuplicatesPage() {
                       <td><Link href={`/images/${img.id}`} style={{ fontWeight: 600 }}>{img.id}</Link></td>
                       <td>{img.source}</td>
                       <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <a href={img.url} target="_blank" rel="noopener noreferrer">{img.url}</a>
+                        <a href={img.url || '#'} target="_blank" rel="noopener noreferrer">{img.url}</a>
                       </td>
                       <td style={{ fontSize: '0.8rem' }}>{img.collectedAt?.slice(0, 10)}</td>
                     </tr>

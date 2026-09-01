@@ -8,7 +8,6 @@ export default function Navbar() {
   const pathname = usePathname()
   const [username, setUsername] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/me')

@@ -11,29 +11,57 @@ export async function logAudit(action: string, entityType: string, entityId: num
   }
 }
 
-export async function getAuditLogs(entityType?: string, entityId?: number, limit = 50) {
+export interface AuditQuery {
+  entityType?: string
+  entityId?: number
+  action?: string
+  page?: number
+  limit?: number
+}
+
+export async function getAuditLogs(query: AuditQuery = {}) {
+  const { entityType, entityId, action } = query
+  const page = Math.max(1, query.page || 1)
+  const limit = Math.min(200, Math.max(1, query.limit || 50))
+
   const conditions: string[] = []
-  const params: any[] = []
+  const params: (string | number | boolean | null)[] = []
   let idx = 1
 
   if (entityType) {
-    conditions.push(`entity_type = $${idx++}`)
+    conditions.push(`a.entity_type = $${idx++}`)
     params.push(entityType)
   }
   if (entityId) {
-    conditions.push(`entity_id = $${idx++}`)
+    conditions.push(`a.entity_id = $${idx++}`)
     params.push(entityId)
+  }
+  if (action) {
+    conditions.push(`a.action = $${idx++}`)
+    params.push(action)
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const offset = (page - 1) * limit
 
-  return prisma.$queryRawUnsafe(
-    `SELECT id, action, entity_type as "entityType", entity_id as "entityId",
-            user_id as "userId", details, created_at as "createdAt"
-     FROM audit_logs ${where}
-     ORDER BY created_at DESC
-     LIMIT $${idx}`,
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT a.id, a.action, a.entity_type as "entityType", a.entity_id as "entityId",
+            a.user_id as "userId", u.username, a.details, a.created_at as "createdAt"
+     FROM audit_logs a
+     LEFT JOIN users u ON u.id = a.user_id
+     ${where}
+     ORDER BY a.created_at DESC
+     LIMIT $${idx} OFFSET $${idx + 1}`,
     ...params,
-    limit
+    limit,
+    offset
   )
+
+  const totalRows = await prisma.$queryRawUnsafe<{ c: string }[]>(
+    `SELECT count(*)::int as c FROM audit_logs a ${where}`,
+    ...params
+  )
+  const total = Number(totalRows[0]?.c || 0)
+
+  return { logs: rows, total, page, perPage: limit }
 }

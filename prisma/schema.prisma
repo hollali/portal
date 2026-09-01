@@ -36,6 +36,8 @@ model Image {
   faceMatchDistance   Float?   @map("face_match_distance")
   bestReferencePath   String?  @default("") @map("best_reference_path")
   imageHash           String?  @map("image_hash")
+  notes               String?
+  tags                String?
 
   @@index([source])
   @@index([collectedAt])
@@ -53,6 +55,8 @@ model Video {
   views       Int?
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
+  notes       String?
+  tags        String?
 
   @@index([source])
   @@index([platform])
@@ -71,6 +75,8 @@ model News {
   snippet     String?
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
+  notes       String?
+  tags        String?
 
   @@index([source])
   @@index([sourceName])
@@ -89,6 +95,8 @@ model Audio {
   duration    String?
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
+  notes       String?
+  tags        String?
 
   @@index([source])
   @@index([artist])
@@ -102,7 +110,30 @@ model User {
   email     String?  @unique
   password  String
   isAdmin   Boolean  @default(false) @map("is_admin")
+  role      String   @default("viewer") @map("role")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("users")
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String
+  message   String
+  read      Boolean  @default(false) @map("read")
+  userId    Int?     @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
 }

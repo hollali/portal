@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, type Session } from '@/lib/auth'
 
 export async function GET(request: Request) {
-  let session: any
   try {
-    session = await requireAuth()
+    await requireAuth()
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -32,7 +31,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let session: any
+  let session: Session
   try {
     session = await requireAuth()
   } catch {

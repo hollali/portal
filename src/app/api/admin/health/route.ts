@@ -3,7 +3,17 @@ import fs from 'fs'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 
-function getModel(type: string): any {
+interface MediaRow {
+  id: number
+  localPath: string | null
+  url: string | null
+}
+
+interface MediaModel {
+  findMany: (args: { select: { id: true; localPath: true; url: true }; orderBy: { id: 'desc' }; take: number }) => Promise<MediaRow[]>
+}
+
+function getModel(type: string): MediaModel | null {
   switch (type) {
     case 'images': return prisma.image
     case 'videos': return prisma.video
@@ -36,6 +46,7 @@ export async function GET() {
 
   for (const type of types) {
     const model = getModel(type)
+    if (!model) continue
     const rows = await model.findMany({
       select: { id: true, localPath: true, url: true },
       orderBy: { id: 'desc' },
@@ -44,8 +55,8 @@ export async function GET() {
 
     let withLocal = 0
     let withUrlOnly = 0
-    const missingLocal: any[] = []
-    const noMedia: any[] = []
+    const missingLocal: { id: number; localPath: string }[] = []
+    const noMedia: { id: number }[] = []
 
     for (const row of rows) {
       if (row.localPath) {

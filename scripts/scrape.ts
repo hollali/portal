@@ -132,8 +132,8 @@ async function scrapeImages() {
           process.stdout.write(`  [${count}] ✓\r`)
         }
       }
-    } catch (err: any) {
-      console.error(`  Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -221,8 +221,8 @@ async function scrapeNews() {
         count++
         console.log(`  [${count}] ${art.title.slice(0, 60)}`)
       }
-    } catch (err: any) {
-      console.error(`  Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -357,20 +357,9 @@ async function main() {
   console.log('\n' + '=' * 50)
   console.log('FINAL SUMMARY')
   console.log('=' * 50)
-  for (const [k, v] of Object.entries(added)) {
-    const total = await (prisma as any)[k.substring(0, k.length - 1) === k ? k : k.replace(/s$/, '') === k ? k : (
-      k === 'images' ? prisma.image :
-      k === 'videos' ? prisma.video :
-      k === 'news' ? prisma.news :
-      k === 'audio' ? prisma.audio : null
-    )].count()
-    // a simpler approach:
-  }
-
   for (const table of ['image', 'video', 'news', 'audio'] as const) {
-    const total = await (prisma as any)[table].count()
-    const key = table === 'image' ? 'images' : table === 'video' ? 'videos' : table + 's'
-    console.log(`${key.padEnd(8)}: +${(added as any)[key]} new (${total} total)`)
+    const key = table === 'image' ? 'images' : table === 'video' ? 'videos' : `${table}s` as const
+    console.log(`${key.padEnd(8)}: +${added[key]} new (${await prisma[table].count()} total)`)
   }
 
   await prisma.$disconnect()

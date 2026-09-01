@@ -7,7 +7,15 @@ import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 
 export default function AudioDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [item, setItem] = useState<any>(null)
+  interface AudioDetail {
+    id: number
+    error?: string
+    url: string | null
+    localPath: string | null
+    title: string | null
+    [key: string]: unknown
+  }
+  const [item, setItem] = useState<AudioDetail | null>(null)
   const [remoteError, setRemoteError] = useState(false)
 
   useEffect(() => {

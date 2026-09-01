@@ -7,7 +7,15 @@ import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [item, setItem] = useState<any>(null)
+  interface VideoDetail {
+    id: number
+    error?: string
+    url: string | null
+    localPath: string | null
+    title: string | null
+    [key: string]: unknown
+  }
+  const [item, setItem] = useState<VideoDetail | null>(null)
   const [remoteError, setRemoteError] = useState(false)
 
   useEffect(() => {

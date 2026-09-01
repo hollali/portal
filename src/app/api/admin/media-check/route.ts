@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRole, type Session } from '@/lib/auth'
 import { createNotification } from '@/lib/notify'
 
-function getModel(type: string): any {
+interface MediaRow {
+  id: number
+  localPath: string | null
+  url: string | null
+}
+
+interface MediaModel {
+  findMany: (args: { select: { id: true; localPath: true; url: true }; orderBy: { id: 'desc' }; take: number }) => Promise<MediaRow[]>
+}
+
+function getModel(type: string): MediaModel | null {
   switch (type) {
     case 'images': return prisma.image
     case 'videos': return prisma.video
@@ -15,7 +25,7 @@ function getModel(type: string): any {
 }
 
 export async function GET(request: NextRequest) {
-  let session: any
+  let session: Session
   try {
     session = await requireRole('admin', 'editor', 'viewer')
   } catch {
@@ -33,8 +43,8 @@ export async function GET(request: NextRequest) {
     take: 1000,
   })
 
-  const missingLocal: any[] = []
-  const noMedia: any[] = []
+  const missingLocal: { id: number; localPath: string }[] = []
+  const noMedia: { id: number }[] = []
   let withLocal = 0
 
   for (const row of rows) {

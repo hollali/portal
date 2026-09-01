@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/auth'
+import { requireRole, type Session } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 
 export async function GET() {
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let session: any
+  let session: Session
   try {
     session = await requireRole('admin')
   } catch {

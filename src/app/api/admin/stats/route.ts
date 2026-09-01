@@ -23,23 +23,31 @@ export async function GET() {
 
   const total = imageCount + videoCount + newsCount + audioCount
 
-  const topSources = async (model: any, field: string, limit = 8) => {
+  interface GroupByRow {
+    [key: string]: string | { id: number } | undefined
+    _count: { id: number }
+  }
+  interface GroupByModel {
+    groupBy: (args: { by: string[]; _count: { id: true }; orderBy: { _count: { id: 'asc' | 'desc' } }; take: number }) => Promise<GroupByRow[]>
+  }
+
+  const topSources = async (model: GroupByModel, field: string, limit = 8) => {
     const rows = await model.groupBy({
       by: [field],
       _count: { id: true },
-      orderBy: { _count: { id: 'desc' } as any },
+      orderBy: { _count: { id: 'desc' } as const },
       take: limit,
     })
     return rows
-      .filter((r: any) => r[field])
-      .map((r: any) => ({ source: r[field], count: r._count.id }))
+      .filter((r: GroupByRow) => !!r[field])
+      .map((r: GroupByRow) => ({ source: r[field] as string, count: r._count.id }))
   }
 
   const [imageSources, videoSources, newsSources, audioSources] = await Promise.all([
-    topSources(prisma.image, 'source'),
-    topSources(prisma.video, 'source'),
-    topSources(prisma.news, 'sourceName'),
-    topSources(prisma.audio, 'source'),
+    topSources(prisma.image as unknown as GroupByModel, 'source'),
+    topSources(prisma.video as unknown as GroupByModel, 'source'),
+    topSources(prisma.news as unknown as GroupByModel, 'sourceName'),
+    topSources(prisma.audio as unknown as GroupByModel, 'source'),
   ])
 
   const [recentImages, recentVideos, recentNews, recentAudio] = await Promise.all([
@@ -58,7 +66,14 @@ export async function GET() {
     days.push(d.toISOString().slice(0, 10))
   }
 
-  const trendByDay = async (model: any, limit = 14) => {
+  interface TrendRow {
+    collectedAt: string | null
+  }
+  interface TrendModel {
+    findMany: (args: { select: { collectedAt: true }; orderBy: { id: 'desc' }; take: number }) => Promise<TrendRow[]>
+  }
+
+  const trendByDay = async (model: TrendModel) => {
     const raw = await model.findMany({
       select: { collectedAt: true },
       orderBy: { id: 'desc' },
@@ -74,10 +89,10 @@ export async function GET() {
   }
 
   const trend = {
-    images: await trendByDay(prisma.image),
-    videos: await trendByDay(prisma.video),
-    news: await trendByDay(prisma.news),
-    audio: await trendByDay(prisma.audio),
+    images: await trendByDay(prisma.image as unknown as TrendModel),
+    videos: await trendByDay(prisma.video as unknown as TrendModel),
+    news: await trendByDay(prisma.news as unknown as TrendModel),
+    audio: await trendByDay(prisma.audio as unknown as TrendModel),
     labels: days,
   }
 

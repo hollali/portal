@@ -7,7 +7,14 @@ import { localToMediaUrl } from '@/lib/media'
 
 export default function ImageDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [item, setItem] = useState<any>(null)
+  interface ImageDetail {
+    id: number
+    error?: string
+    url: string | null
+    localPath: string | null
+    [key: string]: unknown
+  }
+  const [item, setItem] = useState<ImageDetail | null>(null)
   const [imgError, setImgError] = useState(false)
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword, signToken } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 
 export async function POST(request: Request) {
   const { username, password } = await request.json()
@@ -14,9 +15,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
-  const token = signToken({ userId: user.id, username: user.username, isAdmin: user.isAdmin })
+  const token = signToken({ userId: user.id, username: user.username, isAdmin: user.isAdmin, role: user.role })
   const cookieStore = await cookies()
   cookieStore.set('session', token, { httpOnly: true, secure: false, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 })
 
-  return NextResponse.json({ success: true, username: user.username, isAdmin: user.isAdmin })
+  await logAudit('login', 'user', user.id, user.id, `User "${user.username}" logged in`)
+
+  return NextResponse.json({ success: true, username: user.username, isAdmin: user.isAdmin, role: user.role })
 }

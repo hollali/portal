@@ -4,12 +4,30 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 
+interface VideoRow {
+  id: number
+  url: string | null
+  localPath: string | null
+  source: string | null
+  title: string | null
+  channel: string | null
+  duration: number | null
+  views: number | null
+  collectedAt: string | null
+}
+
+interface ListData {
+  items: VideoRow[]
+  total: number
+  sources: string[]
+}
+
 export default function VideoListPage() {
-  const [data, setData] = useState<any>({ items: [], total: 0, page: 1, sources: [] })
+  const [data, setData] = useState<ListData>({ items: [], total: 0, sources: [] })
   const [query, setQuery] = useState('')
   const [source, setSource] = useState('')
   const [page, setPage] = useState(1)
-  const [playing, setPlaying] = useState<any>(null)
+  const [playing, setPlaying] = useState<VideoRow | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(page), sort: 'id', dir: 'desc', perPage: '20' })
@@ -20,7 +38,7 @@ export default function VideoListPage() {
 
   const totalPages = Math.ceil(data.total / 20)
 
-  const getPlayUrl = (item: any) => {
+  const getPlayUrl = (item: VideoRow) => {
     const local = localToMediaUrl(item.localPath)
     if (local) return { type: 'local', url: local }
     if (item.url && isYouTubeUrl(item.url)) return { type: 'youtube', url: getYouTubeEmbedUrl(item.url)! }
@@ -63,7 +81,7 @@ export default function VideoListPage() {
             </tr>
           </thead>
           <tbody>
-            {data.items.map((item: any) => {
+            {data.items.map((item: VideoRow) => {
               const player = getPlayUrl(item)
               const duration = item.duration
                 ? `${Math.floor(item.duration / 60)}:${String(item.duration % 60).padStart(2, '0')}`

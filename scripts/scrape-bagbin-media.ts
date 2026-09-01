@@ -140,8 +140,8 @@ async function scrapeImages() {
           process.stdout.write(`  [${count}] ✓\r`)
         }
       }
-    } catch (err: any) {
-      console.error(`  Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -230,8 +230,8 @@ async function scrapeNews() {
         count++
         console.log(`  [${count}] ${art.title.slice(0, 60)}`)
       }
-    } catch (err: any) {
-      console.error(`  Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -317,8 +317,8 @@ async function scrapeGoogleNews() {
         count++
         console.log(`  [${count}] ${art.title.slice(0, 60)}`)
       }
-    } catch (err: any) {
-      console.error(`  Error: ${err.message}`)
+    } catch (err: unknown) {
+      console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 

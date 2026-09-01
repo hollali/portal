@@ -10,13 +10,16 @@ import {
   Newspaper,
   Headphones,
   Search,
-  Shield,
   LogOut,
   LogIn,
   Menu,
   X,
   Activity,
   ScrollText,
+  Users,
+  Settings,
+  Bell,
+  ShieldCheck,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
@@ -29,10 +32,22 @@ const navLinks = [
   { href: '/search', label: 'Search', icon: Search },
 ]
 
+const adminLinks = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/users', label: 'Users', icon: Users },
+  { href: '/admin/notifications', label: 'Notifications', icon: Bell },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/health', label: 'Health', icon: Activity },
+  { href: '/admin/audit', label: 'Audit Log', icon: ScrollText },
+  { href: '/admin/duplicates', label: 'Duplicates', icon: ShieldCheck },
+]
+
 export default function Sidebar() {
   const pathname = usePathname()
   const [username, setUsername] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [role, setRole] = useState<string>('')
+  const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
 
@@ -48,15 +63,24 @@ export default function Sidebar() {
     fetch('/api/me')
       .then(r => r.json())
       .then(d => {
-        if (d.username) { setUsername(d.username); setIsAdmin(d.isAdmin) }
+        if (d.username) { setUsername(d.username); setIsAdmin(d.isAdmin); setRole(d.role || '') }
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    fetch('/api/admin/notifications?limit=1')
+      .then(r => r.json())
+      .then(d => setUnread(d.unreadCount || 0))
+      .catch(() => {})
+  }, [isAdmin])
 
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' })
     setUsername(null)
     setIsAdmin(false)
+    setRole('')
     window.location.href = '/login'
   }
 
@@ -65,10 +89,10 @@ export default function Sidebar() {
     return pathname.startsWith(href)
   }
 
-  const allLinks =
-    isAdmin
-      ? [...navLinks, { href: '/admin', label: 'Admin', icon: Shield }, { href: '/admin/audit', label: 'Audit Log', icon: ScrollText }, { href: '/admin/duplicates', label: 'Duplicates', icon: Image }]
-      : navLinks
+  // Only admins can manage users, settings, and system health
+  const systemLinks = ['/admin/users', '/admin/settings', '/admin/health']
+  const visibleAdminLinks = adminLinks.filter(l => role === 'admin' || !systemLinks.includes(l.href))
+  const allLinks = isAdmin ? visibleAdminLinks : navLinks
 
   const sidebarVisible = isDesktop || open
 
@@ -189,7 +213,17 @@ export default function Sidebar() {
                 }}
               >
                 <Icon size={18} className="nav-icon" style={{ color: active ? 'var(--primary-fg)' : 'var(--muted)' }} />
-                {label}
+                <span style={{ flex: 1 }}>{label}</span>
+                {href === '/admin/notifications' && unread > 0 && (
+                  <span style={{
+                    fontSize: '0.65rem', fontWeight: 700, color: '#fff',
+                    background: 'var(--danger)', borderRadius: '999px',
+                    minWidth: '18px', height: '18px', padding: '0 4px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
               </Link>
             )
           })}
