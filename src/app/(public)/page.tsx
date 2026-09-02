@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { localToMediaUrl } from '@/lib/media'
-import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import PublicHeader from '@/components/PublicHeader'
 import {
   ArrowRight,
   ArrowUpRight,
@@ -13,8 +13,6 @@ import {
   Headphones,
   Play,
   Loader2,
-  Menu,
-  X,
   Landmark,
   GraduationCap,
   Scale,
@@ -69,13 +67,6 @@ interface AudioItem {
    Static content (sourced from Wikipedia)
 ──────────────────────────────────────────────────────────── */
 
-const NAV = [
-  { href: '#biography', label: 'Biography' },
-  { href: '#career', label: 'Career' },
-  { href: '#media', label: 'Media' },
-  { href: '#news', label: 'News' },
-]
-
 const INSTITUTIONS = [
   'Parliament of Ghana',
   'National Democratic Congress',
@@ -117,8 +108,6 @@ export default function PublicHome() {
   const [videos, setVideos] = useState<VideoItem[]>([])
   const [news, setNews] = useState<NewsItem[]>([])
   const [audioItems, setAudioItems] = useState<AudioItem[]>([])
-  const [menuOpen, setMenuOpen] = useState(false)
-
   useEffect(() => {
     fetch('/api/stats')
       .then(r => r.json())
@@ -145,82 +134,7 @@ export default function PublicHome() {
 
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh', overflowX: 'hidden' }}>
-      {/* ── Top navigation ─────────────────────────────── */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: 'color-mix(in srgb, var(--p-bg) 82%, transparent)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid var(--p-border)',
-        }}
-      >
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 1.5rem', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }} className="p-header-inner">
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', textDecoration: 'none' }}>
-            <span style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-fg)' }}>
-              <Landmark size={18} strokeWidth={2.4} />
-            </span>
-            <span className="p-brand-word" style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), var(--font-inter), sans-serif' }}>
-              AlbanBagbin
-            </span>
-          </Link>
-
-          <nav className="hide-sm" style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
-            {NAV.map(n => (
-              <a key={n.href} href={n.href} style={{ fontSize: '0.875rem', color: 'var(--p-text-2)', textDecoration: 'none', transition: 'color 0.2s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--p-text-1)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--p-text-2)')}>
-                {n.label}
-              </a>
-            ))}
-          </nav>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div className="hide-sm"><ThemeToggle /></div>
-            <Link href="/login"
-              className="p-admin-btn"
-              style={{
-                fontSize: '0.8125rem',
-                fontWeight: 600,
-                color: 'var(--primary-fg)',
-                background: 'var(--primary)',
-                padding: '0.5rem 1rem',
-                borderRadius: 999,
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                transition: 'background 0.2s, transform 0.2s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-dark)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'var(--primary)')}
-            >
-              Admin <ArrowRight size={14} className="hide-sm" />
-            </Link>
-            <button
-              onClick={() => setMenuOpen(o => !o)}
-              className="show-sm"
-              style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}
-            >
-              {menuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-          </div>
-        </div>
-
-        {menuOpen && (
-          <div style={{ borderTop: '1px solid var(--p-border)', padding: '0.75rem 1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {NAV.map(n => (
-              <a key={n.href} href={n.href} onClick={() => setMenuOpen(false)}
-                style={{ color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '1rem', padding: '0.5rem 0' }}>
-                {n.label}
-              </a>
-            ))}
-            <div style={{ padding: '0.5rem 0' }}><ThemeToggle /></div>
-          </div>
-        )}
-      </header>
+      <PublicHeader />
 
       {/* ── Hero ───────────────────────────────────────── */}
       <section style={{ position: 'relative', overflow: 'hidden' }}>
@@ -612,7 +526,7 @@ export default function PublicHome() {
               </p>
             </div>
             <div className="p-cta-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <Link href="/dashboard" style={{ background: 'var(--primary)', color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 700, padding: '0.8rem 1.5rem', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Link href="/login" style={{ background: 'var(--primary)', color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 700, padding: '0.8rem 1.5rem', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                 Open the portal <ArrowRight size={16} />
               </Link>
               <Link href="/search" style={{ border: '1px solid color-mix(in srgb, var(--foreground) 25%, transparent)', color: 'var(--p-text-1)', textDecoration: 'none', fontWeight: 600, padding: '0.8rem 1.5rem', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -642,7 +556,6 @@ export default function PublicHome() {
             {([
               { title: 'Profile', links: [['#biography', 'Biography'], ['#career', 'Career'], ['#media', 'Media library'], ['#news', 'News']] },
               { title: 'Explore', links: [['/images', 'Images'], ['/videos', 'Videos'], ['/audio', 'Audio'], ['/news', 'News']] },
-              { title: 'Portal', links: [['/login', 'Sign in'], ['/dashboard', 'Dashboard'], ['/search', 'Search'], ['/admin', 'Admin']] },
             ]).map(col => (
               <div key={col.title}>
                 <div style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.9rem' }}>{col.title}</div>

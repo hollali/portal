@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireRole } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
+  await requireRole('admin', 'editor', 'viewer')
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const perPage = Math.min(100, parseInt(searchParams.get('perPage') || '20'))
