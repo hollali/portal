@@ -6,14 +6,6 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get('session')?.value
   const session = token ? verifyToken(token) : null
 
-  if (pathname.startsWith('/login')) {
-    if (session && (session.role === 'admin' || session.role === 'editor' || session.role === 'viewer')) {
-      const dest = request.nextUrl.searchParams.get('next') || '/dashboard'
-      return NextResponse.redirect(new URL(dest, request.url))
-    }
-    return NextResponse.next()
-  }
-
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin')) {
     if (!session || !(session.role === 'admin' || session.role === 'editor' || session.role === 'viewer')) {
       const url = new URL('/login', request.url)
