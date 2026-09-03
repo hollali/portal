@@ -1258,9 +1258,11 @@ export default function AdminPage() {
                     .map((f) => (
                       <div key={f}>
                         <label className="block text-xs font-semibold mb-1">
-                          {f
-                            .replace(/([A-Z])/g, " $1")
-                            .replace(/^./, (s) => s.toUpperCase())}
+                          {f === "url"
+                            ? "URL (optional if file uploaded)"
+                            : f
+                                .replace(/([A-Z])/g, " $1")
+                                .replace(/^./, (s) => s.toUpperCase())}
                         </label>
                         <input
                           name={f}
@@ -1273,6 +1275,34 @@ export default function AdminPage() {
                         />
                       </div>
                     ))}
+                </div>
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold mb-1">
+                    Upload file from computer
+                  </label>
+                  <input
+                    type="file"
+                    name="file"
+                    accept={
+                      tab === "images"
+                        ? "image/*"
+                        : tab === "videos"
+                        ? "video/*"
+                        : tab === "audio"
+                        ? "audio/*"
+                        : undefined
+                    }
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{
+                      background: "var(--background)",
+                      borderColor: "var(--border)",
+                      color: "var(--foreground)",
+                    }}
+                  />
+                  <p className="text-xs mt-1 opacity-60">
+                    If you upload a file, it will be stored locally and used
+                    instead of a link.
+                  </p>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <AnimBtn

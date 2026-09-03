@@ -337,9 +337,27 @@ export async function POST(request: Request) {
 
   if (action === 'add') {
     const data: DataInput = {}
+    let mediaUrl: string | null = null
+    let localPath: string | null = null
+
+    const file = formData.get('file')
+    if (file instanceof File && file.size > 0) {
+      try {
+        const { saveUploadedFile } = await import('@/lib/upload')
+        const saved = await saveUploadedFile(file, type)
+        localPath = saved.localPath
+        mediaUrl = saved.url
+      } catch {
+        return NextResponse.json({ error: 'Failed to save file' }, { status: 500 })
+      }
+    }
+
     for (const [key, val] of formData.entries()) {
+      if (key === 'action' || key === 'type' || key === 'file') continue
       if (typeof val === 'string') data[key] = val
     }
+    if (mediaUrl) data.url = mediaUrl
+    if (localPath) data.localPath = localPath
     data.collectedAt = new Date().toISOString()
 
     const item = await model.create({ data })
