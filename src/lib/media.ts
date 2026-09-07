@@ -1,4 +1,4 @@
-const MEDIA_ROOT = '/home/hollali/Projects/WebScrapper/osint_bagbin_enhanced'
+export const MEDIA_ROOT = '/home/hollali/Projects/WebScrapper/osint_bagbin_enhanced'
 
 export function localToMediaUrl(localPath: string | null | undefined): string | null {
   if (!localPath) return null

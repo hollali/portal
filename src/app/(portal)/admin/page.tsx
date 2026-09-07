@@ -135,14 +135,7 @@ function getMediaUrl(item: {
   localPath?: string | null;
   url?: string | null;
 }): string | null {
-  if (item.localPath) {
-    const rel = item.localPath.replace(
-      "/home/hollali/Projects/portal/public",
-      "",
-    );
-    return rel;
-  }
-  return item.url || null;
+  return localToMediaUrl(item.localPath) || item.url || null;
 }
 
 function formatDuration(duration?: number | null): string {

@@ -6,6 +6,7 @@ import { PrismaClient } from '../src/generated/prisma/client'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import bcrypt from 'bcryptjs'
 import Database from 'better-sqlite3'
+import { DEFAULT_SECTIONS } from '../src/lib/content'
 
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
@@ -28,6 +29,16 @@ async function main() {
   } else {
     console.log('Admin user already exists')
   }
+
+  console.log('Seeding homepage content sections...')
+  for (const [key, data] of Object.entries(DEFAULT_SECTIONS)) {
+    await prisma.contentSection.upsert({
+      where: { key },
+      create: { key, title: key, data: JSON.stringify(data), status: 'published' },
+      update: {},
+    })
+  }
+  console.log(`  ${Object.keys(DEFAULT_SECTIONS).length} sections ensured (existing left untouched)`)
 
   const sqlitePath = path.resolve(process.cwd(), '../WebScrapper/osint_bagbin_enhanced/osint_enhanced.db')
   try {

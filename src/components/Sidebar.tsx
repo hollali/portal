@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import {
   LayoutDashboard,
   Image,
@@ -20,6 +20,7 @@ import {
   Settings,
   Bell,
   ShieldCheck,
+  FileText,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
@@ -35,12 +36,25 @@ const navLinks = [
 const adminLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/users', label: 'Users', icon: Users },
+  { href: '/admin/content', label: 'Content', icon: FileText },
   { href: '/admin/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
   { href: '/admin/health', label: 'Health', icon: Activity },
   { href: '/admin/audit', label: 'Audit Log', icon: ScrollText },
   { href: '/admin/duplicates', label: 'Duplicates', icon: ShieldCheck },
 ]
+
+const DESKTOP_QUERY = '(min-width: 768px)'
+
+function subscribeDesktop(callback: () => void) {
+  const mq = window.matchMedia(DESKTOP_QUERY)
+  mq.addEventListener('change', callback)
+  return () => mq.removeEventListener('change', callback)
+}
+
+function getDesktopSnapshot() {
+  return window.matchMedia(DESKTOP_QUERY).matches
+}
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -49,15 +63,7 @@ export default function Sidebar() {
   const [role, setRole] = useState<string>('')
   const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
-  const [isDesktop, setIsDesktop] = useState(true)
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    setIsDesktop(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
+  const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, () => true)
 
   useEffect(() => {
     fetch('/api/me')

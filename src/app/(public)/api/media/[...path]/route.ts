@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { MEDIA_ROOT as DEFAULT_MEDIA_ROOT } from '@/lib/media'
 
-const MEDIA_ROOT = path.resolve(
-  process.env.MEDIA_ROOT || path.join(process.cwd(), '..', 'osint_bagbin_enhanced')
-)
+const MEDIA_ROOT = path.resolve(process.env.MEDIA_ROOT || DEFAULT_MEDIA_ROOT)
 
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: pathSegments } = await params

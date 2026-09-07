@@ -18,8 +18,21 @@ import {
   Scale,
   Quote,
   Sparkles,
+  Star,
+  Award,
+  Heart,
+  Users,
+  Flag,
   type LucideIcon,
 } from 'lucide-react'
+import {
+  sectionData,
+  DEFAULT_HERO,
+  DEFAULT_BIOGRAPHY,
+  DEFAULT_TIMELINE,
+  DEFAULT_INSTITUTIONS,
+  type SectionsMap,
+} from '@/lib/content'
 
 /* ────────────────────────────────────────────────────────────
    Types
@@ -64,39 +77,30 @@ interface AudioItem {
 }
 
 /* ────────────────────────────────────────────────────────────
-   Static content (sourced from Wikipedia)
+   CMS content helpers
 ──────────────────────────────────────────────────────────── */
 
-const INSTITUTIONS = [
-  'Parliament of Ghana',
-  'National Democratic Congress',
-  'University of Ghana',
-  'Ghana School of Law',
-  'GIMPA',
-  'UNICEF',
-  '4th Republic',
-  'Commonwealth',
-]
+const FACT_ICON_MAP: Record<string, LucideIcon> = {
+  scale: Scale,
+  landmark: Landmark,
+  'graduation-cap': GraduationCap,
+  sparkles: Sparkles,
+  quote: Quote,
+  star: Star,
+  award: Award,
+  heart: Heart,
+  users: Users,
+  flag: Flag,
+}
 
-const TIMELINE = [
-  { year: '1992', title: 'Elected to Parliament', text: 'Won the Nadowli North seat in the 1992 general elections on the NDC ticket — the start of seven consecutive terms.' },
-  { year: '1996', title: 'Retained Nadowli North', text: 'Re-elected with 76.46% of valid votes cast (12,605 of 16,485 votes).' },
-  { year: '2001', title: 'Minority Leader', text: 'Served as Minority Leader in Parliament from 2001 to 2009.' },
-  { year: '2009', title: 'Majority Leader', text: 'Appointed Majority Leader of the Ghanaian Parliament under President John Atta Mills.' },
-  { year: '2010', title: 'Cabinet Minister', text: 'Appointed Minister for Water Resources, Works and Housing in January 2010.' },
-  { year: '2012', title: 'Minister for Health', text: 'Served as Minister for Health from January 2012 until February 2013.' },
-  { year: '2017', title: 'Second Deputy Speaker', text: 'Elected Second Deputy Speaker of Parliament (2017–2021).' },
-  { year: '2021', title: 'Speaker of Parliament', text: 'Elected Speaker of the 8th Parliament — the first Speaker ever chosen from the opposition in Ghana’s history.' },
-  { year: '2024', title: 'Vacant seats ruling', text: 'Declared four seats vacant over party-switching; the Supreme Court later overturned the decision.' },
-  { year: '2025', title: 'Re-elected Speaker', text: 'Retained as Speaker of the 9th Parliament of the Fourth Republic on 7 January 2025.' },
-]
-
-const FACTS: { icon: LucideIcon; label: string; value: string }[] = [
-  { icon: Scale, value: '8th & 9th', label: 'Speaker of the Fourth Republic' },
-  { icon: Landmark, value: '7 terms', label: 'Member of Parliament' },
-  { icon: GraduationCap, value: 'LL.B · Bar 1982', label: 'University of Ghana · Ghana School of Law' },
-  { icon: Sparkles, value: '24 Sep 1957', label: 'Born in Sombo, Upper West Region' },
-]
+function renderLines(text: string) {
+  return text.split('\n').map((line, i, arr) => (
+    <span key={i}>
+      {line}
+      {i < arr.length - 1 && <br />}
+    </span>
+  ))
+}
 
 /* ────────────────────────────────────────────────────────────
    Page
@@ -104,6 +108,7 @@ const FACTS: { icon: LucideIcon; label: string; value: string }[] = [
 
 export default function PublicHome() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [sections, setSections] = useState<SectionsMap>({})
   const [images, setImages] = useState<ImageItem[]>([])
   const [videos, setVideos] = useState<VideoItem[]>([])
   const [news, setNews] = useState<NewsItem[]>([])
@@ -112,6 +117,10 @@ export default function PublicHome() {
     fetch('/api/stats')
       .then(r => r.json())
       .then(setStats)
+      .catch(() => {})
+    fetch('/api/content')
+      .then(r => r.json())
+      .then(d => setSections(d.sections || {}))
       .catch(() => {})
     Promise.all([
       fetch('/api/images?perPage=6').then(r => r.json()),
@@ -127,6 +136,11 @@ export default function PublicHome() {
       })
       .catch(() => {})
   }, [])
+
+  const hero = sectionData('home_hero', sections, DEFAULT_HERO)
+  const bio = sectionData('home_biography', sections, DEFAULT_BIOGRAPHY)
+  const timeline = sectionData('home_timeline', sections, DEFAULT_TIMELINE)
+  const institutions = sectionData('home_institutions', sections, DEFAULT_INSTITUTIONS)
 
   const mediaCount = (k: 'images' | 'videos' | 'audio' | 'news') => stats?.[k] ?? 0
 
@@ -161,7 +175,7 @@ export default function PublicHome() {
         >
           <div>
             <span className="p-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.375rem 0.75rem', borderRadius: 999 }}>
-              <Quote size={12} /> Rt. Hon. <span className="hide-sm">&middot; Speaker of the Parliament of Ghana</span>
+              <Quote size={12} /> {hero.eyebrow}
             </span>
 
             <h1
@@ -176,17 +190,15 @@ export default function PublicHome() {
                 color: 'var(--p-text-1)',
               }}
             >
-              Alban Sumana
+              {hero.name}
               <br />
               <span style={{ background: 'linear-gradient(90deg,#ff560a,#ff7a3d,#f8b84b)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-                Kingsford Bagbin
+                {hero.displayName}
               </span>
             </h1>
 
             <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '34rem', margin: '0 0 2rem' }}>
-              Ghanaian lawyer, statesman and legislator — elected Speaker of the 8th Parliament in 2021 as the
-              first Speaker chosen from the opposition in Ghana’s history, and re-elected to preside over the 9th
-              Parliament in 2025.
+              {hero.description}
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -219,25 +231,28 @@ export default function PublicHome() {
             </div>
 
             <div className="p-hero-facts" style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '2.75rem' }}>
-              {FACTS.map(f => (
-                <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 150 }}>
-                  <span style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--p-border)', background: 'var(--p-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-                    <f.icon size={18} />
-                  </span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif' }}>{f.value}</div>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f.label}</div>
+              {hero.facts.map(f => {
+                const IconCmp = FACT_ICON_MAP[f.icon || 'scale'] ?? Scale
+                return (
+                  <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 150 }}>
+                    <span style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--p-border)', background: 'var(--p-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                      <IconCmp size={18} />
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif' }}>{f.value}</div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f.label}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
           {/* Portrait */}
           <div style={{ position: 'relative', justifySelf: 'center', width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'center' }}>
             <img
-              src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Speaker_Alban_Bagbin-2_%28cropped%29.jpg"
-              alt="Alban Bagbin in 2021"
+              src={hero.portraitUrl}
+              alt={hero.portraitAlt}
               width={400}
               height={500}
               style={{
@@ -253,8 +268,8 @@ export default function PublicHome() {
               borderRadius: 12, padding: '0.7rem 1rem',
             }}>
               <div>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Incumbent since</div>
-                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--p-text-1)' }}>7 January 2021</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{hero.profileLabel}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--p-text-1)' }}>{hero.profileValue}</div>
               </div>
               <Play size={20} style={{ color: 'var(--primary)' }} />
             </div>
@@ -289,7 +304,7 @@ export default function PublicHome() {
       {/* ── Institutions marquee ───────────────────────── */}
       <div className="marquee-paused" style={{ borderTop: '1px solid var(--p-border)', borderBottom: '1px solid var(--p-border)', overflow: 'hidden', padding: '1rem 0', background: 'var(--p-surface-2)' }}>
         <div className="marquee-track">
-          {[...INSTITUTIONS, ...INSTITUTIONS].map((name, i) => (
+          {[...institutions.items, ...institutions.items].map((name, i) => (
             <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingRight: '2.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--p-text-4)' }}>
               {name} <span style={{ color: 'var(--primary)' }}>◆</span>
             </span>
@@ -303,21 +318,14 @@ export default function PublicHome() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2.5rem', marginTop: '1.25rem' }} className="grid-2-sm">
           <div>
             <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0 0 1.25rem', color: 'var(--p-text-1)' }}>
-              A legislator for
-              <br /> seven parliaments.
+              {renderLines(bio.heading)}
             </h2>
             <p style={{ color: 'var(--p-text-2)', lineHeight: 1.7, fontSize: '1rem' }}>
-              Alban Sumana Kingsford Bagbin was born on <strong style={{ color: 'var(--p-text-1)' }}>24 September 1957</strong> to
-              Sansunni Bagbin and Margaret B. Bagbin, both peasant farmers — the fourth of nine children. A member of the
-              Dagaaba ethnic group, he hails from Sombo in the Upper West Region of Ghana.
+              {bio.intro}
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {[
-              { tag: 'Education', text: 'Attended Wa Secondary School and Tamale Secondary School. Earned a Bachelor of Arts in Law and English at the University of Ghana (1980), trained at the Ghana School of Law in Accra and was called to the bar in 1982. Later completed an Executive Master’s in Governance and Leadership at GIMPA.' },
-              { tag: 'Career', text: 'Acting secretary to the Statistical Service Board (1980–82), personnel manager at the State Hotels Corporation (1982–83) and English teacher in Tripoli, Libya. Joined Akyem Chambers as an attorney on return to Ghana in 1986, rising to partner, and has been a partner at the Law Trust company since 1993.' },
-              { tag: 'Personal life', text: 'Married to Alice Adjua Yornas Bagbin, a Programme Officer at the UNICEF Office in Ghana. He is a Christian and worships as a Roman Catholic.' },
-            ].map((b, i) => (
+            {bio.cards.map((b, i) => (
               <div key={b.tag} style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 12, padding: '1.1rem 1.25rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
                   <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', color: 'var(--p-text-3)' }}>0{i + 1}</span>
@@ -335,15 +343,14 @@ export default function PublicHome() {
         <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(4rem, 8vw, 6.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>02 · Public service & political life</span>
           <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '1rem 0 0.5rem', color: 'var(--p-text-1)' }}>
-            Thirty years of
-            <br /> parliamentary service.
+            {renderLines(timeline.heading)}
           </h2>
           <p style={{ color: 'var(--p-text-3)', maxWidth: '40rem', margin: '0 0 2.5rem' }}>
-            From constituency MP to the Speaker’s chair — the milestones of a career spanning every parliament of the Fourth Republic.
+            {timeline.subheading}
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '1rem' }}>
-            {TIMELINE.map((t, i) => (
+            {timeline.entries.map((t, i) => (
               <div key={t.year} style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.5rem', transition: 'border-color 0.25s, transform 0.25s' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--primary) 50%, transparent)'; e.currentTarget.style.transform = 'translateY(-3px)' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--p-border)'; e.currentTarget.style.transform = 'translateY(0)' }}>
