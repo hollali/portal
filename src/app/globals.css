@@ -1,49 +1,51 @@
 @import "tailwindcss";
 
-/* ─── Sanity-inspired theme ─────────────────────────────
-   Palette lifted from sanity.io:
-   bg #0b0b0b · brand #ff560a · grays #ededed→#212121
-   accent blue #0084f8 · error #f22                    */
+/* ─── Parliament of Ghana theme ────────────────────────
+   Palette from the Parliament of Ghana identity:
+   deep navy blue · rich gold · institutional neutrals   */
 
 :root {
-  --background: #0b0b0b;
-  --foreground: #ededed;
+  --background: #0f1117;
+  --foreground: #eeeeee;
   --muted: #797979;
   --muted-foreground: #b9b9b9;
   --border: #262626;
   --border-strong: #353535;
-  --card: #161616;
-  --card-hover: #1d1d1d;
-  --sidebar-bg: #0e0e0e;
-  --primary: #ff560a;
-  --primary-dark: #ff7a3d;
+  --card: #16181f;
+  --card-hover: #1d2028;
+  --sidebar-bg: #0e1013;
+  --primary: #f2a900;
+  --primary-dark: #f7b629;
   --primary-fg: #0b0b0b;
-  --primary-glow: rgba(255, 86, 10, 0.15);
-  --focus: #0084f8;
+  --primary-glow: rgba(242, 169, 0, 0.16);
+  --focus: #3a6fb5;
   --danger: #f22828;
   --success: #19d600;
   --warning: #fbbf24;
-  --row-hover: rgba(237, 237, 237, 0.04);
+  --row-hover: rgba(238, 238, 238, 0.04);
   --sidebar-width: 260px;
   color-scheme: dark;
 
   /* ─── Public landing surface tokens ─── */
-  --p-bg: #0b0b0b;
-  --p-surface: #131313;
-  --p-surface-2: #0d0d0d;
-  --p-surface-3: #0e0e0e;
-  --p-text-1: #ededed;
-  --p-text-2: #b9b9b9;
-  --p-text-3: #797979;
-  --p-text-4: #4a4a4a;
+  --p-bg: #0f1117;
+  --p-surface: #15171e;
+  --p-surface-2: #0d0f14;
+  --p-surface-3: #10131a;
+  --p-text-1: #eef0f5;
+  --p-text-2: #b9bdc9;
+  --p-text-3: #7c8190;
+  --p-text-4: #4c5160;
   --p-border: rgba(255, 255, 255, 0.08);
   --p-border-2: rgba(255, 255, 255, 0.06);
   --p-border-3: rgba(255, 255, 255, 0.12);
   --p-grid-line: rgba(255, 255, 255, 0.035);
-  --p-img-bg: #0b0b0b;
-  --p-cta-bg: linear-gradient(120deg, #1a0e06 0%, #2b1404 45%, #3a1a06 100%);
-  --p-cta-text: #d6b39a;
+  --p-img-bg: #0f1117;
+  --p-cta-bg: linear-gradient(120deg, #0e1b30 0%, #14284a 45%, #314d77 100%);
+  --p-cta-text: #d8b75a;
   --p-shadow: 0 24px 80px -20px rgba(0, 0, 0, 0.55);
+  --p-navy: #1d4289;
+  --p-navy-deep: #10295c;
+  --p-gold: #f2a900;
 }
 
 .dark {
@@ -52,7 +54,7 @@
 
 .light {
   --background: #ffffff;
-  --foreground: #0b0b0b;
+  --foreground: #0f1117;
   --muted: #797979;
   --muted-foreground: #4a4a4a;
   --border: #e6e6e6;
@@ -60,15 +62,15 @@
   --card: #ffffff;
   --card-hover: #fafafa;
   --sidebar-bg: #fafafa;
-  --primary: #f50;
-  --primary-dark: #e64d00;
+  --primary: #d99a00;
+  --primary-dark: #f2a900;
   --primary-fg: #0b0b0b;
-  --primary-glow: rgba(255, 85, 0, 0.12);
-  --focus: #0084f8;
+  --primary-glow: rgba(217, 154, 0, 0.14);
+  --focus: #1d4289;
   --danger: #d00;
   --success: #0f9d00;
   --warning: #d97706;
-  --row-hover: rgba(11, 11, 11, 0.04);
+  --row-hover: rgba(15, 17, 23, 0.04);
   color-scheme: light;
 
   /* ─── Public landing surface tokens (light) ─── */
@@ -76,18 +78,21 @@
   --p-surface: #f7f7f6;
   --p-surface-2: #f2f2f0;
   --p-surface-3: #fafafa;
-  --p-text-1: #0b0b0b;
-  --p-text-2: #3d3d3d;
-  --p-text-3: #6f6f6f;
-  --p-text-4: #9a9a9a;
+  --p-text-1: #0f1117;
+  --p-text-2: #3d4250;
+  --p-text-3: #6f7480;
+  --p-text-4: #9a9fa8;
   --p-border: rgba(0, 0, 0, 0.09);
   --p-border-2: rgba(0, 0, 0, 0.06);
   --p-border-3: rgba(0, 0, 0, 0.12);
   --p-grid-line: rgba(0, 0, 0, 0.045);
   --p-img-bg: #ececea;
-  --p-cta-bg: linear-gradient(120deg, #fff4ea 0%, #ffeadd 45%, #ffe1cc 100%);
-  --p-cta-text: #7a4415;
+  --p-cta-bg: linear-gradient(120deg, #eef3fb 0%, #e3ebf7 45%, #f7f0dd 100%);
+  --p-cta-text: #1d4289;
   --p-shadow: 0 24px 80px -20px rgba(0, 0, 0, 0.18);
+  --p-navy: #1d4289;
+  --p-navy-deep: #10295c;
+  --p-gold: #d99a00;
 }
 
 * {
@@ -536,3 +541,37 @@ a:hover {
 }
 .cms-prose img { max-width: 100%; border-radius: 12px; margin: 0.5rem 0; }
 .cms-prose hr { border: none; border-top: 1px solid var(--p-border); margin: 2rem 0; }
+
+/* ─── Public library hover utilities (server-render safe) ─── */
+.p-card {
+  transition: border-color 0.25s, transform 0.25s;
+}
+.p-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.p-card-lift {
+  transition: border-color 0.25s, transform 0.25s;
+}
+.p-card-lift:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  transform: translateY(-3px);
+}
+.p-link-strong {
+  transition: color 0.2s;
+}
+.p-link-strong:hover {
+  color: var(--p-text-1);
+}
+.p-link-primary {
+  transition: color 0.2s;
+}
+.p-link-primary:hover {
+  color: var(--primary);
+}
+.p-chip {
+  transition: color 0.2s, border-color 0.2s;
+}
+.p-chip:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}

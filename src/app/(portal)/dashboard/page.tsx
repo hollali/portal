@@ -73,7 +73,7 @@ export default function Dashboard() {
     { label: 'Images', count: stats.images, href: '/images', color: '#0084f8', icon: Image },
     { label: 'Videos', count: stats.videos, href: '/videos', color: '#19d600', icon: Video },
     { label: 'News', count: stats.news, href: '/news', color: '#ff23fc', icon: Newspaper },
-    { label: 'Audio', count: stats.audio, href: '/audio', color: '#ff560a', icon: Headphones },
+    { label: 'Audio', count: stats.audio, href: '/audio', color: '#f2a900', icon: Headphones },
   ]
 
   return (

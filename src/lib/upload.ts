@@ -8,6 +8,7 @@ const ALLOWED_EXT: Record<string, string[]> = {
   videos: ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.ogv'],
   news: ['.html', '.htm', '.txt', '.md', '.pdf'],
   audio: ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'],
+  documents: ['.pdf', '.doc', '.docx', '.txt', '.md', '.rtf', '.ppt', '.pptx'],
 }
 
 function sanitizeName(name: string): string {

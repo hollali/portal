@@ -39,9 +39,86 @@ model Image {
   notes               String?
   tags                String?
 
+  // Digital-library photo facets (Year → Event → Location → Person → Institution → Parliament → Theme)
+  dateTaken           String?  @map("date_taken")
+  year                Int?
+  event               String?
+  location            String?
+  person              String?
+  institution         String?
+  parliament          String?
+  theme               String?
+  caption             String?
+  curated             Boolean  @default(false)
+
   @@index([source])
   @@index([collectedAt])
+  @@index([year])
+  @@index([curated])
   @@map("images")
+}
+
+model ArchiveItem {
+  id          Int      @id @default(autoincrement())
+  kind        String
+  title       String
+  slug        String   @unique
+  date        String?
+  year        Int?
+  event       String?
+  location    String?
+  person      String?
+  institution String?
+  parliament  String?
+  theme       String?
+  venue       String?
+  source      String?
+  sourceUrl   String?
+  sourceType  String   @default("unverified") @map("source_type")
+  excerpt     String?
+  body        String?
+  filePath    String?  @map("file_path")
+  fileName    String?  @map("file_name")
+  coverUrl    String?  @map("cover_url")
+  featured    Boolean  @default(false)
+  status      String   @default("published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([kind])
+  @@index([status])
+  @@index([year])
+  @@map("archive_items")
+}
+
+model Testimonial {
+  id        Int      @id @default(autoincrement())
+  author    String
+  role      String?
+  quote     String
+  source    String?
+  year      Int?
+  photoUrl  String?  @map("photo_url")
+  sortOrder Int      @default(0) @map("sort_order")
+  status    String   @default("published")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("testimonials")
+}
+
+model Milestone {
+  id          Int      @id @default(autoincrement())
+  year        String
+  period      String?
+  title       String
+  description String?
+  category    String   @default("career")
+  order       Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([category])
+  @@map("milestones")
 }
 
 model Video {

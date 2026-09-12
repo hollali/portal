@@ -38,7 +38,11 @@ export default function NewsDetailPage() {
             {Object.entries(item).filter(([k]) => k !== 'id' && k !== 'snippet').map(([key, val]) => (
               <tr key={key}>
                 <th style={{ whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</th>
-                <td>{val === null || val === undefined ? '-' : String(val)}</td>
+                <td>
+                  {val === null || val === undefined ? '-' : /url/i.test(key) && typeof val === 'string' ? (
+                    <a href={val} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline', wordBreak: 'break-all' }}>{val}</a>
+                  ) : String(val)}
+                </td>
               </tr>
             ))}
           </tbody>

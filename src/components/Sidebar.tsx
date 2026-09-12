@@ -21,6 +21,7 @@ import {
   Bell,
   ShieldCheck,
   FileText,
+  Library,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
@@ -37,6 +38,7 @@ const adminLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/content', label: 'Content', icon: FileText },
+  { href: '/admin/archive', label: 'Archive', icon: Library },
   { href: '/admin/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
   { href: '/admin/health', label: 'Health', icon: Activity },
