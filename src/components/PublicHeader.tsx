@@ -123,14 +123,22 @@ export default function PublicHeader() {
           </span>
         </Link>
 
-        <nav className="hide-sm" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
+        <nav ref={dropdownRef} className="hide-sm" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
           {navLink('/', 'Home')}
           {navLink('/the-man', 'The Man')}
-          <div ref={dropdownRef} style={{ position: 'relative' }}>
+          <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setOpenMenu('archives')}
+            onMouseLeave={() => setOpenMenu(null)}
+          >
             {dropdownTrigger('archives', 'Archives', '/archives')}
             {dropdownPanel('archives', ARCHIVE_LINKS, '/archives', 'Browse all collections')}
           </div>
-          <div style={{ position: 'relative' }}>
+          <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setOpenMenu('media')}
+            onMouseLeave={() => setOpenMenu(null)}
+          >
             {dropdownTrigger('media', 'Media', '/media')}
             {dropdownPanel('media', MEDIA_LINKS, '/media', 'Open the media hub')}
           </div>

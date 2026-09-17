@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   const token = signToken({ userId: user.id, username: user.username, isAdmin: user.isAdmin, role: user.role })
   const cookieStore = await cookies()
-  cookieStore.set('session', token, { httpOnly: true, secure: false, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 })
+  cookieStore.set('session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 })
 
   await logAudit('login', 'user', user.id, user.id, `User "${user.username}" logged in`)
 
