@@ -5,6 +5,7 @@ import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { prisma } from '@/lib/prisma'
 import { getLibraryCounts } from '@/lib/libraryQueries'
+import { archiveRouteForKind } from '@/lib/library'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,7 +90,7 @@ export default async function ParliamentPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {legacyDocs.map(item => (
-                <Link key={item.id} href={`/archives/${item.kind === 'note' || item.kind === 'letter' || item.kind === 'memo' ? 'notes' : `${item.kind}s`}/${item.slug}`}
+                <Link key={item.id} href={`/archives/${archiveRouteForKind(item.kind)}/${item.slug}`}
                   style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'flex-start', gap: '1rem', padding: '1rem 0', borderBottom: '1px solid var(--p-border)' }}>
                   <span style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--p-surface-2)', border: '1px solid var(--p-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
                     <ScrollText size={18} />

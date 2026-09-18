@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { Search as SearchIcon, Mic, FileText, MessagesSquare, ScrollText, Award, Milestone as MilestoneIcon } from 'lucide-react'
-import { KIND_CONFIG, type ArchiveKind } from '@/lib/library'
+import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
 
 interface ArchiveHit { id: number; kind: string; title: string; slug: string; date: string | null; year: number | null; excerpt: string | null }
 interface MiscHit { id: number; title: string; description?: string; year?: string }
@@ -88,7 +88,7 @@ function SearchBox() {
                 {results.archive.items.map(a => {
                   const Icon = KIND_ICON[a.kind] || FileText
                   const cfg = KIND_CONFIG[a.kind as ArchiveKind]
-                  const route = a.kind === 'note' || a.kind === 'letter' || a.kind === 'memo' ? 'notes' : `${a.kind}s`
+                  const route = archiveRouteForKind(a.kind)
                   return (
                     <Link key={a.id} href={`/archives/${route}/${a.slug}`} style={{ textDecoration: 'none', display: 'block', padding: '0.6rem 0.25rem', borderBottom: '1px solid var(--border)' }} className="last:border-none">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: 'var(--p-text-1)' }}>

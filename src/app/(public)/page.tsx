@@ -20,7 +20,7 @@ import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { MAN_SECTIONS, ARCHIVE_LINKS } from '@/lib/man'
 import { getLibraryCounts, getLatestArchiveItems } from '@/lib/libraryQueries'
-import { KIND_CONFIG, type ArchiveKind } from '@/lib/library'
+import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
 
 export const dynamic = 'force-dynamic'
 
@@ -212,7 +212,7 @@ export default async function LibraryHome() {
           {latest.map(item => {
             const Icon = KIND_ICON[item.kind] || FileText
             const cfg = KIND_CONFIG[item.kind as ArchiveKind]
-            const route = item.kind === 'note' || item.kind === 'letter' || item.kind === 'memo' ? 'notes' : `${item.kind}s`
+            const route = archiveRouteForKind(item.kind)
             return (
               <Link key={item.id} href={`/archives/${route}/${item.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="p-card-lift" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.4rem', height: '100%' }}>

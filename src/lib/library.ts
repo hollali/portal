@@ -57,6 +57,11 @@ export const LIST_ROUTE_KINDS: Record<ListRouteKind, ArchiveKind[]> = {
   notes: ['note', 'letter', 'memo'],
 }
 
+export function archiveRouteForKind(kind: string): string {
+  const entry = Object.entries(LIST_ROUTE_KINDS).find(([, kinds]) => kinds.includes(kind as ArchiveKind))
+  return entry ? entry[0] : 'notes'
+}
+
 export const FACET_FIELDS = ['year', 'event', 'location', 'person', 'institution', 'parliament', 'theme'] as const
 export type FacetField = (typeof FACET_FIELDS)[number]
 
