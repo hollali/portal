@@ -1,5 +1,20 @@
 import { prisma } from '@/lib/prisma'
 
+const CACHE_TTL_MS = 60_000
+
+function memCache<T, A extends unknown[]>(load: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
+  const slots = new Map<string, { value: T; at: number }>()
+  return async (...args: A) => {
+    const key = JSON.stringify(args)
+    const entry = slots.get(key)
+    const now = Date.now()
+    if (entry && now - entry.at < CACHE_TTL_MS) return entry.value
+    const value = await load(...args)
+    slots.set(key, { value, at: now })
+    return value
+  }
+}
+
 export interface LibraryCounts {
   speeches: number
   papers: number
@@ -16,6 +31,9 @@ export interface LibraryCounts {
 }
 
 export async function getLibraryCounts(): Promise<LibraryCounts> {
+  return getLibraryCountsCached()
+}
+const getLibraryCountsCached = memCache(async () => {
   try {
     const [byKind, milestones, testimonials, photos, videos, audio, news, images] = await Promise.all([
       prisma.archiveItem.groupBy({ by: ['kind'], where: { status: 'published' }, _count: { _all: true } }),
@@ -55,7 +73,7 @@ export async function getLibraryCounts(): Promise<LibraryCounts> {
   } catch {
     return { speeches: 0, papers: 0, interviews: 0, notes: 0, milestones: 0, testimonials: 0, photos: 0, videos: 0, audio: 0, news: 0, images: 0, total: 0 }
   }
-}
+})
 
 export interface LatestItem {
   id: number
@@ -73,6 +91,10 @@ export interface LatestItem {
 }
 
 export async function getLatestArchiveItems(limit = 8): Promise<LatestItem[]> {
+  return getLatestArchiveItemsCached(limit)
+}
+
+const getLatestArchiveItemsCached = memCache(async (limit: number) => {
   try {
     const items = await prisma.archiveItem.findMany({
       where: { status: 'published' },
@@ -96,4 +118,4 @@ export async function getLatestArchiveItems(limit = 8): Promise<LatestItem[]> {
   } catch {
     return []
   }
-}
+})
