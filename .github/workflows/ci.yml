@@ -13,6 +13,9 @@ env:
   # Used only to satisfy env parsing during `next build`.
   # All data routes are dynamic, so no DB connection happens at build time.
   DATABASE_URL: postgresql://user:pass@localhost:5432/db?sslmode=require
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 jobs:
   ci:
@@ -49,15 +52,11 @@ jobs:
     needs: ci
     if: >-
       github.ref == 'refs/heads/main' &&
-      secrets.VERCEL_TOKEN != '' &&
-      secrets.VERCEL_ORG_ID != '' &&
-      secrets.VERCEL_PROJECT_ID != ''
+      env.VERCEL_TOKEN != '' &&
+      env.VERCEL_ORG_ID != '' &&
+      env.VERCEL_PROJECT_ID != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,13 +69,13 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: --prod
 
-  # Netlify alternative — enable by uncommenting and setting the NETLIFY_* secrets,
-  # then remove the Vercel deploy job above if Netlify is the host.
+  # Netlify alternative — enable by uncommenting, adding the NETLIFY_* env vars
+# to the workflow-level `env`, and removing the Vercel deploy job above.
   #
   # deploy-netlify:
   #   name: Deploy to Netlify
   #   needs: ci
-  #   if: github.ref == 'refs/heads/main' && secrets.NETLIFY_AUTH_TOKEN != ''
+  #   if: github.ref == 'refs/heads/main' && env.NETLIFY_AUTH_TOKEN != ''
   #   runs-on: ubuntu-latest
   #   env:
   #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
