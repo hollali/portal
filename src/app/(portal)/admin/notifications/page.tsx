@@ -48,7 +48,9 @@ export default function NotificationsPage() {
   }
 
   useEffect(() => {
-    if (isAdmin) fetchNotifications()
+    if (!isAdmin) return
+    const id = requestAnimationFrame(() => fetchNotifications())
+    return () => cancelAnimationFrame(id)
   }, [isAdmin])
 
   const markRead = async (id?: number) => {

@@ -28,6 +28,13 @@ export default function AuditPage() {
   const [total, setTotal] = useState(0);
   const perPage = 50;
 
+  const filterKey = `${entityType}|${action}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
   useEffect(() => {
     jsonFetch<{ isAdmin?: boolean }>("/api/me")
       .then((d) => {
@@ -39,19 +46,15 @@ export default function AuditPage() {
       });
   }, [router]);
 
-  // Reset to first page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [entityType, action]);
-
   useEffect(() => {
     if (!isAdmin) return;
     let active = true;
-    setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: String(perPage) });
     if (entityType) params.set("entityType", entityType);
     if (action) params.set("action", action);
-    jsonFetch<{ logs?: AuditLog[]; total?: number }>(`/api/admin/audit?${params}`)
+    Promise.resolve()
+      .then(() => setLoading(true))
+      .then(() => jsonFetch<{ logs?: AuditLog[]; total?: number }>(`/api/admin/audit?${params}`))
       .then((d) => {
         if (!active) return;
         setLogs(d?.logs || []);

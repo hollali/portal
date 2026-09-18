@@ -17,12 +17,18 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
 
   useEffect(() => {
     if (open) {
-      setVisible(true)
-      requestAnimationFrame(() => setAnimate(true))
-    } else {
-      setAnimate(false)
-      const timer = setTimeout(() => setVisible(false), 200)
-      return () => clearTimeout(timer)
+      const tid = window.setTimeout(() => setVisible(true), 0)
+      const rid = requestAnimationFrame(() => setAnimate(true))
+      return () => {
+        window.clearTimeout(tid)
+        cancelAnimationFrame(rid)
+      }
+    }
+    const rid = requestAnimationFrame(() => setAnimate(false))
+    const tid = window.setTimeout(() => setVisible(false), 200)
+    return () => {
+      cancelAnimationFrame(rid)
+      window.clearTimeout(tid)
     }
   }, [open])
 

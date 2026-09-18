@@ -151,8 +151,9 @@ export default function MediaManager({
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    jsonFetch<AdminData>(`/api/admin/${type}?${buildParams()}`)
+    Promise.resolve()
+      .then(() => setLoading(true))
+      .then(() => jsonFetch<AdminData>(`/api/admin/${type}?${buildParams()}`))
       .then((d: AdminData | null) => {
         if (active && d) setData(d)
       })

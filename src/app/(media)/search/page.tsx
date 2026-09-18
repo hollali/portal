@@ -43,9 +43,11 @@ function SearchBox() {
 
   useEffect(() => {
     const q0 = searchParams.get('q') || ''
-    setQuery(q0)
-    if (q0) run(q0)
-     
+    const id = requestAnimationFrame(() => {
+      setQuery(q0)
+      if (q0) run(q0)
+    })
+    return () => cancelAnimationFrame(id)
   }, [searchParams])
 
   const groupTitle = (label: string, href: string | null, total: number) => (

@@ -1,0 +1,91 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Used only to satisfy env parsing during `next build`.
+  # All data routes are dynamic, so no DB connection happens at build time.
+  DATABASE_URL: postgresql://user:pass@localhost:5432/db?sslmode=require
+
+jobs:
+  ci:
+    name: Lint · Typecheck · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to Vercel
+    needs: ci
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      secrets.VERCEL_TOKEN != '' &&
+      secrets.VERCEL_ORG_ID != '' &&
+      secrets.VERCEL_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        uses: vercel/action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: --prod
+
+  # Netlify alternative — enable by uncommenting and setting the NETLIFY_* secrets,
+  # then remove the Vercel deploy job above if Netlify is the host.
+  #
+  # deploy-netlify:
+  #   name: Deploy to Netlify
+  #   needs: ci
+  #   if: github.ref == 'refs/heads/main' && secrets.NETLIFY_AUTH_TOKEN != ''
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  #     NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: jsmrcaga/action-netlify-deploy@v2.3.0
+  #       with:
+  #         NETLIFY_AUTH_TOKEN: ${{ env.NETLIFY_AUTH_TOKEN }}
+  #         NETLIFY_SITE_ID: ${{ env.NETLIFY_SITE_ID }}
+  #         install_command: npm ci
+  #         build_command: npm run build

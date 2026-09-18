@@ -54,7 +54,9 @@ export default function UsersPage() {
   }, [])
 
   useEffect(() => {
-    if (isAdmin) fetchUsers()
+    if (!isAdmin) return
+    const id = requestAnimationFrame(() => fetchUsers())
+    return () => cancelAnimationFrame(id)
   }, [isAdmin, fetchUsers])
 
   const handleAdd = async (e: FormEvent<HTMLFormElement>) => {

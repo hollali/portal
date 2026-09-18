@@ -53,7 +53,9 @@ export default function HealthPage() {
   }, [])
 
   useEffect(() => {
-    if (isAdmin) fetchHealth()
+    if (!isAdmin) return
+    const id = requestAnimationFrame(() => fetchHealth())
+    return () => cancelAnimationFrame(id)
   }, [isAdmin, fetchHealth])
 
   const refresh = () => {
