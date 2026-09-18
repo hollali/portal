@@ -32,8 +32,14 @@ export default function LoginPage() {
       }
     }
     else {
-      const data = await res.json()
-      setError(data.error || 'Login failed')
+      let message = 'Login failed'
+      try {
+        const data = await res.json()
+        if (data?.error) message = data.error
+      } catch {
+        if (res.status >= 500) message = 'Server error, please retry'
+      }
+      setError(message)
     }
   }
 

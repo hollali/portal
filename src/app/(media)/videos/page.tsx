@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface VideoRow {
   id: number
   url: string | null
+  src: string | null
   localPath: string | null
   source: string | null
   title: string | null
@@ -33,17 +35,16 @@ export default function VideoListPage() {
     const params = new URLSearchParams({ page: String(page), sort: 'id', dir: 'desc', perPage: '20' })
     if (query) params.set('q', query)
     if (source) params.set('source', source)
-    fetch(`/api/videos?${params}`).then(r => r.json()).then(setData)
+    jsonFetch<ListData>(`/api/videos?${params}`).then(d => d && setData(d))
   }, [page, query, source])
 
   const totalPages = Math.ceil(data.total / 20)
 
   const getPlayUrl = (item: VideoRow) => {
-    const local = localToMediaUrl(item.localPath)
-    if (local) return { type: 'local', url: local }
-    if (item.url && isYouTubeUrl(item.url)) return { type: 'youtube', url: getYouTubeEmbedUrl(item.url)! }
-    if (item.url) return { type: 'remote', url: item.url }
-    return null
+    if (!item.src) return null
+    if (item.src.startsWith('/api/media')) return { type: 'local', url: item.src }
+    if (isYouTubeUrl(item.src)) return { type: 'youtube', url: getYouTubeEmbedUrl(item.src)! }
+    return { type: 'remote', url: item.src }
   }
 
   return (

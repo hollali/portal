@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
+import TestimonialCarousel from '@/components/TestimonialCarousel'
 import { MAN_SECTIONS, ARCHIVE_LINKS } from '@/lib/man'
 import { getLibraryCounts, getLatestArchiveItems } from '@/lib/libraryQueries'
 import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
@@ -59,6 +60,17 @@ const NUM_ICONS: Record<string, LucideIcon> = {
   Audio: Headphones,
 }
 
+const EDUCATION_CAPS: Record<string, string> = {
+  'Wa Secondary School': 'Senior secondary',
+  'Tamale Secondary School': 'Senior secondary',
+  'University of Ghana': 'BA Law & English · 1980',
+  'Ghana School of Law': 'Called to the Bar · 1982',
+  GIMPA: 'Executive Master’s · Governance & Leadership',
+}
+
+const SCHOOLS = (MAN_SECTIONS.find(s => s.id === 'education')?.items ?? [])
+  .map(s => ({ name: s.title, cap: EDUCATION_CAPS[s.title] ?? null }))
+
 export default async function LibraryHome() {
   const counts = await getLibraryCounts()
   const latest = await getLatestArchiveItems(8)
@@ -75,10 +87,10 @@ export default async function LibraryHome() {
       <PublicHeader />
 
       {/* ── Hero ───────────────────────────────────────── */}
-      <section style={{ position: 'relative', overflow: 'hidden' }}>
+      <section id="content" style={{ position: 'relative', overflow: 'hidden' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div className="orb" style={{ position: 'absolute', top: -140, right: -120, width: 460, height: 460, borderRadius: '50%', background: 'radial-gradient(circle, rgba(242,169,0,0.22) 0%, rgba(29,66,137,0.18) 45%, transparent 70%)', filter: 'blur(10px)', pointerEvents: 'none' }} />
-        <div className="p-hero p-section" style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(4rem, 9vw, 7rem) 1.5rem clamp(2.5rem, 5vw, 4rem)', display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', alignItems: 'center', gap: '3rem' }}>
+        <div className="p-hero p-section" data-motion-entry style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(4rem, 9vw, 7rem) 1.5rem clamp(2.5rem, 5vw, 4rem)', display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', alignItems: 'center', gap: '3rem' }}>
           <div>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.375rem 0.75rem', borderRadius: 999 }}>
               <Landmark size={12} /> Speaker of the Parliament of Ghana
@@ -130,8 +142,21 @@ export default async function LibraryHome() {
         </div>
       </section>
 
+      {/* ── Schools attended marquee ─────────────────── */}
+      <div className="marquee-paused" style={{ borderTop: '1px solid var(--p-border)', borderBottom: '1px solid var(--p-border)', overflow: 'hidden', padding: '1rem 0', background: 'var(--p-surface-2)' }}>
+        <div className="marquee-track">
+          {[...SCHOOLS, ...SCHOOLS].map((s, i) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingRight: '2.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.75rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--p-text-4)' }}>
+              <span>{s.name}</span>
+              {s.cap && <span style={{ color: 'var(--p-text-3)' }}>{s.cap}</span>}
+              <span style={{ color: 'var(--primary)' }}>◆</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* ── Archive quick links ───────────────────────── */}
-      <section className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
+      <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
         <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The digital archives</span>
         <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 0.5rem', color: 'var(--p-text-1)' }}>
           Explore the collections
@@ -164,7 +189,7 @@ export default async function LibraryHome() {
 
       {/* ── The Man teaser ─────────────────────────────── */}
       <section style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-3)' }}>
-        <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
+        <div className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
             <div>
               <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The Man</span>
@@ -193,7 +218,7 @@ export default async function LibraryHome() {
       </section>
 
       {/* ── Latest additions ───────────────────────────── */}
-      <section className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
+      <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
           <div>
             <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Recently added</span>
@@ -237,15 +262,16 @@ export default async function LibraryHome() {
 
       {/* ── Testimonial band ───────────────────────────── */}
       <section style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-3)' }}>
-        <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
+        <div className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
             <div style={{ maxWidth: 680 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>
-                <Quote size={13} /> Testimonials
-              </span>
-              <blockquote style={{ margin: '1rem 0 0', fontSize: 'clamp(1.1rem, 2.4vw, 1.45rem)', lineHeight: 1.55, color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif' }}>
-                &ldquo;In Rt. Hon. Alban Bagbin, Ghana has a Speaker whose commitment to parliamentary independence and the rule of law speaks to the highest traditions of legislative service.&rdquo;
-              </blockquote>
+              <TestimonialCarousel
+                quotes={[
+                  { quote: 'In Rt. Hon. Alban Bagbin, Ghana has a Speaker whose commitment to parliamentary independence and the rule of law speaks to the highest traditions of legislative service.' },
+                  { quote: 'Three decades in public life, and he has never stopped showing up — for the people of the Upper West first, and for Parliament as an institution always.' },
+                  { quote: 'His is a career built on the conviction that the chamber belongs to the people it serves — and the records are kept so the people can see it.' },
+                ]}
+              />
               <Link href="/archives/testimonials" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderBottom: '1px solid var(--primary)', paddingBottom: '0.25rem', marginTop: '1.25rem' }}>
                 Read more testimonials <ArrowUpRight size={15} style={{ color: 'var(--primary)' }} />
               </Link>

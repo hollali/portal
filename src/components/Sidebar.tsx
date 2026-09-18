@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useSyncExternalStore } from 'react'
+import { jsonFetch } from '@/lib/jsonFetch'
 import {
   LayoutDashboard,
   Image,
@@ -101,20 +102,16 @@ export default function Sidebar() {
   const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, () => true)
 
   useEffect(() => {
-    fetch('/api/me')
-      .then(r => r.json())
-      .then(d => {
-        if (d.username) { setUsername(d.username); setIsAdmin(d.isAdmin); setRole(d.role || '') }
-      })
-      .catch(() => {})
+    jsonFetch<{ username?: string; isAdmin?: boolean; role?: string }>('/api/me').then(d => {
+      if (d?.username) { setUsername(d.username); setIsAdmin(d.isAdmin || false); setRole(d.role || '') }
+    })
   }, [])
 
   useEffect(() => {
     if (!isAdmin) return
-    fetch('/api/admin/notifications?limit=1')
-      .then(r => r.json())
-      .then(d => setUnread(d.unreadCount || 0))
-      .catch(() => {})
+    jsonFetch<{ unreadCount?: number }>('/api/admin/notifications?limit=1').then(d => {
+      setUnread(d?.unreadCount || 0)
+    })
   }, [isAdmin])
 
   const handleLogout = async () => {

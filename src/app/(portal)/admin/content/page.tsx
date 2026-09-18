@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { Modal, AnimBtn, Toast, Skeleton, EmptyState } from '@/components/ui'
+import { jsonFetch } from '@/lib/jsonFetch'
 import {
   DEFAULT_SECTIONS,
   normalizeSlug,
@@ -314,8 +315,8 @@ export default function ContentAdminPage() {
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(d => {
-      if (d.role !== 'admin' && d.role !== 'editor') {
+    jsonFetch<{ role?: string }>('/api/me').then(d => {
+      if (d?.role !== 'admin' && d?.role !== 'editor') {
         router.push('/login')
         return
       }
@@ -326,11 +327,11 @@ export default function ContentAdminPage() {
   useEffect(() => {
     if (!role) return
     Promise.all([
-      fetch('/api/admin/content').then(r => r.json()),
-      fetch('/api/admin/pages').then(r => r.json()),
+      jsonFetch<{ sections?: SectionRow[] }>('/api/admin/content'),
+      jsonFetch<{ pages?: PageRow[] }>('/api/admin/pages'),
     ]).then(([c, p]) => {
-      setSections(c.sections || [])
-      setPages(p.pages || [])
+      setSections(c?.sections || [])
+      setPages(p?.pages || [])
       setLoaded(true)
     }).catch(() => setLoaded(true))
   }, [role])
@@ -362,7 +363,7 @@ export default function ContentAdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save', key, data, status }),
     })
-    const d = await res.json()
+    const d: { error?: string; section?: SectionRow } = await res.json().catch(() => ({}))
     setSavingKey(null)
     if (res.ok) {
       notify(status === 'published' ? `"${key}" published` : `"${key}" saved`)
@@ -378,7 +379,7 @@ export default function ContentAdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'set_status', key, status }),
     })
-    const d = await res.json()
+    const d: { error?: string; section?: SectionRow } = await res.json().catch(() => ({}))
     if (res.ok) {
       notify(`"${key}" ${status === 'published' ? 'published' : 'moved to draft'}`)
       setSections(prev => prev.map(s => (s.key === key ? { ...s, status: d.section?.status ?? status } : s)))
@@ -417,10 +418,10 @@ export default function ContentAdminPage() {
         body: pageForm.body,
       }),
     })
-    const d = await res.json()
-    if (!res.ok) { notify(d.error || 'Failed to save page', 'error'); return }
-    const reload = await fetch('/api/admin/pages').then(r => r.json())
-    setPages(reload.pages || [])
+    const d: { error?: string } = await res.json().catch(() => ({}))
+    if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
+    const reload = await jsonFetch<{ pages?: PageRow[] }>('/api/admin/pages')
+    setPages(reload?.pages || [])
     setPageModal(null)
     notify(pageModal.mode === 'create' ? 'Page created' : 'Page updated')
   }
@@ -431,9 +432,9 @@ export default function ContentAdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'set_status', id: page.id, status: draft ? 'draft' : 'published' }),
     })
-    const d = await res.json()
-    if (!res.ok) { notify(d.error || 'Failed to update', 'error'); return }
-    setPages(prev => prev.map(p => (p.id === page.id ? { ...p, status: d.page.status, publishedAt: d.page.publishedAt } : p)))
+    const d: { error?: string; page?: PageRow } = await res.json().catch(() => ({}))
+    if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
+    setPages(prev => prev.map(p => (p.id === page.id ? { ...p, status: d.page?.status ?? p.status, publishedAt: d.page?.publishedAt ?? p.publishedAt } : p)))
     notify(draft ? 'Page moved to draft' : 'Page published')
   }
 
@@ -448,8 +449,8 @@ export default function ContentAdminPage() {
       setPages(prev => prev.filter(p => p.id !== page.id))
       notify('Page deleted')
     } else {
-      const d = await res.json()
-      notify(d.error || 'Failed to delete', 'error')
+      const d: { error?: string } = await res.json().catch(() => ({}))
+      notify(d.error || 'Failed', 'error')
     }
   }
 

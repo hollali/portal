@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
+import { jsonFetch } from '@/lib/jsonFetch'
 import {
   Eye,
   Trash2,
@@ -48,6 +49,7 @@ interface MediaItem {
   source?: string
   query?: string
   url?: string
+  src?: string
   localPath?: string | null
   title?: string
   channel?: string
@@ -74,8 +76,8 @@ interface AdminData {
 
 type ViewMode = 'details' | 'edit' | 'public'
 
-function getMediaUrl(item: { localPath?: string | null; url?: string | null }): string | null {
-  return localToMediaUrl(item.localPath) || item.url || null
+function getMediaUrl(item: { src?: string | null; localPath?: string | null; url?: string | null }): string | null {
+  return item.src || localToMediaUrl(item.localPath) || item.url || null
 }
 
 function formatDuration(duration?: number | null): string {
@@ -143,18 +145,16 @@ export default function MediaManager({
   )
 
   const fetchData = useCallback(async () => {
-    const res = await fetch(`/api/admin/${type}?${buildParams()}`)
-    const d: AdminData = await res.json()
-    setData(d)
+    const d = await jsonFetch<AdminData>(`/api/admin/${type}?${buildParams()}`)
+    if (d) setData(d)
   }, [type, buildParams])
 
   useEffect(() => {
     let active = true
     setLoading(true)
-    fetch(`/api/admin/${type}?${buildParams()}`)
-      .then(r => r.json())
-      .then((d: AdminData) => {
-        if (active) setData(d)
+    jsonFetch<AdminData>(`/api/admin/${type}?${buildParams()}`)
+      .then((d: AdminData | null) => {
+        if (active && d) setData(d)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -243,7 +243,7 @@ export default function MediaManager({
     formData.set('action', 'bulk_import')
     formData.set('type', type)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setBulkImporting(false)
     if (res.ok) {
       setToast({ message: `Imported ${d.created} record(s), skipped ${d.skipped} duplicate(s)` })
@@ -272,7 +272,7 @@ export default function MediaManager({
     formData.set('dateFrom', dateFrom)
     formData.set('dateTo', dateTo)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setDeleting(false)
     if (res.ok) {
       setToast({ message: `Deleted ${d.deleted} record(s)` })
@@ -293,7 +293,7 @@ export default function MediaManager({
     formData.set('tags', bulkTagValue)
     formData.set('mode', bulkTagMode)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setBulkOperating(false)
     if (res.ok) {
       setToast({ message: `Updated tags on ${d.updated} item(s)` })
@@ -315,7 +315,7 @@ export default function MediaManager({
     formData.set('pks', Array.from(selected).join(','))
     formData.set('source', bulkReassignValue)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setBulkOperating(false)
     if (res.ok) {
       setToast({ message: `Reassigned source on ${d.updated} item(s)` })
@@ -336,7 +336,7 @@ export default function MediaManager({
     formData.set('action', 'csv_import')
     formData.set('type', type)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setCsvImporting(false)
     if (res.ok) {
       setToast({
@@ -402,13 +402,13 @@ export default function MediaManager({
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
     setEditing(false)
     if (res.ok) {
-      const d = await res.json()
+      const d = await res.json().catch(() => ({}))
       setToast({ message: `Updated #${viewItem.id}` })
       setViewItem(d.item)
       setViewMode('details')
       fetchData()
     } else {
-      const d = await res.json()
+      const d = await res.json().catch(() => ({}))
       setToast({ message: d.error || 'Failed to update', type: 'error' })
     }
   }
@@ -1647,7 +1647,7 @@ function ModalActions({
 /* ---------- Public preview ---------- */
 
 function PublicPreview({ type, item }: { type: MediaType; item: MediaItem }) {
-  const mediaUrl = localToMediaUrl(item.localPath) || getMediaUrl({ localPath: item.localPath, url: item.url })
+  const mediaUrl = getMediaUrl(item)
 
   return (
     <div>

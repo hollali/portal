@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import MediaManager, { MEDIA_TYPES, MEDIA_LABELS, type MediaType } from '@/components/admin/MediaManager'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function AdminMediaPage() {
   const router = useRouter()
@@ -10,10 +11,9 @@ export default function AdminMediaPage() {
   const [state, setState] = useState<{ role: string } | null>(null)
 
   useEffect(() => {
-    fetch('/api/me')
-      .then(r => r.json())
+    jsonFetch<{ isAdmin?: boolean; role?: string }>('/api/me')
       .then(d => {
-        if (!d.isAdmin) {
+        if (!d?.isAdmin) {
           router.push('/login')
           return
         }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { localToMediaUrl } from '@/lib/media'
+import { jsonFetch } from '@/lib/jsonFetch'
 import { Image, Video, Newspaper, Headphones, Database, Globe } from 'lucide-react'
 
 interface Stats {
@@ -51,13 +52,13 @@ export default function Dashboard() {
   const [animCount, setAnimCount] = useState(false)
 
   useEffect(() => {
-    fetch('/api/stats').then(r => r.json()).then(setStats)
+    jsonFetch<Stats>('/api/stats').then(d => d && setStats(d))
     Promise.all([
-      fetch('/api/images?perPage=8').then(r => r.json()),
-      fetch('/api/videos?perPage=8').then(r => r.json()),
-      fetch('/api/news?perPage=8').then(r => r.json()),
-      fetch('/api/audio?perPage=8').then(r => r.json()),
-    ]).then(([i, v, n, a]) => setRecent({ images: i.items, videos: v.items, news: n.items, audio: a.items }))
+      jsonFetch<{ items: RecentImage[] }>('/api/images?perPage=8'),
+      jsonFetch<{ items: RecentVideo[] }>('/api/videos?perPage=8'),
+      jsonFetch<{ items: RecentNews[] }>('/api/news?perPage=8'),
+      jsonFetch<{ items: RecentAudio[] }>('/api/audio?perPage=8'),
+    ]).then(([i, v, n, a]) => setRecent({ images: i?.items ?? [], videos: v?.items ?? [], news: n?.items ?? [], audio: a?.items ?? [] }))
   }, [])
 
   useEffect(() => {

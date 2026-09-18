@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Activity, RefreshCw, HardDrive, Database, AlertTriangle, CheckCircle2, FileWarning, EyeOff } from 'lucide-react'
 import { AnimBtn, SkeletonTable, EmptyState } from '@/components/ui'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface TypeHealth {
   type: string
@@ -32,8 +33,8 @@ export default function HealthPage() {
   const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(d => {
-      if (!d.role || !['admin', 'editor', 'viewer'].includes(d.role)) {
+    jsonFetch<{ role?: string }>('/api/me').then(d => {
+      if (!d?.role || !['admin', 'editor', 'viewer'].includes(d.role)) {
         router.push('/login')
         return
       }
@@ -44,8 +45,8 @@ export default function HealthPage() {
   const fetchHealth = useCallback(async () => {
     const res = await fetch('/api/admin/health')
     if (res.ok) {
-      const d = await res.json()
-      setData(d)
+      const d = await res.json().catch(() => null)
+      if (d) setData(d)
     }
     setLoading(false)
     setRefreshing(false)

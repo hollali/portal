@@ -4,16 +4,16 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 import type { MediaType } from '@/components/admin/MediaManager'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function AdminPage() {
   const router = useRouter()
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    fetch('/api/me')
-      .then(r => r.json())
+    jsonFetch<{ isAdmin?: boolean }>('/api/me')
       .then(d => {
-        if (!d.isAdmin) {
+        if (!d?.isAdmin) {
           router.push('/login')
           return
         }

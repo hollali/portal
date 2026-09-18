@@ -42,7 +42,7 @@ export default async function ParliamentPage() {
       <PublicHeader />
 
       {/* ── Hero ── */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
+      <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Parliament · The 8th House</span>
@@ -57,7 +57,7 @@ export default async function ParliamentPage() {
 
       <main style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
         {/* ── Signature rulings ── */}
-        <section style={{ marginBottom: '3.5rem' }}>
+        <section data-motion-entry style={{ marginBottom: '3.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
             <div>
               <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The record of the chair</span>
@@ -78,7 +78,7 @@ export default async function ParliamentPage() {
         </section>
 
         {/* ── Legacy documents ── */}
-        <section style={{ marginBottom: '3.5rem' }}>
+        <section data-motion-entry style={{ marginBottom: '3.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
             <div>
               <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>In the record</span>
@@ -109,7 +109,7 @@ export default async function ParliamentPage() {
         </section>
 
         {/* ── Parliamentary milestones ── */}
-        <section style={{ marginBottom: '3rem' }}>
+        <section data-motion-entry style={{ marginBottom: '3rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
             <div>
               <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Milestones</span>

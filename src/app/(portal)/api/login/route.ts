@@ -5,12 +5,25 @@ import { verifyPassword, signToken } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 
 export async function POST(request: Request) {
-  const { username, password } = await request.json()
+  let username = ''
+  let password = ''
+  try {
+    const body = await request.json()
+    username = body?.username ?? ''
+    password = body?.password ?? ''
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
   if (!username || !password) {
     return NextResponse.json({ error: 'Username and password required' }, { status: 400 })
   }
 
-  const user = await prisma.user.findUnique({ where: { username } })
+  let user: { id: number; username: string; password: string; isAdmin: boolean; role: string } | null
+  try {
+    user = await prisma.user.findUnique({ where: { username } })
+  } catch {
+    return NextResponse.json({ error: 'Database unavailable, please retry' }, { status: 503 })
+  }
   if (!user || !(await verifyPassword(password, user.password))) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }

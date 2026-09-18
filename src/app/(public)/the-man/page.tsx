@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowDown, Landmark, Quote } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
+import ChapterNav from '@/components/ChapterNav'
 import { MAN_SECTIONS } from '@/lib/man'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,7 @@ export default function TheManPage() {
       <PublicHeader />
 
       {/* Page hero */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
+      <section id="content" data-motion-entry style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', alignItems: 'center', gap: '3rem' }} className="p-hero">
           <div>
@@ -54,30 +55,38 @@ export default function TheManPage() {
       </section>
 
       {/* Sections */}
-      {MAN_SECTIONS.map(s => (
-        <section key={s.id} id={s.id} style={{ borderBottom: '1px solid var(--p-border)', background: s.id === 'education' ? 'var(--p-surface-3)' : undefined }}>
-          <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: '3rem' }} className="grid-2-sm">
-              <div>
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{s.eyebrow}</span>
-                <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 1rem', color: 'var(--p-text-1)' }}>{s.title}</h2>
-                <p style={{ color: 'var(--p-text-2)', lineHeight: 1.7, fontSize: '0.98rem', margin: 0 }}>{s.intro}</p>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {s.items.map((item, i) => (
-                  <div key={item.title} className="p-card" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 12, padding: '1.25rem 1.4rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.4rem' }}>
-                      <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', color: 'var(--p-text-4)', whiteSpace: 'nowrap' }}>{String(i + 1).padStart(2, '0')}</span>
-                      <span style={{ fontWeight: 700, fontSize: '1.02rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)' }}>{item.title}</span>
+      <div className="p-toc-wrap" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem clamp(3.5rem, 7vw, 5.5rem)' }}>
+        <ChapterNav sections={MAN_SECTIONS} />
+        <div>
+          {MAN_SECTIONS.map(s => (
+            <section
+              key={s.id}
+              id={s.id}
+              data-motion-entry
+              style={{ scrollMarginTop: 96, border: '1px solid var(--p-border)', borderRadius: 16, marginBottom: '1.5rem', padding: 'clamp(1.75rem, 3.5vw, 2.5rem)', background: s.id === 'education' ? 'var(--p-surface-3)' : 'var(--p-surface)' }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: '2.5rem' }} className="grid-2-sm">
+                <div>
+                  <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{s.eyebrow}</span>
+                  <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 1rem', color: 'var(--p-text-1)' }}>{s.title}</h2>
+                  <p style={{ color: 'var(--p-text-2)', lineHeight: 1.7, fontSize: '0.98rem', margin: 0 }}>{s.intro}</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {s.items.map((item, i) => (
+                    <div key={item.title} className="p-card" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 12, padding: '1.25rem 1.4rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', color: 'var(--p-text-4)', whiteSpace: 'nowrap' }}>{String(i + 1).padStart(2, '0')}</span>
+                        <span style={{ fontWeight: 700, fontSize: '1.02rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)' }}>{item.title}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.65, color: 'var(--p-text-2)' }}>{item.text}</p>
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.65, color: 'var(--p-text-2)' }}>{item.text}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-        </section>
-      ))}
+            </section>
+          ))}
+        </div>
+      </div>
 
       {/* Explore band */}
       <section className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>

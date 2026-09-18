@@ -58,7 +58,7 @@ export default async function ArchiveDetailPage({ params }: Props) {
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
 
-      <main style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem 4rem' }}>
+      <main id="content" style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem 4rem' }}>
         <Link href={`/archives/${kind}`} className="p-link-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-3)', textDecoration: 'none', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
           <ArrowLeft size={15} /> Back to {kind === 'notes' ? 'Notes & Correspondence' : kind}
         </Link>

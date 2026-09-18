@@ -7,6 +7,7 @@ import {
   Award, Milestone as MilestoneIcon, Upload, ListFilter,
 } from 'lucide-react'
 import { Modal, AnimBtn, Toast, Skeleton, EmptyState } from '@/components/ui'
+import { jsonFetch } from '@/lib/jsonFetch'
 import { KIND_CONFIG, DOCUMENT_KINDS, FACET_LABELS, type ArchiveKind } from '@/lib/library'
 
 type Tab = 'archive' | 'milestones' | 'testimonials'
@@ -74,25 +75,24 @@ export default function ArchiveAdminPage() {
   const [testiForm, setTestiForm] = useState<Record<string, string>>({})
 
   const load = async (t: Tab) => {
-    const res = await fetch(`/api/admin/library?type=${t}&q=${encodeURIComponent(search)}`)
-    const d = await res.json()
-    if (t === 'archive') setArchive(d.items || [])
-    else if (t === 'milestones') setMilestones(d.items || [])
-    else setTestimonials(d.items || [])
+    const d = await jsonFetch<{ items?: ArchiveRow[] | MilestoneRow[] | TestimonialRow[] }>(`/api/admin/library?type=${t}&q=${encodeURIComponent(search)}`)
+    if (t === 'archive') setArchive((d?.items || []) as ArchiveRow[])
+    else if (t === 'milestones') setMilestones((d?.items || []) as MilestoneRow[])
+    else setTestimonials((d?.items || []) as TestimonialRow[])
     setLoaded(true)
   }
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(d => {
-      if (d.role !== 'admin' && d.role !== 'editor') { router.push('/login'); return }
+    jsonFetch<{ role?: string }>('/api/me').then(d => {
+      if (d?.role !== 'admin' && d?.role !== 'editor') { router.push('/login'); return }
       setRole(d.role)
     })
   }, [router])
 
   useEffect(() => {
     if (!role) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(tab)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, tab, search])
 
   const notify = (message: string, type?: 'success' | 'error') => setToast({ message, type })
@@ -136,7 +136,7 @@ export default function ArchiveAdminPage() {
     if (status) body.set('status', status)
     if (docFile) body.set('file', docFile)
     const res = await fetch('/api/admin/library', { method: 'POST', body })
-    const d = await res.json()
+    const d: { error?: string } = await res.json().catch(() => ({}))
     if (!res.ok) { notify(d.error || 'Failed to save', 'error'); return }
     notify(docModal.mode === 'edit' ? 'Document updated' : 'Document created')
     closeDocModal()
@@ -166,7 +166,7 @@ export default function ArchiveAdminPage() {
   const submitMile = async (status?: string) => {
     if (!mileModal) return
     const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: mileModal.mode === 'edit' ? 'update' : 'create', type: 'milestones', ...(mileModal.mode === 'edit' && mileModal.row ? { id: mileModal.row.id } : {}), ...mileForm, ...(status ? { status } : {}) }) })
-    const d = await res.json()
+    const d: { error?: string } = await res.json().catch(() => ({}))
     if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
     notify(mileModal.mode === 'edit' ? 'Milestone updated' : 'Milestone created')
     closeMileModal(); load('milestones')
@@ -189,7 +189,7 @@ export default function ArchiveAdminPage() {
   const submitTesti = async (status?: string) => {
     if (!testiModal) return
     const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: testiModal.mode === 'edit' ? 'update' : 'create', type: 'testimonials', ...(testiModal.mode === 'edit' && testiModal.row ? { id: testiModal.row.id } : {}), ...testiForm, ...(status ? { status } : {}) }) })
-    const d = await res.json()
+    const d: { error?: string } = await res.json().catch(() => ({}))
     if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
     notify(testiModal.mode === 'edit' ? 'Testimonial updated' : 'Testimonial created')
     closeTestiModal(); load('testimonials')

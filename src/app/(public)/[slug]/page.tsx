@@ -28,7 +28,7 @@ export default async function CmsPage({ params }: Props) {
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
-      <main style={{ maxWidth: 820, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem 4rem' }}>
+      <main id="content" style={{ maxWidth: 820, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem 4rem' }}>
         <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>
           About
         </span>

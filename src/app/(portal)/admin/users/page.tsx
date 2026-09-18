@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Plus, Pencil, Trash2, ShieldCheck, Shield } from 'lucide-react'
 import { Modal, AnimBtn, Toast, SkeletonTable, EmptyState } from '@/components/ui'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface User {
   id: number
@@ -32,8 +33,8 @@ export default function UsersPage() {
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(d => {
-      if (!d.isAdmin || d.role !== 'admin') {
+    jsonFetch<{ isAdmin?: boolean; role?: string }>('/api/me').then(d => {
+      if (!d?.isAdmin || d.role !== 'admin') {
         router.push('/login')
         return
       }
@@ -43,11 +44,11 @@ export default function UsersPage() {
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users')
-    const d = await res.json()
     if (res.ok) {
-      setUsers(d.users || [])
-      const me = await fetch('/api/me').then(r => r.json())
-      setSelfId(me.userId ?? null)
+      const d = await res.json().catch(() => null)
+      setUsers(d?.users || [])
+      const me = await jsonFetch<{ userId?: number }>('/api/me')
+      setSelfId(me?.userId ?? null)
     }
     setLoading(false)
   }, [])
@@ -73,7 +74,7 @@ export default function UsersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setSaving(false)
     if (res.ok) {
       setToast({ message: `User "${body.username}" created` })
@@ -103,7 +104,7 @@ export default function UsersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setSaving(false)
     if (res.ok) {
       setToast({ message: `User "${editingUser.username}" updated` })
@@ -117,7 +118,7 @@ export default function UsersPage() {
   const handleDelete = async (user: User) => {
     if (!confirm(`Delete user "${user.username}"? This cannot be undone.`)) return
     const res = await fetch(`/api/admin/users?id=${user.id}`, { method: 'DELETE' })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     if (res.ok) {
       setToast({ message: `Deleted user "${user.username}"` })
       fetchUsers()

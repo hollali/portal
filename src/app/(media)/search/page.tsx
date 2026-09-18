@@ -7,6 +7,7 @@ import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { Search as SearchIcon, Mic, FileText, MessagesSquare, ScrollText, Award, Milestone as MilestoneIcon } from 'lucide-react'
 import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface ArchiveHit { id: number; kind: string; title: string; slug: string; date: string | null; year: number | null; excerpt: string | null }
 interface MiscHit { id: number; title: string; description?: string; year?: string }
@@ -35,9 +36,8 @@ function SearchBox() {
   const run = (q: string) => {
     if (!q.trim()) { setResults(null); return }
     setLoading(true)
-    fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)
-      .then(r => r.json())
-      .then(d => { setResults(d); setLoading(false) })
+    jsonFetch<SearchResults>(`/api/search?q=${encodeURIComponent(q.trim())}`)
+      .then(d => { if (d) setResults(d); setLoading(false) })
       .catch(() => setLoading(false))
   }
 
@@ -45,7 +45,7 @@ function SearchBox() {
     const q0 = searchParams.get('q') || ''
     setQuery(q0)
     if (q0) run(q0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams])
 
   const groupTitle = (label: string, href: string | null, total: number) => (

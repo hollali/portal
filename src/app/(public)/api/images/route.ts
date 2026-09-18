@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveMediaSrc } from '@/lib/mediaServer'
 
 const SORTABLE = new Set(['id', 'source', 'query', 'collected_at', 'face_detected', 'face_match', 'face_match_score'])
 
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   }
   if (source) where.source = source
 
-  const [items, total] = await Promise.all([
+  const [rows, total] = await Promise.all([
     prisma.image.findMany({
       where,
       orderBy: { [sort]: dir },
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest) {
   ])
 
   const sources = await prisma.image.findMany({ distinct: ['source'], select: { source: true }, orderBy: { source: 'asc' } })
+
+  const items = rows.map(row => ({ ...row, src: resolveMediaSrc(row) }))
 
   return NextResponse.json({ items, total, page, perPage, sources: sources.map(s => s.source).filter(Boolean) })
 }

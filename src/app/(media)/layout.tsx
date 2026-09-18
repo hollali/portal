@@ -14,7 +14,7 @@ export default function MediaLayout({
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
-      <main style={{ maxWidth: 1180, margin: '0 auto', padding: '2rem 1.5rem 4rem' }} className="p-section">
+      <main id="content" style={{ maxWidth: 1180, margin: '0 auto', padding: '2rem 1.5rem 4rem' }} className="p-section">
         {children}
       </main>
       <footer style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-2)' }}>

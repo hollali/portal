@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function NewsDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -16,7 +17,7 @@ export default function NewsDetailPage() {
   const [item, setItem] = useState<NewsDetail | null>(null)
 
   useEffect(() => {
-    fetch(`/api/news/${id}`).then(r => r.json()).then(setItem)
+    jsonFetch<NewsDetail>(`/api/news/${id}`).then(setItem)
   }, [id])
 
   if (!item) return <div>Loading...</div>

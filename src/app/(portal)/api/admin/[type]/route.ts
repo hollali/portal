@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, canManageMedia, type Session } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notify'
+import { resolveMediaSrc } from '@/lib/mediaServer'
 
 type WhereInput = Record<string, unknown>
 type DataInput = Record<string, unknown>
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: allItems, total: allItems.length })
   }
 
-  const [items, total, sources] = await Promise.all([
+  const [rawItems, total, sources] = await Promise.all([
     model.findMany({ where, orderBy, skip, take: perPage }),
     model.count({ where }),
     model.findMany({
@@ -148,6 +149,7 @@ export async function GET(request: NextRequest) {
   ])
 
   const sourceList = sources.map((s: MediaItem) => s.source).filter(Boolean)
+  const items = rawItems.map((row: MediaItem) => ({ ...row, src: resolveMediaSrc(row as { localPath?: string | null; url?: string | null }) }))
 
   return NextResponse.json({ items, total, page, perPage, sources: sourceList })
 }

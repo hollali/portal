@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { localToMediaUrl } from '@/lib/media'
 import { PHOTO_FACET_FIELDS } from '@/lib/library'
+import { resolveMediaSrc } from '@/lib/mediaServer'
 
 export interface PhotoItem {
   id: number
@@ -30,6 +30,10 @@ const FIELD_MAP: Record<string, string> = {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
 
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+  const perPage = Math.min(200, Math.max(1, parseInt(searchParams.get('perPage') || '48')))
+  const skip = (page - 1) * perPage
+
   const facetWhere: Record<string, unknown>[] = []
   let hasFacetFilter = false
   for (const f of PHOTO_FACET_FIELDS) {
@@ -46,7 +50,7 @@ export async function GET(request: NextRequest) {
   }
 
   const [rows, count, allRows] = await Promise.all([
-    prisma.image.findMany({ where, orderBy: [{ year: 'desc' }, { id: 'desc' }], take: 200 }),
+    prisma.image.findMany({ where, orderBy: [{ year: 'desc' }, { id: 'desc' }], skip, take: perPage }),
     prisma.image.count({ where }),
     prisma.image.findMany({ where: {}, select: { year: true, event: true, location: true, person: true, institution: true, parliament: true, theme: true } }),
   ])
@@ -54,7 +58,7 @@ export async function GET(request: NextRequest) {
   const items: PhotoItem[] = rows
     .map(img => ({
       id: img.id,
-      src: localToMediaUrl(img.localPath) || img.url,
+      src: resolveMediaSrc(img),
       year: img.year,
       event: img.event,
       location: img.location,
@@ -82,5 +86,5 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.count - a.count)
   }
 
-  return NextResponse.json({ items, total: count, facets })
+  return NextResponse.json({ items, total: count, page, perPage, facets })
 }

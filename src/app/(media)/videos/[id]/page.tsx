@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -11,6 +12,7 @@ export default function VideoDetailPage() {
     id: number
     error?: string
     url: string | null
+    src: string | null
     localPath: string | null
     title: string | null
     [key: string]: unknown
@@ -19,13 +21,13 @@ export default function VideoDetailPage() {
   const [remoteError, setRemoteError] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/videos/${id}`).then(r => r.json()).then(setItem)
+    jsonFetch<VideoDetail>(`/api/videos/${id}`).then(setItem)
   }, [id])
 
   if (!item) return <div>Loading...</div>
   if (item.error) return <div>Not found</div>
 
-  const mediaUrl = localToMediaUrl(item.localPath)
+  const mediaUrl = item.src && item.src.startsWith('/api/media') ? item.src : null
   const ytEmbed = item.url && isYouTubeUrl(item.url) ? getYouTubeEmbedUrl(item.url) : null
 
   const getPlayer = () => {

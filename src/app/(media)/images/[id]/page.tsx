@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { localToMediaUrl } from '@/lib/media'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function ImageDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -11,6 +11,7 @@ export default function ImageDetailPage() {
     id: number
     error?: string
     url: string | null
+    src: string | null
     localPath: string | null
     [key: string]: unknown
   }
@@ -18,14 +19,14 @@ export default function ImageDetailPage() {
   const [imgError, setImgError] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/images/${id}`).then(r => r.json()).then(setItem)
+    jsonFetch<ImageDetail>(`/api/images/${id}`).then(setItem)
   }, [id])
 
   if (!item) return <div>Loading...</div>
   if (item.error) return <div>Not found</div>
 
-  const mediaUrl = localToMediaUrl(item.localPath)
-  const src = (!imgError && mediaUrl) ? mediaUrl : item.url
+  const localUrl = item.src && item.src.startsWith('/api/media') ? item.src : null
+  const src = (!imgError && item.src) ? item.src : item.url
 
   return (
     <div>
@@ -46,9 +47,9 @@ export default function ImageDetailPage() {
               No preview available
             </div>
           )}
-          {item.url && mediaUrl && (
+          {item.url && localUrl && (
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem' }}>
-              {mediaUrl && <a href={mediaUrl} download style={{ fontSize: '0.875rem' }}>Download &darr;</a>}
+              {localUrl && <a href={localUrl} download style={{ fontSize: '0.875rem' }}>Download &darr;</a>}
               <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.875rem' }}>Open source URL &rarr;</a>
             </div>
           )}

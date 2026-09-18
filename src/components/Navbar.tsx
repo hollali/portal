@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -10,12 +11,9 @@ export default function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    fetch('/api/me')
-      .then(r => r.json())
-      .then(d => {
-        if (d.username) { setUsername(d.username); setIsAdmin(d.isAdmin) }
-      })
-      .catch(() => {})
+    jsonFetch<{ username?: string; isAdmin?: boolean }>('/api/me').then(d => {
+      if (d?.username) { setUsername(d.username); setIsAdmin(d.isAdmin || false) }
+    })
   }, [])
 
   const handleLogout = async () => {

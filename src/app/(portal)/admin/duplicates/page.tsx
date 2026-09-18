@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { localToMediaUrl } from '@/lib/media'
+import { jsonFetch } from '@/lib/jsonFetch'
 import { Image } from 'lucide-react'
 
 export default function DuplicatesPage() {
@@ -23,7 +24,7 @@ export default function DuplicatesPage() {
   const [errored, setErrored] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    fetch(`/api/admin/duplicates?page=${page}`).then(r => r.json()).then(setData)
+    jsonFetch<DuplicatesData>(`/api/admin/duplicates?page=${page}`).then(d => d && setData(d))
   }, [page])
 
   if (!data) return <div>Loading...</div>

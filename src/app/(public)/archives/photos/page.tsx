@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { PHOTO_FACET_FIELDS } from '@/lib/library'
+import { jsonFetch } from '@/lib/jsonFetch'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface PhotoItem {
@@ -29,6 +30,8 @@ interface PhotosData {
   items: PhotoItem[]
   total: number
   facets: Record<string, FacetOption[]>
+  page?: number
+  perPage?: number
 }
 
 type FilterMap = Record<string, string>
@@ -39,33 +42,41 @@ export default function PhotosPage() {
   const [filters, setFilters] = useState<FilterMap>({})
   const [q, setQ] = useState('')
   const [active, setActive] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
+  const PER_PAGE = 48
 
   const baseUrl = '/api/photos'
 
-  const load = useCallback((f: FilterMap, query: string) => {
+  const load = useCallback((f: FilterMap, query: string, p: number) => {
     setLoading(true)
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ page: String(p), perPage: String(PER_PAGE) })
     for (const [k, v] of Object.entries(f)) if (v) params.set(k, v)
     if (query) params.set('q', query)
-    fetch(`${baseUrl}?${params.toString()}`)
-      .then(r => r.json())
-      .then(setData)
+    jsonFetch<PhotosData>(`${baseUrl}?${params.toString()}`)
+      .then(d => { if (d) setData(d) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    const t = setTimeout(() => load(filters, q), q ? 250 : 0)
+    const t = setTimeout(() => load(filters, q, page), q ? 250 : 0)
     return () => clearTimeout(t)
-  }, [filters, q, load])
+  }, [filters, q, page, load])
 
   const setFilter = (key: string, value: string) => {
+    setPage(1)
     setFilters(prev => {
       const next = { ...prev }
       if (value) next[key] = value
       else delete next[key]
       return next
     })
+  }
+
+  const changePage = (p: number) => {
+    setPage(p)
+    setActive(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const activeItems = useMemo(() => data?.items ?? [], [data])
@@ -77,7 +88,7 @@ export default function PhotosPage() {
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
 
-      <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
+      <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Archive · Photo Library</span>
@@ -88,7 +99,7 @@ export default function PhotosPage() {
         </div>
       </section>
 
-      <section className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
+      <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
         {/* Facet filters */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.65rem', marginBottom: '1.25rem' }}>
           {PHOTO_FACET_FIELDS.map(f => (
@@ -105,19 +116,19 @@ export default function PhotosPage() {
             </select>
           ))}
           <input
-            placeholder="Search captions…"
-            value={q}
-            onChange={e => setQ(e.target.value)}
+placeholder="Search captions…"
+              value={q}
+              onChange={e => { setQ(e.target.value); setPage(1) }}
             style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.55rem 0.9rem', color: 'var(--p-text-1)', fontSize: '0.8rem', outline: 'none', minWidth: 150 }}
           />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--p-text-3)' }}>
-            {loading ? 'Loading…' : `${activeItems.length.toLocaleString()} photograph${activeItems.length === 1 ? '' : 's'} in the curated library`}
+            {loading ? 'Loading…' : `${(data?.total ?? 0).toLocaleString()} photograph${data?.total === 1 ? '' : 's'} in the curated library`}
           </span>
           {(Object.keys(filters).length > 0 || q) && (
-            <button onClick={() => { setFilters({}); setQ('') }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+            <button onClick={() => { setFilters({}); setQ(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
               Reset filters
             </button>
           )}
@@ -151,6 +162,35 @@ export default function PhotosPage() {
             ))}
           </div>
         )}
+
+        {(() => {
+          const totalPages = Math.ceil((data?.total ?? 0) / PER_PAGE)
+          if (totalPages <= 1) return null
+          const start = Math.max(1, Math.min(page - 4, totalPages - 9))
+          const nums = Array.from({ length: Math.min(10, totalPages) }, (_, i) => start + i)
+          const pageBtn = (label: string | number, target: number, opts?: { active?: boolean; disabled?: boolean; key?: number | string }) => (
+            <button
+              key={opts?.key}
+              disabled={opts?.disabled}
+              onClick={() => changePage(target)}
+              style={{
+                minWidth: 38, height: 38, borderRadius: 999, cursor: opts?.disabled ? 'not-allowed' : 'pointer',
+                fontSize: '0.8rem', fontFamily: 'var(--font-mono), monospace',
+                border: '1px solid var(--p-border-3)',
+                background: opts?.active ? 'var(--primary)' : 'var(--p-surface)',
+                color: opts?.active ? 'var(--primary-fg)' : opts?.disabled ? 'var(--p-text-4)' : 'var(--p-text-1)',
+                padding: '0 0.9rem',
+              }}
+            >{label}</button>
+          )
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '2.25rem', flexWrap: 'wrap' }}>
+              {pageBtn('← Prev', page - 1, { disabled: page <= 1 })}
+              {nums.map(p => pageBtn(p, p, { active: p === page, key: p }))}
+              {pageBtn('Next →', page + 1, { disabled: page >= totalPages })}
+            </div>
+          )
+        })()}
       </section>
 
       {/* Lightbox */}

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { localToMediaUrl } from '@/lib/media'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface ImageRow {
   id: number
   url: string | null
+  src: string | null
   localPath: string | null
   source: string | null
   query: string | null
@@ -30,7 +31,7 @@ export default function ImageListPage() {
     const params = new URLSearchParams({ page: String(page), sort: 'id', dir: 'desc', perPage: '24' })
     if (query) params.set('q', query)
     if (source) params.set('source', source)
-    fetch(`/api/images?${params}`).then(r => r.json()).then(setData)
+    jsonFetch<ListData>(`/api/images?${params}`).then(d => d && setData(d))
   }, [page, query, source])
 
   const totalPages = Math.ceil(data.total / 24)
@@ -57,8 +58,7 @@ export default function ImageListPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
         {data.items.map((img: ImageRow) => {
-          const mediaUrl = localToMediaUrl(img.localPath)
-          const src = (!errored.has(img.id) && mediaUrl) ? mediaUrl : img.url
+          const src = (!errored.has(img.id) && img.src) ? img.src : img.url
           return (
             <div key={img.id} className="card" style={{ cursor: 'pointer', padding: '0.75rem' }} onClick={() => setLightboxImg(img)}>
               <div style={{ width: '100%', height: '160px', overflow: 'hidden', borderRadius: '0.25rem', marginBottom: '0.5rem', background: 'var(--background)' }}>
@@ -111,7 +111,7 @@ export default function ImageListPage() {
               &times;
             </button>
             <img
-              src={localToMediaUrl(lightboxImg.localPath) || lightboxImg.url || ''}
+              src={lightboxImg.src || lightboxImg.url || ''}
               alt=""
               style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '0.375rem' }}
             />

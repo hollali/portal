@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Info, AlertTriangle, XCircle, CheckCircle2, BellOff, type LucideIcon } from 'lucide-react'
 import { AnimBtn, EmptyState, SkeletonTable, Toast } from '@/components/ui'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface Notification {
   id: number
@@ -28,8 +29,8 @@ export default function NotificationsPage() {
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(d => {
-      if (!d.isAdmin) {
+    jsonFetch<{ isAdmin?: boolean }>('/api/me').then(d => {
+      if (!d?.isAdmin) {
         router.push('/login')
         return
       }
@@ -39,8 +40,10 @@ export default function NotificationsPage() {
 
   const fetchNotifications = async () => {
     const res = await fetch('/api/admin/notifications')
-    const d = await res.json()
-    setNotifications(d.notifications || [])
+    if (res.ok) {
+      const d = await res.json().catch(() => null)
+      setNotifications(d?.notifications || [])
+    }
     setLoading(false)
   }
 

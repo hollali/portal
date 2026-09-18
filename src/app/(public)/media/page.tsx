@@ -69,7 +69,7 @@ export default function MediaPage() {
       <PublicHeader />
 
       {/* ── Hero ── */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
+      <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 5vw, 4.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Media & Social</span>
@@ -102,7 +102,7 @@ export default function MediaPage() {
         </div>
 
         {/* Social channels */}
-        <section className="p-connector-card" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 16, padding: '2rem', marginBottom: '3rem' }}>
+        <section className="p-connector-card" data-motion-entry style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 16, padding: '2rem', marginBottom: '3rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
             <Globe2 size={16} style={{ color: 'var(--primary)' }} />
             <span style={{ fontSize: '0.6875rem', fontFamily: 'var(--font-mono), monospace', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>On the platforms</span>

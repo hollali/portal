@@ -2,6 +2,7 @@
 
 import { useEffect, useState, JSX } from 'react'
 import Link from 'next/link'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 interface MediaRow {
   id: number
@@ -37,7 +38,7 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
     const params = new URLSearchParams({ page: String(page), sort, dir, perPage: '24' })
     if (query) params.set('q', query)
     if (source) params.set('source', source)
-    fetch(`${apiPath}?${params}`).then(r => r.json()).then(setData)
+    jsonFetch<ListPageData>(`${apiPath}?${params}`).then(d => d && setData(d))
   }, [page, sort, dir, query, source, apiPath])
 
   useEffect(() => {
@@ -45,10 +46,9 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
       const params = new URLSearchParams({ page: String(page), sort, dir, perPage: '10000' })
       if (query) params.set('q', query)
       if (source) params.set('source', source)
-      fetch(`${apiPath}?${params}`)
-        .then(r => r.json())
+      jsonFetch<{ items?: MediaRow[] }>(`${apiPath}?${params}`)
         .then(d => {
-          const blob = new Blob([JSON.stringify(d.items, null, 2)], { type: 'application/json' })
+          const blob = new Blob([JSON.stringify(d?.items ?? [], null, 2)], { type: 'application/json' })
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a')
           a.href = url; a.download = `${type}_${new Date().toISOString().slice(0, 10)}.json`; a.click()

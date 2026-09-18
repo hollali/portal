@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Settings, Save } from 'lucide-react'
 import { Toast } from '@/components/ui'
+import { jsonFetch } from '@/lib/jsonFetch'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -14,8 +15,8 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(d => {
-      if (d.role !== 'admin') {
+    jsonFetch<{ role?: string }>('/api/me').then(d => {
+      if (d?.role !== 'admin') {
         router.push('/login')
         return
       }
@@ -25,9 +26,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!isAdmin) return
-    fetch('/api/admin/settings').then(r => r.json()).then(d => {
-      setSettings(d.settings || {})
-      setLoaded(true)
+    jsonFetch<{ settings?: Record<string, string> }>('/api/admin/settings').then(d => {
+      if (d) {
+        setSettings(d.settings || {})
+        setLoaded(true)
+      }
     })
   }, [isAdmin])
 
@@ -48,7 +51,7 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings: body }),
     })
-    const d = await res.json()
+    const d = await res.json().catch(() => ({}))
     setSaving(false)
     if (res.ok) {
       setToast({ message: 'Settings saved' })

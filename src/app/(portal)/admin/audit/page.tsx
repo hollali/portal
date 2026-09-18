@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScrollText, Trash2, Plus, Edit, LogIn, LogOut } from "lucide-react";
 import { SkeletonTable, EmptyState } from "@/components/ui";
+import { jsonFetch } from "@/lib/jsonFetch";
 
 interface AuditLog {
   id: number;
@@ -28,10 +29,9 @@ export default function AuditPage() {
   const perPage = 50;
 
   useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
+    jsonFetch<{ isAdmin?: boolean }>("/api/me")
       .then((d) => {
-        if (!d.isAdmin) {
+        if (!d?.isAdmin) {
           router.push("/login");
           return;
         }
@@ -51,12 +51,11 @@ export default function AuditPage() {
     const params = new URLSearchParams({ page: String(page), limit: String(perPage) });
     if (entityType) params.set("entityType", entityType);
     if (action) params.set("action", action);
-    fetch(`/api/admin/audit?${params}`)
-      .then((r) => r.json())
+    jsonFetch<{ logs?: AuditLog[]; total?: number }>(`/api/admin/audit?${params}`)
       .then((d) => {
         if (!active) return;
-        setLogs(d.logs || []);
-        setTotal(d.total || 0);
+        setLogs(d?.logs || []);
+        setTotal(d?.total || 0);
         setLoading(false);
       });
     return () => {

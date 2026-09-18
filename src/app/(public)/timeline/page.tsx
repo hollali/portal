@@ -35,7 +35,7 @@ export default async function TimelinePage() {
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
 
-      <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
+      <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Timeline</span>
@@ -46,7 +46,7 @@ export default async function TimelinePage() {
         </div>
       </section>
 
-      <section className="p-section" style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
+      <section className="p-section" data-motion-entry style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
         {entries.length === 0 && (
           <p style={{ color: 'var(--p-text-3)' }}>The timeline is being compiled. Check back soon.</p>
         )}

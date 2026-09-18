@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Landmark, LogIn, Menu, X, ChevronDown, Search } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import AnnouncementBanner from '@/components/AnnouncementBanner'
 
 const ARCHIVE_LINKS = [
   { href: '/archives/speeches', label: 'Speeches' },
@@ -32,6 +33,8 @@ export default function PublicHeader() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  const lastYRef = useRef(0)
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -40,6 +43,21 @@ export default function PublicHeader() {
     document.addEventListener('click', onClick)
     return () => document.removeEventListener('click', onClick)
   }, [])
+
+  useEffect(() => {
+    const onScroll = () => {
+      const el = headerRef.current
+      if (!el) return
+      const y = window.scrollY
+      const goingDown = y > lastYRef.current
+      lastYRef.current = y
+      el.dataset.scrolled = y > 4 ? 'true' : 'false'
+      el.dataset.hidden = y < 90 || openMenu || searchOpen || !goingDown ? 'false' : 'true'
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [openMenu, searchOpen])
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -107,7 +125,15 @@ export default function PublicHeader() {
   }
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'color-mix(in srgb, var(--p-bg) 82%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--p-border)' }}>
+    <>
+      <AnnouncementBanner
+        announcement={{
+          message: 'Explore the digitised public archive',
+          href: '/archives',
+          hrefLabel: 'Browse collections',
+        }}
+      />
+      <header ref={headerRef} className="p-header" aria-label="Site">
       <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 1.5rem', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }} className="p-header-inner">
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', textDecoration: 'none' }}>
           <span style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-fg)' }}>
@@ -123,7 +149,7 @@ export default function PublicHeader() {
           </span>
         </Link>
 
-        <nav ref={dropdownRef} className="hide-sm" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem' }}>
+        <nav ref={dropdownRef} className="hide-sm" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem' }} aria-label="Primary">
           {navLink('/', 'Home')}
           {navLink('/the-man', 'The Man')}
           <div
@@ -145,6 +171,8 @@ export default function PublicHeader() {
           {navLink('/timeline', 'Timeline')}
           <button
             onClick={() => setSearchOpen(o => !o)}
+            aria-expanded={searchOpen}
+            aria-controls="site-search"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.875rem', color: 'var(--p-text-2)', background: 'none', border: 'none', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--p-text-1)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--p-text-2)')}
@@ -167,14 +195,14 @@ export default function PublicHeader() {
           >
             <LogIn size={14} /> Sign in
           </Link>
-          <button onClick={() => setMenuOpen(o => !o)} className="show-sm" style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}>
+          <button onClick={() => setMenuOpen(o => !o)} className="show-sm" aria-expanded={menuOpen} aria-controls="mobile-menu" style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </div>
 
       {searchOpen && (
-        <div style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-2)', padding: '0.85rem 1.5rem' }}>
+        <div id="site-search" style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-2)', padding: '0.85rem 1.5rem' }}>
           <form onSubmit={submitSearch} style={{ maxWidth: 560, margin: '0 auto', display: 'flex', gap: '0.5rem' }}>
             <input
               autoFocus
@@ -191,7 +219,7 @@ export default function PublicHeader() {
       )}
 
       {menuOpen && (
-        <div style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-bg)', padding: '0.75rem 1.25rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div id="mobile-menu" style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-bg)', padding: '0.75rem 1.25rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           {[{ href: '/', label: 'Home' }, { href: '/the-man', label: 'The Man' }, { href: '/timeline', label: 'Timeline' }, ...[...ARCHIVE_LINKS, ...MEDIA_LINKS].filter((item, idx, arr) => arr.findIndex(i => i.href === item.href) === idx)].map(item => (
             <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} style={{ color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '1rem', padding: '0.5rem 0' }}>
               {item.label}
@@ -202,5 +230,6 @@ export default function PublicHeader() {
         </div>
       )}
     </header>
+    </>
   )
 }
