@@ -17,9 +17,34 @@ export default function MotionInit() {
       },
       { threshold: 0.12, rootMargin: '0px 0px -10% 0px' },
     )
-    const els = document.querySelectorAll<HTMLElement>('[data-motion-entry]')
-    els.forEach(el => observer.observe(el))
-    return () => observer.disconnect()
+
+    const scan = () => {
+      document
+        .querySelectorAll<HTMLElement>('[data-motion-entry]:not([data-motion-reveal])')
+        .forEach(el => observer.observe(el))
+    }
+
+    const mutation = new MutationObserver(mutations => {
+      for (const m of mutations) {
+        if (m.type !== 'childList') continue
+        const hasEntry = Array.from(m.addedNodes).some(
+          node =>
+            node instanceof HTMLElement &&
+            (node.hasAttribute('data-motion-entry') || node.querySelector('[data-motion-entry]')),
+        )
+        if (hasEntry) {
+          scan()
+          return
+        }
+      }
+    })
+    mutation.observe(document.body, { childList: true, subtree: true })
+
+    scan()
+    return () => {
+      observer.disconnect()
+      mutation.disconnect()
+    }
   }, [])
   return null
 }
