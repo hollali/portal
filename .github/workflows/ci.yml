@@ -13,9 +13,6 @@ env:
   # Used only to satisfy env parsing during `next build`.
   # All data routes are dynamic, so no DB connection happens at build time.
   DATABASE_URL: postgresql://user:pass@localhost:5432/db?sslmode=require
-  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 jobs:
   ci:
@@ -50,18 +47,30 @@ jobs:
   deploy:
     name: Deploy to Vercel
     needs: ci
-    if: >-
-      github.ref == 'refs/heads/main' &&
-      env.VERCEL_TOKEN != '' &&
-      env.VERCEL_ORG_ID != '' &&
-      env.VERCEL_PROJECT_ID != ''
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Check Vercel secrets
+        id: gate
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "VERCEL_* secrets not configured — skipping deploy"
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.gate.outputs.should_deploy == 'true'
         uses: actions/checkout@v4
 
       - name: Deploy
+        if: steps.gate.outputs.should_deploy == 'true'
         uses: vercel/action@v1
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -69,13 +78,13 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: --prod
 
-  # Netlify alternative — enable by uncommenting, adding the NETLIFY_* env vars
-# to the workflow-level `env`, and removing the Vercel deploy job above.
+  # Netlify alternative — enable by uncommenting, adding a NETLIFY_* gate step
+  # (mirroring the Vercel gate above), and removing the Vercel deploy job.
   #
   # deploy-netlify:
   #   name: Deploy to Netlify
   #   needs: ci
-  #   if: github.ref == 'refs/heads/main' && env.NETLIFY_AUTH_TOKEN != ''
+  #   if: github.ref == 'refs/heads/main'
   #   runs-on: ubuntu-latest
   #   env:
   #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
