@@ -69,14 +69,13 @@ jobs:
         if: steps.gate.outputs.should_deploy == 'true'
         uses: actions/checkout@v4
 
-      - name: Deploy
+      - name: Deploy to production
         if: steps.gate.outputs.should_deploy == 'true'
-        uses: vercel/action@v1
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
 
   # Netlify alternative — enable by uncommenting, adding a NETLIFY_* gate step
   # (mirroring the Vercel gate above), and removing the Vercel deploy job.
