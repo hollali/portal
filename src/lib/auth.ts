@@ -8,7 +8,14 @@ const JWT_SECRET =
   (process.env.NODE_ENV === 'production' ? '' : `dev-${crypto.randomUUID()}`)
 
 if (!JWT_SECRET) {
-  console.error('JWT_SECRET must be set in production')
+  console.error('JWT_SECRET must be set in production (e.g. netlify env var)')
+}
+
+function secret(): string {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured; set JWT_SECRET env var (production)')
+  }
+  return JWT_SECRET
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -41,12 +48,12 @@ export function canManageSystem(role?: string): boolean {
 }
 
 export function signToken(payload: Session): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, secret(), { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string): Session | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as Session
+    return jwt.verify(token, secret()) as Session
   } catch {
     return null
   }
