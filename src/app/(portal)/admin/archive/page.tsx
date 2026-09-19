@@ -124,6 +124,8 @@ export default function ArchiveAdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, tab, search, page, kindFilter])
 
+  const [saving, setSaving] = useState(false)
+
   const switchTab = (t: Tab) => {
     setTab(t)
     setPage(1)
@@ -132,8 +134,6 @@ export default function ArchiveAdminPage() {
   }
 
   const notify = (message: string, type?: 'success' | 'error') => setToast({ message, type })
-
-  const block = (s: string) => document.body.style.overflow = s
 
   /* ── Documents ── */
   const openDocModal = (mode: 'create' | 'edit', row?: ArchiveRow) => {
@@ -158,12 +158,12 @@ export default function ArchiveAdminPage() {
       body: row?.body || '',
       status: row?.status || 'draft',
     })
-    block('hidden')
   }
-  const closeDocModal = () => { setDocModal(null); block('') }
+  const closeDocModal = () => { setDocModal(null) }
 
   const submitDoc = async (status?: string) => {
-    if (!docModal) return
+    if (!docModal || saving) return
+    setSaving(true)
     const body = new FormData()
     body.set('action', docModal.mode === 'edit' ? 'update' : 'create')
     body.set('type', 'archive')
@@ -171,12 +171,16 @@ export default function ArchiveAdminPage() {
     for (const [k, v] of Object.entries(docForm)) body.set(k, v)
     if (status) body.set('status', status)
     if (docFile) body.set('file', docFile)
-    const res = await fetch('/api/admin/library', { method: 'POST', body })
-    const d: { error?: string } = await res.json().catch(() => ({}))
-    if (!res.ok) { notify(d.error || 'Failed to save', 'error'); return }
-    notify(docModal.mode === 'edit' ? 'Document updated' : 'Document created')
-    closeDocModal()
-    load('archive')
+    try {
+      const res = await fetch('/api/admin/library', { method: 'POST', body })
+      const d: { error?: string } = await res.json().catch(() => ({}))
+      if (!res.ok) { notify(d.error || 'Failed to save', 'error'); return }
+      notify(docModal.mode === 'edit' ? 'Document updated' : 'Document created')
+      closeDocModal()
+      load('archive')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const deleteDoc = async (row: ArchiveRow) => {
@@ -210,46 +214,54 @@ export default function ArchiveAdminPage() {
   const openMileModal = (mode: 'create' | 'edit', row?: MilestoneRow) => {
     setMileModal({ mode, row })
     setMileForm({ year: row?.year || '', period: row?.period || '', title: row?.title || '', description: row?.description || '', category: row?.category || 'career', order: String(row?.order ?? 0), status: row?.status || 'draft' })
-    block('hidden')
   }
-  const closeMileModal = () => { setMileModal(null); block('') }
+  const closeMileModal = () => { setMileModal(null) }
 
   const submitMile = async (status?: string) => {
-    if (!mileModal) return
-    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: mileModal.mode === 'edit' ? 'update' : 'create', type: 'milestones', ...(mileModal.mode === 'edit' && mileModal.row ? { id: mileModal.row.id } : {}), ...mileForm, ...(status ? { status } : {}) }) })
-    const d: { error?: string } = await res.json().catch(() => ({}))
-    if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
-    notify(mileModal.mode === 'edit' ? 'Milestone updated' : 'Milestone created')
-    closeMileModal(); load('milestones')
+    if (!mileModal || saving) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: mileModal.mode === 'edit' ? 'update' : 'create', type: 'milestones', ...(mileModal.mode === 'edit' && mileModal.row ? { id: mileModal.row.id } : {}), ...mileForm, ...(status ? { status } : {}) }) })
+      const d: { error?: string } = await res.json().catch(() => ({}))
+      if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
+      notify(mileModal.mode === 'edit' ? 'Milestone updated' : 'Milestone created')
+      closeMileModal(); load('milestones')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const deleteMile = async (row: MilestoneRow) => {
     if (!confirm(`Delete "${row.title}"?`)) return
-    await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'milestones', id: row.id }) })
-    load('milestones'); notify('Deleted')
+    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'milestones', id: row.id }) })
+    if (res.ok) { load('milestones'); notify('Deleted') } else notify('Failed to delete', 'error')
   }
 
   /* ── Testimonials ── */
   const openTestiModal = (mode: 'create' | 'edit', row?: TestimonialRow) => {
     setTestiModal({ mode, row })
     setTestiForm({ author: row?.author || '', role: row?.role || '', quote: row?.quote || '', source: row?.source || '', year: String(row?.year ?? ''), photoUrl: row?.photoUrl || '', sortOrder: String(row?.sortOrder ?? 0), status: row?.status || 'draft' })
-    block('hidden')
   }
-  const closeTestiModal = () => { setTestiModal(null); block('') }
+  const closeTestiModal = () => { setTestiModal(null) }
 
   const submitTesti = async (status?: string) => {
-    if (!testiModal) return
-    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: testiModal.mode === 'edit' ? 'update' : 'create', type: 'testimonials', ...(testiModal.mode === 'edit' && testiModal.row ? { id: testiModal.row.id } : {}), ...testiForm, ...(status ? { status } : {}) }) })
-    const d: { error?: string } = await res.json().catch(() => ({}))
-    if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
-    notify(testiModal.mode === 'edit' ? 'Testimonial updated' : 'Testimonial created')
-    closeTestiModal(); load('testimonials')
+    if (!testiModal || saving) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: testiModal.mode === 'edit' ? 'update' : 'create', type: 'testimonials', ...(testiModal.mode === 'edit' && testiModal.row ? { id: testiModal.row.id } : {}), ...testiForm, ...(status ? { status } : {}) }) })
+      const d: { error?: string } = await res.json().catch(() => ({}))
+      if (!res.ok) { notify(d.error || 'Failed', 'error'); return }
+      notify(testiModal.mode === 'edit' ? 'Testimonial updated' : 'Testimonial created')
+      closeTestiModal(); load('testimonials')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const deleteTesti = async (row: TestimonialRow) => {
     if (!confirm(`Delete testimonial from ${row.author}?`)) return
-    await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'testimonials', id: row.id }) })
-    load('testimonials'); notify('Deleted')
+    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'testimonials', id: row.id }) })
+    if (res.ok) { load('testimonials'); notify('Deleted') } else notify('Failed to delete', 'error')
   }
 
   const tabButton = (t: Tab, label: string, Icon: React.ElementType) => (
@@ -505,14 +517,14 @@ export default function ArchiveAdminPage() {
             </Field>
           </div>
           <div className="flex justify-end gap-2 mt-6">
-            <button onClick={closeDocModal} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={closeDocModal} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
             {docModal?.mode === 'create' && (
-              <button onClick={() => submitDoc('draft')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: 'pointer' }}>
+              <button onClick={() => submitDoc('draft')} disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: saving ? 'not-allowed' : 'pointer' }}>
                 <Save size={14} /> Save draft
               </button>
             )}
-            <button onClick={() => submitDoc('published')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
-              <Eye size={14} /> {docModal?.mode === 'create' ? 'Create & publish' : 'Publish changes'}
+            <button onClick={() => submitDoc('published')} disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              <Eye size={14} /> {saving ? 'Saving…' : (docModal?.mode === 'create' ? 'Create & publish' : 'Publish changes')}
             </button>
           </div>
         </div>
@@ -539,14 +551,14 @@ export default function ArchiveAdminPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
-            <button onClick={closeMileModal} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={closeMileModal} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
             {mileModal?.mode === 'create' && (
-              <button onClick={() => submitMile('draft')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: 'pointer' }}>
+              <button onClick={() => submitMile('draft')} disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: saving ? 'not-allowed' : 'pointer' }}>
                 <Save size={14} /> Save draft
               </button>
             )}
-            <button onClick={() => submitMile('published')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
-              <Eye size={14} /> {mileModal?.mode === 'create' ? 'Create & publish' : 'Publish changes'}
+            <button onClick={() => submitMile('published')} disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              <Eye size={14} /> {saving ? 'Saving…' : (mileModal?.mode === 'create' ? 'Create & publish' : 'Publish changes')}
             </button>
           </div>
         </div>
@@ -570,14 +582,14 @@ export default function ArchiveAdminPage() {
             <Field label="Photo URL (optional)"><TextInput value={testiForm.photoUrl} onChange={e => setTestiForm(f => ({ ...f, photoUrl: e.target.value }))} /></Field>
           </div>
           <div className="flex justify-end gap-2 mt-6">
-            <button onClick={closeTestiModal} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={closeTestiModal} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: saving ? 'not-allowed' : 'pointer' }}>Cancel</button>
             {testiModal?.mode === 'create' && (
-              <button onClick={() => submitTesti('draft')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: 'pointer' }}>
+              <button onClick={() => submitTesti('draft')} disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: saving ? 'not-allowed' : 'pointer' }}>
                 <Save size={14} /> Save draft
               </button>
             )}
-            <button onClick={() => submitTesti('published')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
-              <Eye size={14} /> {testiModal?.mode === 'create' ? 'Create & publish' : 'Publish changes'}
+            <button onClick={() => submitTesti('published')} disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              <Eye size={14} /> {saving ? 'Saving…' : (testiModal?.mode === 'create' ? 'Create & publish' : 'Publish changes')}
             </button>
           </div>
         </div>

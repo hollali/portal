@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -13,10 +14,23 @@ interface ModalProps {
 
 const FOCUSABLE = 'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])'
 
+let scrollLockCount = 0
+
+function lockScroll() {
+  scrollLockCount += 1
+  if (scrollLockCount === 1) document.body.style.overflow = 'hidden'
+}
+
+function unlockScroll() {
+  scrollLockCount = Math.max(0, scrollLockCount - 1)
+  if (scrollLockCount === 0) document.body.style.overflow = ''
+}
+
 export function Modal({ open, onClose, children, maxWidth = '600px', showClose = true }: ModalProps) {
   const [visible, setVisible] = useState(false)
   const [animate, setAnimate] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const lastFocusedRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -37,16 +51,25 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
 
   useEffect(() => {
     if (open) {
-      document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = '' }
+      lastFocusedRef.current = document.activeElement as HTMLElement | null
+      lockScroll()
+      return () => {
+        unlockScroll()
+        lastFocusedRef.current?.focus?.()
+        lastFocusedRef.current = null
+      }
     }
   }, [open])
 
   useEffect(() => {
     if (visible && open) {
       const el = dialogRef.current
-      const first = el?.querySelector<HTMLElement>(FOCUSABLE)
-      first?.focus()
+      const input = el?.querySelector<HTMLElement>('input:not([type="hidden"]), select, textarea')
+      if (input) {
+        input.focus()
+      } else {
+        el?.focus()
+      }
     }
   }, [visible, open])
 
@@ -92,6 +115,7 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         className="relative w-full overflow-auto transition-all duration-200"
         style={{
           maxWidth,
@@ -99,6 +123,7 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
           background: 'var(--card)',
           borderRadius: '0.75rem',
           cursor: 'default',
+          outline: 'none',
           transform: animate ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(10px)',
           opacity: animate ? 1 : 0,
         }}
@@ -220,12 +245,13 @@ export function Toast({ message, type = 'success', onClose }: ToastProps) {
     return () => clearTimeout(timer)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div
-      className="flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200"
+      role="status"
+      className="fixed top-4 right-4 left-4 sm:left-auto z-[60] flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200"
       style={{
         background: type === 'error' ? 'var(--danger)' : 'var(--success)',
-        marginBottom: '1rem',
+        maxWidth: '24rem',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(-10px)',
       }}
@@ -234,7 +260,8 @@ export function Toast({ message, type = 'success', onClose }: ToastProps) {
       <button onClick={onClose} className="ml-4 flex items-center rounded-full p-1 transition-colors hover:bg-white/20" style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
         <X size={14} />
       </button>
-    </div>
+    </div>,
+    document.body
   )
 }
 

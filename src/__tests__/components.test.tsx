@@ -4,13 +4,13 @@ import { Modal } from '@/components/ui'
 import { Pagination } from '@/components/ui/Pagination'
 
 describe('Modal', () => {
-  it('renders children when open', () => {
+  it('renders children when open', async () => {
     render(
       <Modal open onClose={() => {}}>
         <p>Modal content</p>
       </Modal>
     )
-    expect(screen.getByText('Modal content')).toBeInTheDocument()
+    expect(await screen.findByText('Modal content')).toBeInTheDocument()
   })
 
   it('does not render when closed', () => {
