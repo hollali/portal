@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Plus, Pencil, Trash2, ShieldCheck, Shield } from 'lucide-react'
-import { Modal, AnimBtn, Toast, SkeletonTable, EmptyState } from '@/components/ui'
+import { Modal, AnimBtn, Toast, SkeletonTable, EmptyState, ConfirmDialog } from '@/components/ui'
 import { jsonFetch } from '@/lib/jsonFetch'
 
 interface User {
@@ -31,6 +31,8 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
+  const [confirm, setConfirm] = useState<{ title: string; message: React.ReactNode; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   useEffect(() => {
     jsonFetch<{ isAdmin?: boolean; role?: string }>('/api/me').then(d => {
@@ -118,7 +120,6 @@ export default function UsersPage() {
   }
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`Delete user "${user.username}"? This cannot be undone.`)) return
     const res = await fetch(`/api/admin/users?id=${user.id}`, { method: 'DELETE' })
     const d = await res.json().catch(() => ({}))
     if (res.ok) {
@@ -128,6 +129,21 @@ export default function UsersPage() {
       setToast({ message: d.error || 'Failed to delete', type: 'error' })
     }
   }
+
+  const askDeleteUser = (user: User) =>
+    setConfirm({
+      title: 'Delete user?',
+      message: <>This will permanently remove <strong>&ldquo;{user.username}&rdquo;</strong>. They will no longer be able to sign in. This cannot be undone.</>,
+      onConfirm: async () => {
+        setConfirmBusy(true)
+        try {
+          await handleDelete(user)
+        } finally {
+          setConfirmBusy(false)
+          setConfirm(null)
+        }
+      },
+    })
 
   if (!isAdmin) {
     return (
@@ -203,7 +219,7 @@ export default function UsersPage() {
                           <Pencil size={14} />
                         </AnimBtn>
                         <AnimBtn
-                          onClick={() => handleDelete(user)}
+                          onClick={() => askDeleteUser(user)}
                           title={isSelf ? 'Cannot delete your own account' : 'Delete'}
                           disabled={isSelf || (isLastAdmin && !isSelf)}
                           style={{ padding: '0.375rem', background: 'var(--danger)', color: 'white', opacity: isSelf || (isLastAdmin && !isSelf) ? 0.5 : 1 }}
@@ -299,6 +315,15 @@ export default function UsersPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title || 'Confirm delete'}
+        message={confirm?.message}
+        busy={confirmBusy}
+        onConfirm={() => confirm?.onConfirm()}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }

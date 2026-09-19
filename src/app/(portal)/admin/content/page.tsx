@@ -14,7 +14,7 @@ import {
   LayoutDashboard,
   ExternalLink,
 } from 'lucide-react'
-import { Modal, AnimBtn, Toast, Skeleton, EmptyState } from '@/components/ui'
+import { Modal, AnimBtn, Toast, Skeleton, EmptyState, ConfirmDialog } from '@/components/ui'
 import { jsonFetch } from '@/lib/jsonFetch'
 import {
   DEFAULT_SECTIONS,
@@ -310,6 +310,8 @@ export default function ContentAdminPage() {
 
   const [pageModal, setPageModal] = useState<{ mode: 'create' | 'edit'; page?: PageRow } | null>(null)
   const [pageForm, setPageForm] = useState({ title: '', slug: '', body: '', status: 'draft' })
+  const [confirm, setConfirm] = useState<{ title: string; message: React.ReactNode; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
@@ -439,7 +441,6 @@ export default function ContentAdminPage() {
   }
 
   const deletePage = async (page: PageRow) => {
-    if (!confirm(`Delete page "${page.title}"? This cannot be undone.`)) return
     const res = await fetch('/api/admin/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -453,6 +454,23 @@ export default function ContentAdminPage() {
       notify(d.error || 'Failed', 'error')
     }
   }
+
+  const runDelete = async (fn: () => Promise<void>) => {
+    setConfirmBusy(true)
+    try {
+      await fn()
+    } finally {
+      setConfirmBusy(false)
+      setConfirm(null)
+    }
+  }
+
+  const askDeletePage = (page: PageRow) =>
+    setConfirm({
+      title: 'Delete page?',
+      message: <>This will permanently delete <strong>&ldquo;{page.title}&rdquo;</strong> and any content on <code>/{page.slug}</code>. This cannot be undone.</>,
+      onConfirm: () => runDelete(() => deletePage(page)),
+    })
 
   const sectionIcons: Record<SectionKey, React.ReactNode> = {
     home_hero: <Eye size={15} />,
@@ -626,7 +644,7 @@ export default function ContentAdminPage() {
                               Unpublish
                             </button>
                           )}
-                          <AnimBtn onClick={() => deletePage(p)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }} title="Delete">
+                          <AnimBtn onClick={() => askDeletePage(p)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }} title="Delete">
                             <Trash2 size={14} />
                           </AnimBtn>
                         </div>
@@ -677,6 +695,15 @@ export default function ContentAdminPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title || 'Confirm delete'}
+        message={confirm?.message}
+        busy={confirmBusy}
+        onConfirm={() => confirm?.onConfirm()}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }

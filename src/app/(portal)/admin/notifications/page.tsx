@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, Check, Trash2, Info, AlertTriangle, XCircle, CheckCircle2, BellOff, type LucideIcon } from 'lucide-react'
-import { AnimBtn, EmptyState, SkeletonTable, Toast } from '@/components/ui'
+import { AnimBtn, EmptyState, SkeletonTable, Toast, ConfirmDialog } from '@/components/ui'
 import { jsonFetch } from '@/lib/jsonFetch'
 
 interface Notification {
@@ -27,6 +27,8 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
+  const [confirm, setConfirm] = useState<{ title: string; message: React.ReactNode; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   useEffect(() => {
     jsonFetch<{ role?: string }>('/api/me').then(d => {
@@ -80,7 +82,6 @@ export default function NotificationsPage() {
   }
 
   const clearAll = async () => {
-    if (!confirm('Delete all notifications? This cannot be undone.')) return
     const res = await fetch('/api/admin/notifications?limit=200')
     const d = await res.json().catch(() => null)
     const all = d?.notifications || []
@@ -92,6 +93,25 @@ export default function NotificationsPage() {
       })
     }
     await fetchNotifications()
+  }
+
+  const runDelete = async (fn: () => Promise<void>) => {
+    setConfirmBusy(true)
+    try {
+      await fn()
+    } finally {
+      setConfirmBusy(false)
+      setConfirm(null)
+    }
+  }
+
+  const askClearAll = () => {
+    if (notifications.length === 0) return
+    setConfirm({
+      title: 'Delete all notifications?',
+      message: <>This will permanently delete all <strong>{notifications.length}</strong> notification(s). This cannot be undone.</>,
+      onConfirm: () => runDelete(clearAll),
+    })
   }
 
   if (!isAdmin) {
@@ -122,7 +142,7 @@ export default function NotificationsPage() {
             </AnimBtn>
           )}
           {notifications.length > 0 && (
-            <AnimBtn onClick={clearAll} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+            <AnimBtn onClick={askClearAll} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
               <Trash2 size={14} /> Clear all
             </AnimBtn>
           )}
@@ -185,6 +205,15 @@ export default function NotificationsPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title || 'Confirm delete'}
+        message={confirm?.message}
+        busy={confirmBusy}
+        onConfirm={() => confirm?.onConfirm()}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }

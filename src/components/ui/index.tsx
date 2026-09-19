@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
+import { useState, useEffect, useRef, useId, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { X, AlertTriangle } from 'lucide-react'
 
 interface ModalProps {
   open: boolean
@@ -10,6 +10,11 @@ interface ModalProps {
   children: ReactNode
   maxWidth?: string
   showClose?: boolean
+  role?: 'dialog' | 'alertdialog'
+  ariaLabel?: string
+  ariaLabelledBy?: string
+  ariaDescribedBy?: string
+  initialFocusRef?: { current: HTMLElement | null }
 }
 
 const FOCUSABLE = 'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])'
@@ -26,11 +31,23 @@ function unlockScroll() {
   if (scrollLockCount === 0) document.body.style.overflow = ''
 }
 
-export function Modal({ open, onClose, children, maxWidth = '600px', showClose = true }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  children,
+  maxWidth = '600px',
+  showClose = true,
+  role = 'dialog',
+  ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
+  initialFocusRef,
+}: ModalProps) {
   const [visible, setVisible] = useState(false)
   const [animate, setAnimate] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const lastFocusedRef = useRef<HTMLElement | null>(null)
+  const autoTitleId = useId()
 
   useEffect(() => {
     if (open) {
@@ -62,8 +79,26 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
   }, [open])
 
   useEffect(() => {
+    if (!visible || !open) return
+    const el = dialogRef.current
+    if (!el) return
+    if (ariaLabel) el.setAttribute('aria-label', ariaLabel)
+    if (!el.getAttribute('aria-labelledby')) {
+      const heading = el.querySelector<HTMLElement>('h1, h2, h3')
+      if (heading) {
+        if (!heading.id) heading.id = `dlg-title-${autoTitleId.replace(/[:]/g, '')}`
+        el.setAttribute('aria-labelledby', heading.id)
+      }
+    }
+  }, [visible, open, ariaLabel, autoTitleId])
+
+  useEffect(() => {
     if (visible && open) {
       const el = dialogRef.current
+      if (initialFocusRef?.current) {
+        initialFocusRef.current.focus()
+        return
+      }
       const input = el?.querySelector<HTMLElement>('input:not([type="hidden"]), select, textarea')
       if (input) {
         input.focus()
@@ -71,7 +106,7 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
         el?.focus()
       }
     }
-  }, [visible, open])
+  }, [visible, open, initialFocusRef])
 
   useEffect(() => {
     if (!open) return
@@ -100,10 +135,10 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
 
   if (!visible) return null
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
-      className="fixed inset-0 flex items-center justify-center p-4 z-50 transition-opacity duration-200"
+      className="fixed inset-0 flex items-center justify-center p-4 z-[70] transition-opacity duration-200"
       style={{
         background: 'rgba(0,0,0,0.85)',
         opacity: animate ? 1 : 0,
@@ -113,8 +148,11 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
       <div
         ref={dialogRef}
         onClick={e => e.stopPropagation()}
-        role="dialog"
+        role={role}
         aria-modal="true"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         tabIndex={-1}
         className="relative w-full overflow-auto transition-all duration-200"
         style={{
@@ -131,6 +169,8 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
         {showClose && (
           <button
             onClick={onClose}
+            aria-label="Close dialog"
+            title="Close"
             className="absolute top-3 right-3 z-10 flex items-center justify-center rounded-full transition-all duration-200 hover:rotate-90 hover:scale-110"
             style={{
               width: '32px', height: '32px', border: 'none', cursor: 'pointer',
@@ -142,7 +182,77 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
+  )
+}
+
+interface ConfirmDialogProps {
+  open: boolean
+  title: string
+  message?: ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  busy?: boolean
+  onConfirm: () => void
+  onClose: () => void
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
+  busy = false,
+  onConfirm,
+  onClose,
+}: ConfirmDialogProps) {
+  const titleId = useId()
+  const descId = useId()
+  const cancelRef = useRef<HTMLButtonElement>(null)
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      maxWidth="440px"
+      role="alertdialog"
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={message ? descId : undefined}
+      initialFocusRef={cancelRef}
+    >
+      <div className="p-6">
+        <h2 id={titleId} className="text-lg font-bold mb-2 flex items-center gap-2">
+          <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+          {title}
+        </h2>
+        {message && (
+          <p id={descId} className="text-sm mb-6" style={{ color: 'var(--muted-foreground)' }}>
+            {message}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <button
+            ref={cancelRef}
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg px-4 py-2 text-sm font-semibold"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: busy ? 'not-allowed' : 'pointer' }}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
+            style={{ background: 'var(--danger)', border: 'none', color: '#fff', cursor: busy ? 'not-allowed' : 'pointer' }}
+          >
+            {busy ? 'Please wait…' : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -248,7 +358,7 @@ export function Toast({ message, type = 'success', onClose }: ToastProps) {
   return createPortal(
     <div
       role="status"
-      className="fixed top-4 right-4 left-4 sm:left-auto z-[60] flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200"
+      className="fixed top-4 right-4 left-4 sm:left-auto z-[80] flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200"
       style={{
         background: type === 'error' ? 'var(--danger)' : 'var(--success)',
         maxWidth: '24rem',

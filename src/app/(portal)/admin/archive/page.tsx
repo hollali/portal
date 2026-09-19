@@ -6,7 +6,7 @@ import {
   FileText, Save, Trash2, Plus, Pencil, Eye,
   Award, Milestone as MilestoneIcon, Upload, ListFilter,
 } from 'lucide-react'
-import { Modal, AnimBtn, Toast, Skeleton, EmptyState } from '@/components/ui'
+import { Modal, AnimBtn, Toast, Skeleton, EmptyState, ConfirmDialog } from '@/components/ui'
 import { jsonFetch } from '@/lib/jsonFetch'
 import { KIND_CONFIG, DOCUMENT_KINDS, FACET_LABELS, type ArchiveKind } from '@/lib/library'
 
@@ -125,6 +125,8 @@ export default function ArchiveAdminPage() {
   }, [role, tab, search, page, kindFilter])
 
   const [saving, setSaving] = useState(false)
+  const [confirm, setConfirm] = useState<{ title: string; message: React.ReactNode; onConfirm: () => Promise<void> } | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   const switchTab = (t: Tab) => {
     setTab(t)
@@ -183,8 +185,21 @@ export default function ArchiveAdminPage() {
     }
   }
 
+  const runDelete = async (fn: () => Promise<void>) => {
+    setConfirmBusy(true)
+    try {
+      await fn()
+    } finally {
+      setConfirmBusy(false)
+      setConfirm(null)
+    }
+  }
+
+  const askDelete = (title: string, message: React.ReactNode, fn: () => Promise<void>) => {
+    setConfirm({ title, message, onConfirm: () => runDelete(fn) })
+  }
+
   const deleteDoc = async (row: ArchiveRow) => {
-    if (!confirm(`Delete "${row.title}"? This cannot be undone.`)) return
     const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'archive', id: row.id }) })
     if (res.ok) { load('archive'); notify('Deleted') } else notify('Failed to delete', 'error')
   }
@@ -232,7 +247,6 @@ export default function ArchiveAdminPage() {
   }
 
   const deleteMile = async (row: MilestoneRow) => {
-    if (!confirm(`Delete "${row.title}"?`)) return
     const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'milestones', id: row.id }) })
     if (res.ok) { load('milestones'); notify('Deleted') } else notify('Failed to delete', 'error')
   }
@@ -259,7 +273,6 @@ export default function ArchiveAdminPage() {
   }
 
   const deleteTesti = async (row: TestimonialRow) => {
-    if (!confirm(`Delete testimonial from ${row.author}?`)) return
     const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', type: 'testimonials', id: row.id }) })
     if (res.ok) { load('testimonials'); notify('Deleted') } else notify('Failed to delete', 'error')
   }
@@ -360,7 +373,7 @@ export default function ArchiveAdminPage() {
                             <AnimBtn onClick={() => openDocModal('edit', a)} className="p-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }} title="Edit">
                               <Pencil size={14} />
                             </AnimBtn>
-                            <AnimBtn onClick={() => deleteDoc(a)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }} title="Delete">
+                            <AnimBtn onClick={() => askDelete('Delete document?', <>This will permanently delete <strong>&ldquo;{a.title}&rdquo;</strong>. This cannot be undone.</>, () => deleteDoc(a))} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }} title="Delete">
                               <Trash2 size={14} />
                             </AnimBtn>
                           </div>
@@ -410,7 +423,7 @@ export default function ArchiveAdminPage() {
                               <button onClick={() => publishMile(m)} className="rounded-md px-2 py-1.5 text-xs font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>Publish</button>
                             )}
                             <AnimBtn onClick={() => openMileModal('edit', m)} className="p-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }}><Pencil size={14} /></AnimBtn>
-                            <AnimBtn onClick={() => deleteMile(m)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }}><Trash2 size={14} /></AnimBtn>
+                            <AnimBtn onClick={() => askDelete('Delete milestone?', <>This will permanently delete <strong>&ldquo;{m.title}&rdquo;</strong>.</>, () => deleteMile(m))} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }}><Trash2 size={14} /></AnimBtn>
                           </div>
                         </td>
                       </tr>
@@ -458,7 +471,7 @@ export default function ArchiveAdminPage() {
                               <button onClick={() => publishTesti(t)} className="rounded-md px-2 py-1.5 text-xs font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>Publish</button>
                             )}
                             <AnimBtn onClick={() => openTestiModal('edit', t)} className="p-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }}><Pencil size={14} /></AnimBtn>
-                            <AnimBtn onClick={() => deleteTesti(t)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }}><Trash2 size={14} /></AnimBtn>
+                            <AnimBtn onClick={() => askDelete('Delete testimonial?', <>This will permanently delete the testimonial from <strong>{t.author}</strong>.</>, () => deleteTesti(t))} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }}><Trash2 size={14} /></AnimBtn>
                           </div>
                         </td>
                       </tr>
@@ -471,6 +484,16 @@ export default function ArchiveAdminPage() {
           <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
         </div>
       )}
+
+      {/* ── Delete confirmation ── */}
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title || 'Confirm delete'}
+        message={confirm?.message}
+        busy={confirmBusy}
+        onConfirm={() => confirm?.onConfirm()}
+        onClose={() => setConfirm(null)}
+      />
 
       {/* ── Document modal ── */}
       <Modal open={docModal !== null} onClose={closeDocModal} maxWidth="760px">

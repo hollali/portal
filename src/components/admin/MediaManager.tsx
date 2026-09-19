@@ -22,7 +22,7 @@ import {
   FileInput,
   type LucideIcon,
 } from 'lucide-react'
-import { Modal, AnimBtn, AnimLink, Toast, SkeletonTable, EmptyState } from '@/components/ui'
+import { Modal, AnimBtn, AnimLink, Toast, SkeletonTable, EmptyState, ConfirmDialog } from '@/components/ui'
 import { Pagination } from '@/components/ui/Pagination'
 import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 
@@ -126,6 +126,8 @@ export default function MediaManager({
   const [bulkTagValue, setBulkTagValue] = useState('')
   const [bulkReassignValue, setBulkReassignValue] = useState('')
   const [bulkOperating, setBulkOperating] = useState(false)
+  const [confirm, setConfirm] = useState<{ title: string; message: ReactNode; onConfirm: () => Promise<void> } | null>(null)
+  const confirmBusy = deleting
 
   const buildParams = useCallback(
     () =>
@@ -203,7 +205,6 @@ export default function MediaManager({
 
   const handleDeleteSelected = async () => {
     if (selected.size === 0) return
-    if (!confirm(`Delete ${selected.size} selected item(s)?`)) return
     setDeleting(true)
     const formData = new FormData()
     formData.set('action', 'delete_image')
@@ -221,7 +222,6 @@ export default function MediaManager({
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this item?')) return
     const formData = new FormData()
     formData.set('action', 'delete_image')
     formData.set('pks', String(id))
@@ -257,12 +257,6 @@ export default function MediaManager({
 
   const handleDeleteFiltered = async () => {
     if (!data || data.total === 0) return
-    if (
-      !confirm(
-        `This will delete ALL ${data.total} currently filtered ${type} record(s). This cannot be undone. Continue?`,
-      )
-    )
-      return
     setDeleting(true)
     const formData = new FormData()
     formData.set('action', 'delete_filtered')
@@ -282,6 +276,39 @@ export default function MediaManager({
     } else {
       setToast({ message: d.error || 'Failed to delete', type: 'error' })
     }
+  }
+
+  const runConfirmed = async (fn: () => Promise<void>) => {
+    try {
+      await fn()
+    } finally {
+      setConfirm(null)
+    }
+  }
+
+  const askDeleteSelected = () => {
+    if (selected.size === 0) return
+    setConfirm({
+      title: `Delete ${selected.size} item(s)?`,
+      message: <>This will permanently delete the <strong>{selected.size}</strong> selected {type} record(s). This cannot be undone.</>,
+      onConfirm: () => runConfirmed(handleDeleteSelected),
+    })
+  }
+
+  const askDelete = (id: number) =>
+    setConfirm({
+      title: 'Delete this item?',
+      message: <>This will permanently delete this {singular(type)}. This cannot be undone.</>,
+      onConfirm: () => runConfirmed(() => handleDelete(id)),
+    })
+
+  const askDeleteFiltered = () => {
+    if (!data || data.total === 0) return
+    setConfirm({
+      title: 'Delete all filtered records?',
+      message: <>This will delete ALL <strong>{data.total}</strong> currently filtered {type} record(s). This cannot be undone.</>,
+      onConfirm: () => runConfirmed(handleDeleteFiltered),
+    })
   }
 
   const handleBulkTag = async () => {
@@ -509,7 +536,7 @@ export default function MediaManager({
         )}
         {showManagement && data && data.total > 0 && (
           <AnimBtn
-            onClick={handleDeleteFiltered}
+            onClick={askDeleteFiltered}
             disabled={deleting}
             style={{
               padding: '0.5rem 1rem',
@@ -525,7 +552,7 @@ export default function MediaManager({
         )}
         {showManagement && selected.size > 0 && (
           <AnimBtn
-            onClick={handleDeleteSelected}
+            onClick={askDeleteSelected}
             disabled={deleting}
             style={{
               padding: '0.5rem 1rem',
@@ -957,7 +984,7 @@ export default function MediaManager({
                         )}
                         {showManagement && (
                           <AnimBtn
-                            onClick={() => handleDelete(item.id)}
+                            onClick={() => askDelete(item.id)}
                             title="Delete"
                             style={{ padding: '0.375rem', background: 'var(--danger)', color: 'white' }}
                           >
@@ -1367,13 +1394,22 @@ export default function MediaManager({
                 getMediaUrl={getMediaUrl}
                 isYouTubeUrl={isYouTubeUrl}
                 getYouTubeEmbedUrl={getYouTubeEmbedUrl}
-                onDelete={showManagement ? () => handleDelete(viewItem.id) : undefined}
+                onDelete={showManagement ? () => askDelete(viewItem.id) : undefined}
                 onEdit={showManagement ? () => setViewMode('edit') : undefined}
               />
             )}
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title || 'Confirm delete'}
+        message={confirm?.message}
+        busy={confirmBusy}
+        onConfirm={() => confirm?.onConfirm()}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }
