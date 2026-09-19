@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
+import { useState, useEffect, useRef, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -11,9 +11,12 @@ interface ModalProps {
   showClose?: boolean
 }
 
+const FOCUSABLE = 'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])'
+
 export function Modal({ open, onClose, children, maxWidth = '600px', showClose = true }: ModalProps) {
   const [visible, setVisible] = useState(false)
   const [animate, setAnimate] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -34,11 +37,43 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
 
   useEffect(() => {
     if (open) {
-      const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-      window.addEventListener('keydown', handler)
-      return () => window.removeEventListener('keydown', handler)
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = '' }
     }
-  }, [open, onClose])
+  }, [open])
+
+  useEffect(() => {
+    if (visible && open) {
+      const el = dialogRef.current
+      const first = el?.querySelector<HTMLElement>(FOCUSABLE)
+      first?.focus()
+    }
+  }, [visible, open])
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      const focusables = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey && (active === first || active === dialogRef.current)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose, visible])
 
   if (!visible) return null
 
@@ -53,7 +88,10 @@ export function Modal({ open, onClose, children, maxWidth = '600px', showClose =
       }}
     >
       <div
+        ref={dialogRef}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
         className="relative w-full overflow-auto transition-all duration-200"
         style={{
           maxWidth,

@@ -35,7 +35,7 @@ export async function getLibraryCounts(): Promise<LibraryCounts> {
 }
 const getLibraryCountsCached = memCache(async () => {
   try {
-    const [byKind, milestones, testimonials, photos, videos, audio, news, images] = await Promise.all([
+    const [byKind, milestones, testimonials, photos, videos, audio, news] = await Promise.all([
       prisma.archiveItem.groupBy({ by: ['kind'], where: { status: 'published' }, _count: { _all: true } }),
       prisma.milestone.count({ where: { status: 'published' } }),
       prisma.testimonial.count({ where: { status: 'published' } }),
@@ -43,7 +43,6 @@ const getLibraryCountsCached = memCache(async () => {
       prisma.video.count(),
       prisma.audio.count(),
       prisma.news.count(),
-      prisma.image.count(),
     ])
 
     const kindMap: Record<string, number> = {}
@@ -67,7 +66,7 @@ const getLibraryCountsCached = memCache(async () => {
       videos,
       audio,
       news,
-      images,
+      images: photos,
       total: speeches + papers + interviews + notes + milestones + testimonials + photos + videos + audio + news,
     }
   } catch {

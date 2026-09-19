@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScrollText, Trash2, Plus, Edit, LogIn, LogOut } from "lucide-react";
 import { SkeletonTable, EmptyState } from "@/components/ui";
@@ -29,17 +29,19 @@ export default function AuditPage() {
   const perPage = 50;
 
   const filterKey = `${entityType}|${action}`;
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
-  if (prevFilterKey !== filterKey) {
-    setPrevFilterKey(filterKey);
-    setPage(1);
-  }
+  const prevFilterKey = useRef(filterKey);
+  useEffect(() => {
+    if (prevFilterKey.current !== filterKey) {
+      prevFilterKey.current = filterKey;
+      setPage(1);
+    }
+  }, [filterKey]);
 
   useEffect(() => {
-    jsonFetch<{ isAdmin?: boolean }>("/api/me")
+    jsonFetch<{ role?: string }>("/api/me")
       .then((d) => {
-        if (!d?.isAdmin) {
-          router.push("/login");
+        if (d?.role !== "admin" && d?.role !== "editor") {
+          router.push("/admin");
           return;
         }
         setIsAdmin(true);

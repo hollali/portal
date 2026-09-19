@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
+import path from 'path'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 
@@ -34,9 +35,52 @@ interface TypeHealth {
   noMedia: { id: number }[]
 }
 
+const MAX_WALKED_FILES = 20_000
+
+async function walkMediaFiles(): Promise<{ localFileSize: number; localFileCount: number }> {
+  const root = path.join(process.cwd(), 'public', 'media')
+  let localFileCount = 0
+  let localFileSize = 0
+  const visited = new Set<string>()
+
+  const walk = async (dir: string): Promise<void> => {
+    if (localFileCount >= MAX_WALKED_FILES) return
+    let entries: fs.Dirent[]
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (localFileCount >= MAX_WALKED_FILES) return
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        let realPath: string
+        try {
+          realPath = await fs.promises.realpath(full)
+        } catch {
+          continue
+        }
+        if (visited.has(realPath)) continue
+        visited.add(realPath)
+        await walk(full)
+      } else if (entry.isFile()) {
+        try {
+          const stat = await fs.promises.stat(full)
+          localFileSize += stat.size
+          localFileCount++
+        } catch {}
+      }
+    }
+  }
+
+  await walk(root)
+  return { localFileSize, localFileCount }
+}
+
 export async function GET() {
   try {
-    await requireRole('admin', 'editor', 'viewer')
+    await requireRole('admin', 'editor')
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -83,31 +127,7 @@ export async function GET() {
     })
   }
 
-  // Storage usage for local media
-  let localFileSize = 0
-  let localFileCount = 0
-  const publicDir = process.env.PUBLIC_DIR || '/home/hollali/Projects/portal/public'
-  const walk = (dir: string) => {
-    let entries: fs.Dirent[] = []
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const entry of entries) {
-      const full = `${dir}/${entry.name}`
-      if (entry.isDirectory()) {
-        walk(full)
-      } else {
-        try {
-          const stat = fs.statSync(full)
-          localFileSize += stat.size
-          localFileCount++
-        } catch {}
-      }
-    }
-  }
-  walk(publicDir)
+  const { localFileSize, localFileCount } = await walkMediaFiles()
 
   // Database record counts
   const [imageCount, videoCount, newsCount, audioCount, userCount, auditCount] = await Promise.all([
@@ -138,7 +158,7 @@ export async function GET() {
       localFileCount,
       localFileSize,
       localFileSizeFormatted: formatBytes(localFileSize),
-      publicDir,
+      publicDir: path.join(process.cwd(), 'public'),
     },
     dbStats,
     totalIssues,

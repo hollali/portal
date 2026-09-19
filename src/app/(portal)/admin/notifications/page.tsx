@@ -29,9 +29,9 @@ export default function NotificationsPage() {
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    jsonFetch<{ isAdmin?: boolean }>('/api/me').then(d => {
-      if (!d?.isAdmin) {
-        router.push('/login')
+    jsonFetch<{ role?: string }>('/api/me').then(d => {
+      if (d?.role !== 'admin' && d?.role !== 'editor') {
+        router.push('/admin')
         return
       }
       setIsAdmin(true)
@@ -54,21 +54,44 @@ export default function NotificationsPage() {
   }, [isAdmin])
 
   const markRead = async (id?: number) => {
-    await fetch('/api/admin/notifications', {
+    const res = await fetch('/api/admin/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'mark_read', id }),
     })
-    fetchNotifications()
+    if (!res.ok) {
+      setToast({ message: 'Failed to update notifications', type: 'error' })
+      return
+    }
+    await fetchNotifications()
   }
 
   const deleteNotification = async (id?: number) => {
-    await fetch('/api/admin/notifications', {
+    const res = await fetch('/api/admin/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', id }),
     })
-    fetchNotifications()
+    if (!res.ok) {
+      setToast({ message: 'Failed to delete notification', type: 'error' })
+      return
+    }
+    await fetchNotifications()
+  }
+
+  const clearAll = async () => {
+    if (!confirm('Delete all notifications? This cannot be undone.')) return
+    const res = await fetch('/api/admin/notifications?limit=200')
+    const d = await res.json().catch(() => null)
+    const all = d?.notifications || []
+    for (const n of all) {
+      await fetch('/api/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id: n.id }),
+      })
+    }
+    await fetchNotifications()
   }
 
   if (!isAdmin) {
@@ -99,7 +122,7 @@ export default function NotificationsPage() {
             </AnimBtn>
           )}
           {notifications.length > 0 && (
-            <AnimBtn onClick={() => deleteNotification()} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
+            <AnimBtn onClick={clearAll} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
               <Trash2 size={14} /> Clear all
             </AnimBtn>
           )}

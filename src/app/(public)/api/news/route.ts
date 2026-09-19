@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-const SORTABLE = new Set(['id', 'source', 'query', 'title', 'source_name', 'date', 'collected_at'])
+const SORTABLE = new Set(['id', 'source', 'query', 'title', 'sourceName', 'date', 'collectedAt'])
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '15')))
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
+  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '15') || 15))
   const query = searchParams.get('q') || ''
   const source = searchParams.get('source') || ''
   const sort = SORTABLE.has(searchParams.get('sort') || '') ? searchParams.get('sort')! : 'id'

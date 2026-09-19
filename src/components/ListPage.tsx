@@ -35,19 +35,25 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
   const [exportFormat, setExportFormat] = useState('')
 
   useEffect(() => {
+    let ignore = false
     const params = new URLSearchParams({ page: String(page), sort, dir, perPage: '24' })
     if (query) params.set('q', query)
     if (source) params.set('source', source)
-    jsonFetch<ListPageData>(`${apiPath}?${params}`).then(d => d && setData(d))
+    jsonFetch<ListPageData>(`${apiPath}?${params}`).then(d => {
+      if (!ignore && d) setData(d)
+    })
+    return () => { ignore = true }
   }, [page, sort, dir, query, source, apiPath])
 
   useEffect(() => {
     if (exportFormat) {
+      let ignore = false
       const params = new URLSearchParams({ page: String(page), sort, dir, perPage: '10000' })
       if (query) params.set('q', query)
       if (source) params.set('source', source)
       jsonFetch<{ items?: MediaRow[] }>(`${apiPath}?${params}`)
         .then(d => {
+          if (ignore) return
           const blob = new Blob([JSON.stringify(d?.items ?? [], null, 2)], { type: 'application/json' })
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a')
@@ -55,6 +61,7 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
           URL.revokeObjectURL(url)
           setExportFormat('')
         })
+      return () => { ignore = true }
     }
   }, [exportFormat, apiPath, page, sort, dir, query, source, type])
 

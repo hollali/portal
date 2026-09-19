@@ -57,6 +57,8 @@ export async function POST(request: Request) {
     if (!key || (status !== 'draft' && status !== 'published')) {
       return NextResponse.json({ error: 'Invalid status or key' }, { status: 400 })
     }
+    const existing = await prisma.contentSection.findUnique({ where: { key } })
+    if (!existing) return NextResponse.json({ error: 'Section not found' }, { status: 404 })
     const section = await prisma.contentSection.update({ where: { key }, data: { status } })
     await logAudit('edit', 'content', section.id, session.userId, `Section "${key}" -> ${status}`)
     return NextResponse.json({ success: true, section })

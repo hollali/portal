@@ -77,9 +77,11 @@ export async function POST(request: Request) {
   if (action === 'set_status') {
     const id = Number(body.id)
     const status = body.status
-    if (!id || (status !== 'draft' && status !== 'published')) {
+    if (!Number.isInteger(id) || id <= 0 || (status !== 'draft' && status !== 'published')) {
       return NextResponse.json({ error: 'Invalid status or id' }, { status: 400 })
     }
+    const existing = await prisma.contentPage.findUnique({ where: { id } })
+    if (!existing) return NextResponse.json({ error: 'Page not found' }, { status: 404 })
     const page = await prisma.contentPage.update({
       where: { id },
       data: { status, publishedAt: status === 'published' ? new Date() : null },

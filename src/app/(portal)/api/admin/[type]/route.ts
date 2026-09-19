@@ -33,6 +33,62 @@ function getModel(type: string): MediaModelApi | null {
   }
 }
 
+const SORTABLE: Record<string, string[]> = {
+  images: ['id', 'source', 'query', 'url', 'collectedAt', 'faceDetected', 'year', 'curated'],
+  videos: ['id', 'source', 'platform', 'title', 'url', 'collectedAt', 'duration', 'views'],
+  news: ['id', 'source', 'title', 'url', 'sourceName', 'date', 'collectedAt'],
+  audio: ['id', 'source', 'title', 'url', 'artist', 'collectedAt'],
+}
+
+const EDITABLE_FIELDS: Record<string, string[]> = {
+  images: ['source', 'query', 'url', 'faceDetected', 'faceCount', 'faceMatch', 'faceMatchScore', 'faceMatchDistance', 'dateTaken', 'year', 'event', 'location', 'person', 'institution', 'parliament', 'theme', 'caption', 'notes', 'tags', 'curated'],
+  videos: ['source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'notes', 'tags'],
+  news: ['source', 'query', 'title', 'url', 'sourceName', 'date', 'snippet', 'notes', 'tags'],
+  audio: ['source', 'query', 'title', 'url', 'artist', 'duration', 'notes', 'tags'],
+}
+
+const INT_FIELDS: Record<string, string[]> = {
+  images: ['faceDetected', 'faceCount', 'faceMatch', 'year'],
+  videos: ['duration', 'views'],
+  news: [],
+  audio: [],
+}
+
+const FLOAT_FIELDS: Record<string, string[]> = {
+  images: ['faceMatchScore', 'faceMatchDistance'],
+  videos: [],
+  news: [],
+  audio: [],
+}
+
+const BOOL_FIELDS: Record<string, string[]> = {
+  images: ['curated'],
+  videos: [],
+  news: [],
+  audio: [],
+}
+
+function cleanData(type: string, raw: Record<string, unknown>): DataInput {
+  const allowed = new Set(EDITABLE_FIELDS[type] || [])
+  const ints = new Set(INT_FIELDS[type] || [])
+  const floats = new Set(FLOAT_FIELDS[type] || [])
+  const bools = new Set(BOOL_FIELDS[type] || [])
+  const data: DataInput = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (!allowed.has(key)) continue
+    if (ints.has(key)) {
+      data[key] = value === '' || value === null || value === undefined ? null : Number(value)
+    } else if (floats.has(key)) {
+      data[key] = value === '' || value === null || value === undefined ? null : Number(value)
+    } else if (bools.has(key)) {
+      data[key] = value === true || value === 'true' || value === '1'
+    } else {
+      data[key] = String(value)
+    }
+  }
+  return data
+}
+
 function buildWhere(type: string, source: string, search: string, tags?: string, dateFrom?: string, dateTo?: string): WhereInput {
   const where: WhereInput = {}
   if (source) where.source = source
@@ -73,10 +129,18 @@ function buildWhere(type: string, source: string, search: string, tags?: string,
     }
   }
   if (dateFrom || dateTo) {
+    const fromDate = new Date(dateFrom || '')
+    const toDate = new Date(dateTo || '')
+    if (dateFrom && isNaN(fromDate.getTime())) {
+      return where
+    }
+    if (dateTo && isNaN(toDate.getTime())) {
+      return where
+    }
     const range: Record<string, string> = {}
-    if (dateFrom) range.gte = new Date(dateFrom).toISOString()
+    if (dateFrom) range.gte = fromDate.toISOString()
     if (dateTo) {
-      const d = new Date(dateTo)
+      const d = toDate
       d.setDate(d.getDate() + 1)
       range.lt = d.toISOString()
     }
@@ -86,16 +150,17 @@ function buildWhere(type: string, source: string, search: string, tags?: string,
 }
 
 export async function GET(request: NextRequest) {
+  let session: Session
   try {
-    await requireAuth()
+    session = await requireAuth()
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type') || 'images'
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-  const perPage = parseInt(searchParams.get('perPage') || '10')
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
+  const perPage = Math.min(200, Math.max(1, parseInt(searchParams.get('perPage') || '10') || 10))
   const search = searchParams.get('search') || ''
   const source = searchParams.get('source') || ''
   const tags = searchParams.get('tags') || ''
@@ -108,12 +173,19 @@ export async function GET(request: NextRequest) {
   const model = getModel(type)
   if (!model) return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
 
+  const sortable = SORTABLE[type] || ['id']
+  const safeSort = sortable.includes(sort) ? sort : 'id'
+  const safeDir = dir === 'asc' ? 'asc' : 'desc'
+
   const skip = (page - 1) * perPage
-  const orderBy: WhereInput = { [sort]: dir }
+  const orderBy: WhereInput = { [safeSort]: safeDir }
   const where = buildWhere(type, source, search, tags, dateFrom, dateTo)
 
-  // Export all matching records
+  // Export requires editor/admin rights (viewers can browse but not exfiltrate)
   if (exportFormat === 'json' || exportFormat === 'csv') {
+    if (!canManageMedia(session.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     const allItems = await model.findMany({ where, orderBy: { id: 'desc' } })
     const fields = type === 'images' ? ['id', 'source', 'query', 'url', 'collectedAt'] :
       type === 'videos' ? ['id', 'source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'collectedAt'] :
@@ -168,7 +240,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const formData = await request.formData()
+  let formData: FormData
+  try {
+    formData = await request.formData()
+  } catch {
+    return NextResponse.json({ error: 'Invalid multipart body' }, { status: 400 })
+  }
   const action = formData.get('action') as string
   const type = formData.get('type') as string || 'images'
 
@@ -177,28 +254,31 @@ export async function POST(request: Request) {
   const model = getModel(type)
   if (!model) return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
 
+  const parseIds = (raw: string | null): number[] =>
+    (raw || '').split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+
   if (action === 'delete_image') {
-    const pks = (formData.get('pks') as string || '').split(',').filter(Boolean)
-    if (pks.length === 0) return NextResponse.json({ error: 'No IDs' }, { status: 400 })
+    const ids = parseIds(formData.get('pks') as string | null)
+    if (ids.length === 0) return NextResponse.json({ error: 'No IDs' }, { status: 400 })
 
-    const ids = pks.map(Number).filter(n => !isNaN(n))
-
-    await model.deleteMany({ where: { id: { in: ids } } })
+    const result = await model.deleteMany({ where: { id: { in: ids } } })
 
     for (const id of ids) {
       await logAudit('delete', type, id, userId, `Deleted ${type} #${id}`)
     }
 
-    return NextResponse.json({ success: true, deleted: ids.length })
+    return NextResponse.json({ success: true, deleted: result.count })
   }
 
   if (action === 'delete_filtered') {
-    const search = (formData.get('search') as string) || ''
-    const source = (formData.get('source') as string) || ''
-    const tags = (formData.get('tags') as string) || ''
-    const dateFrom = (formData.get('dateFrom') as string) || ''
-    const dateTo = (formData.get('dateTo') as string) || ''
-    const where = buildWhere(type, source, search, tags, dateFrom, dateTo)
+    const where = buildWhere(
+      type,
+      (formData.get('source') as string) || '',
+      (formData.get('search') as string) || '',
+      (formData.get('tags') as string) || '',
+      (formData.get('dateFrom') as string) || '',
+      (formData.get('dateTo') as string) || '',
+    )
 
     const matching = await model.findMany({ where, select: { id: true } })
     const ids = matching.map((r: MediaItem) => r.id).filter((id: unknown): id is number => typeof id === 'number')
@@ -214,7 +294,7 @@ export async function POST(request: Request) {
   }
 
   if (action === 'bulk_tag') {
-    const pks = (formData.get('pks') as string || '').split(',').filter(Boolean).map(Number).filter(n => !isNaN(n))
+    const pks = parseIds(formData.get('pks') as string | null)
     const rawTags = (formData.get('tags') as string || '').split(',').map((t: string) => t.trim()).filter(Boolean)
     const mode = (formData.get('mode') as string) || 'add'
     if (pks.length === 0 || rawTags.length === 0) return NextResponse.json({ error: 'No IDs or tags' }, { status: 400 })
@@ -243,7 +323,7 @@ export async function POST(request: Request) {
   }
 
   if (action === 'bulk_reassign') {
-    const pks = (formData.get('pks') as string || '').split(',').filter(Boolean).map(Number).filter(n => !isNaN(n))
+    const pks = parseIds(formData.get('pks') as string | null)
     const newSource = (formData.get('source') as string || '').trim()
     if (pks.length === 0 || !newSource) return NextResponse.json({ error: 'No IDs or source' }, { status: 400 })
 
@@ -264,14 +344,14 @@ export async function POST(request: Request) {
       where: { url: { in: urls } },
       select: { url: true },
     })
-    const existingUrls = new Set(existing.map((r: MediaItem) => r.url) as (string | undefined)[])
+    const existingUrls = new Set(existing.map((r: MediaItem) => r.url).filter(Boolean).map(u => String(u).toLowerCase()))
 
     let created = 0
     const seen = new Set<string>()
     let failed = 0
     for (const url of urls) {
       const key = url.toLowerCase()
-      if (existingUrls.has(url) || seen.has(key)) continue
+      if (existingUrls.has(key) || seen.has(key)) continue
       seen.add(key)
       try {
         const data: DataInput = { url, source, collectedAt: new Date().toISOString() }
@@ -279,7 +359,12 @@ export async function POST(request: Request) {
         // best-effort title from filename for videos/news/audio
         if (type !== 'images') {
           const seg = url.split('/').filter(Boolean).pop() || ''
-          const title = decodeURIComponent(seg.replace(/[-_]/g, ' ').replace(/\.[a-z0-9]{2,5}$/i, '')).trim()
+          let title = ''
+          try {
+            title = decodeURIComponent(seg.replace(/[-_]/g, ' ').replace(/\.[a-z0-9]{2,5}$/i, '')).trim()
+          } catch {
+            title = seg.trim()
+          }
           if (title) data.title = title
         }
         await model.create({ data })
@@ -310,13 +395,22 @@ export async function POST(request: Request) {
     let created = 0
     let failed = 0
     for (const line of lines) {
-      // Parse simple CSV (comma separated, optional quotes)
+      // Parse simple CSV (comma separated, optional quotes, escaped quotes)
       const fields: string[] = []
       let cur = '', inQ = false
-      for (const ch of line) {
-        if (ch === '"') inQ = !inQ
-        else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = '' }
-        else cur += ch
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') {
+            cur += '"'; i++
+          } else {
+            inQ = !inQ
+          }
+        } else if (ch === ',' && !inQ) {
+          fields.push(cur.trim()); cur = ''
+        } else {
+          cur += ch
+        }
       }
       fields.push(cur.trim())
       const url = fields[0] || ''
@@ -354,40 +448,52 @@ export async function POST(request: Request) {
       }
     }
 
+    const raw: Record<string, unknown> = {}
     for (const [key, val] of formData.entries()) {
       if (key === 'action' || key === 'type' || key === 'file') continue
-      if (typeof val === 'string') data[key] = val
+      if (typeof val === 'string') raw[key] = val
     }
+    Object.assign(data, cleanData(type, raw))
     if (mediaUrl) data.url = mediaUrl
     if (localPath) data.localPath = localPath
     data.collectedAt = new Date().toISOString()
 
-    const item = await model.create({ data })
-    await logAudit('create', type, item.id, userId, `Created ${type} #${item.id}`)
-
-    return NextResponse.json({ success: true, item })
+    try {
+      const item = await model.create({ data })
+      await logAudit('create', type, item.id, userId, `Created ${type} #${item.id}`)
+      return NextResponse.json({ success: true, item })
+    } catch (e: unknown) {
+      if ((e as { code?: string }).code === 'P2002') {
+        return NextResponse.json({ error: 'A record with that URL already exists' }, { status: 409 })
+      }
+      return NextResponse.json({ error: 'Failed to create record' }, { status: 500 })
+    }
   }
 
   if (action === 'edit') {
-    const id = parseInt(formData.get('id') as string || '')
-    if (!id || isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    const id = Number(formData.get('id') as string || '')
+    if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-    const data: DataInput = {}
+    const raw: Record<string, unknown> = {}
     for (const [key, val] of formData.entries()) {
       if (typeof val !== 'string' || key === 'action' || key === 'type' || key === 'id') continue
-      if (key === 'duration' || key === 'views' || key === 'faceDetected' || key === 'faceCount' || key === 'faceMatch') {
-        data[key] = val === '' ? null : Number(val)
-      } else if (key === 'faceMatchScore' || key === 'faceMatchDistance') {
-        data[key] = val === '' ? null : Number(val)
-      } else {
-        data[key] = val
-      }
+      raw[key] = val
     }
+    const data = cleanData(type, raw)
 
-    const item = await model.update({ where: { id }, data })
-    await logAudit('edit', type, id, userId, `Updated ${type} #${id}`)
-
-    return NextResponse.json({ success: true, item })
+    try {
+      const item = await model.update({ where: { id }, data })
+      await logAudit('edit', type, id, userId, `Updated ${type} #${id}`)
+      return NextResponse.json({ success: true, item })
+    } catch (e: unknown) {
+      if ((e as { code?: string }).code === 'P2025') {
+        return NextResponse.json({ error: 'Record not found' }, { status: 404 })
+      }
+      if ((e as { code?: string }).code === 'P2002') {
+        return NextResponse.json({ error: 'A record with that URL already exists' }, { status: 409 })
+      }
+      return NextResponse.json({ error: 'Failed to update record' }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

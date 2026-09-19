@@ -4,13 +4,13 @@ import { requireRole } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole('admin', 'editor', 'viewer')
-  } catch (e) {
-    return NextResponse.json({ error: (e as Error).message || 'Unauthorized' }, { status: 401 })
+    await requireRole('admin', 'editor')
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   const { searchParams } = new URL(request.url)
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-  const perPage = Math.min(100, parseInt(searchParams.get('perPage') || '20'))
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
+  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '20') || 20))
   const mode = searchParams.get('mode') === 'url' ? 'url' : 'hash'
 
   if (mode === 'url') {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   const groups: Record<string, typeof hashed> = {}
   for (const img of hashed) {
-    const h = img.imageHash!
+    const h = img.imageHash!.toLowerCase()
     if (!groups[h]) groups[h] = []
     groups[h].push(img)
   }

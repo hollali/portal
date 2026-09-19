@@ -27,7 +27,7 @@ function getModel(type: string): MediaModel | null {
 export async function GET(request: NextRequest) {
   let session: Session
   try {
-    session = await requireRole('admin', 'editor', 'viewer')
+    session = await requireRole('admin', 'editor')
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -63,11 +63,23 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const notifyOnce = async (kind: 'warning' | 'error', message: string) => {
+    try {
+      const existing = await prisma.notification.findFirst({
+        where: { type: kind, message, read: false },
+        orderBy: { id: 'desc' },
+      })
+      if (!existing) {
+        await createNotification(kind, message, session?.userId)
+      }
+    } catch {}
+  }
+
   if (missingLocal.length > 0) {
-    await createNotification('warning', `${missingLocal.length} ${type} record(s) reference missing local files.`, session?.userId)
+    await notifyOnce('warning', `${missingLocal.length} ${type} record(s) reference missing local files.`)
   }
   if (noMedia.length > 0) {
-    await createNotification('warning', `${noMedia.length} ${type} record(s) have no media source at all.`, session?.userId)
+    await notifyOnce('warning', `${noMedia.length} ${type} record(s) have no media source at all.`)
   }
 
   return NextResponse.json({

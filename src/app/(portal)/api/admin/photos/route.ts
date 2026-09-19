@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const q = searchParams.get('q') || ''
   const onlyCurated = searchParams.get('curated') === 'true'
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-  const perPage = parseInt(searchParams.get('perPage') || '20')
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
+  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '20') || 20))
 
   const where: Record<string, unknown> = {}
   if (onlyCurated) where.curated = true
@@ -50,28 +50,39 @@ export async function POST(request: Request) {
   }
   if (!canManageMedia(session.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const body = await request.json()
+  const body = await request.json().catch(() => null)
+  if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const action = body.action || ''
   const id = Number(body.id || '')
 
-  if (!id || isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+  if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
   if (action === 'save_facets') {
     const data: Record<string, unknown> = { curated: body.curated === true }
-    if (body.year) data.year = parseInt(String(body.year)) || null
-    for (const f of PHOTO_FACET_FIELDS) {
-      if (body[f.key] !== undefined) data[f.key] = body[f.key] || null
+    if (body.year !== undefined && body.year !== null && body.year !== '') {
+      const y = parseInt(String(body.year), 10)
+      data.year = isNaN(y) ? null : y
     }
-    if (body.caption !== undefined) data.caption = body.caption || null
+    for (const f of PHOTO_FACET_FIELDS) {
+      if (body[f.key] !== undefined) {
+        data[f.key] = body[f.key] === null || body[f.key] === '' ? null : String(body[f.key]).slice(0, 300)
+      }
+    }
+    if (body.caption !== undefined) data.caption = body.caption === null || body.caption === '' ? null : String(body.caption).slice(0, 2000)
 
-    const item = await prisma.image.update({ where: { id }, data: data as never })
-    await logAudit('edit', 'images', id, session.userId, `Updated photo facets for image #${id}`)
-    return NextResponse.json({ success: true, item })
+    try {
+      const item = await prisma.image.update({ where: { id }, data: data as never })
+      await logAudit('edit', 'images', id, session.userId, `Updated photo facets for image #${id}`)
+      return NextResponse.json({ success: true, item })
+    } catch {
+      return NextResponse.json({ error: 'Image not found' }, { status: 404 })
+    }
   }
 
   if (action === 'toggle_curated') {
     const item = await prisma.image.findUnique({ where: { id }, select: { curated: true } })
-    const next = !item?.curated
+    if (!item) return NextResponse.json({ error: 'Image not found' }, { status: 404 })
+    const next = !item.curated
     await prisma.image.update({ where: { id }, data: { curated: next } })
     await logAudit('edit', 'images', id, session.userId, `${next ? 'Curated' : 'Uncurated'} image #${id}`)
     return NextResponse.json({ success: true, curated: next })

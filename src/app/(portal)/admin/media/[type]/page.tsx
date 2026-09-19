@@ -13,7 +13,7 @@ export default function AdminMediaPage() {
   useEffect(() => {
     jsonFetch<{ isAdmin?: boolean; role?: string }>('/api/me')
       .then(d => {
-        if (!d?.isAdmin) {
+        if (d?.role !== 'admin' && d?.role !== 'editor') {
           router.push('/login')
           return
         }

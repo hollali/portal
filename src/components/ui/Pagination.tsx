@@ -28,12 +28,21 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
   if (totalPages <= maxVisible) {
     for (let i = 1; i <= totalPages; i++) visiblePages.push(i)
   } else {
-    visiblePages.push(1)
-    if (page > 3) visiblePages.push('...')
-    const start = Math.max(2, page - 1)
-    const end = Math.min(totalPages - 1, page + 1)
+    const windowSize = maxVisible - 2
+    let start = page - Math.floor(windowSize / 2)
+    let end = page + Math.ceil(windowSize / 2)
+    if (start < 2) {
+      start = 2
+      end = start + windowSize - 1
+    }
+    if (end > totalPages - 1) {
+      end = totalPages - 1
+      start = end - windowSize + 1
+    }
     for (let i = start; i <= end; i++) visiblePages.push(i)
-    if (page < totalPages - 2) visiblePages.push('...')
+    if (start > 2) visiblePages.unshift('...')
+    if (end < totalPages - 1) visiblePages.push('...')
+    visiblePages.unshift(1)
     visiblePages.push(totalPages)
   }
 

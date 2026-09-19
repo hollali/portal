@@ -57,12 +57,34 @@ type Tab = (typeof TABS)[number]['tab']
 
 export default function AdminDashboard({ onBrowse }: { onBrowse: (tab: MediaType) => void }) {
   const [stats, setStats] = useState<StatsData | null>(null)
+  const [error, setError] = useState(false)
+
+  const load = () => {
+    Promise.resolve()
+      .then(() => fetch('/api/admin/stats'))
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (d) setStats(d)
+        else setError(true)
+      })
+      .catch(() => setError(true))
+  }
 
   useEffect(() => {
-    fetch('/api/admin/stats')
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => setStats(d))
+    load()
   }, [])
+
+  if (error && !stats) {
+    return (
+      <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
+        <p style={{ marginBottom: '1rem' }}>Could not load dashboard stats.</p>
+        <button onClick={load}
+          style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 8, padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   if (!stats) return <SkeletonTable rows={6} cols={4} />
 

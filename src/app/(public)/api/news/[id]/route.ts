@@ -3,7 +3,11 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const item = await prisma.news.findUnique({ where: { id: parseInt(id) } })
+  const numericId = Number(id)
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+  const item = await prisma.news.findUnique({ where: { id: numericId } })
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(item)
 }

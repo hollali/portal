@@ -1,8 +1,15 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
+import { prisma } from '@/lib/prisma'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === 'production' ? '' : `dev-${crypto.randomUUID()}`)
+
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET must be set in production')
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12)
@@ -57,7 +64,19 @@ export async function getSession(): Promise<Session | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get('session')?.value
   if (!token) return null
-  return verifyToken(token)
+  const payload = verifyToken(token)
+  if (!payload) return null
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, username: true, isAdmin: true, role: true },
+    })
+    if (!user) return null
+    return { userId: user.id, username: user.username, isAdmin: user.isAdmin, role: user.role }
+  } catch {
+    return null
+  }
 }
 
 export async function requireAuth(): Promise<Session> {

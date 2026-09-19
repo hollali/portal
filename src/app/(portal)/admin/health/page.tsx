@@ -34,15 +34,16 @@ export default function HealthPage() {
 
   useEffect(() => {
     jsonFetch<{ role?: string }>('/api/me').then(d => {
-      if (!d?.role || !['admin', 'editor', 'viewer'].includes(d.role)) {
-        router.push('/login')
+      if (d?.role !== 'admin' && d?.role !== 'editor') {
+        router.push('/admin')
         return
       }
       setIsAdmin(true)
     })
   }, [router])
 
-  const fetchHealth = useCallback(async () => {
+  const fetchHealth = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setRefreshing(true)
     const res = await fetch('/api/admin/health')
     if (res.ok) {
       const d = await res.json().catch(() => null)
@@ -80,7 +81,15 @@ export default function HealthPage() {
   }
 
   if (!data) {
-    return <EmptyState message="Could not load health data." icon={<Activity size={48} />} />
+    return (
+      <div className="text-center py-16">
+        <EmptyState message="Could not load health data." icon={<Activity size={48} />} />
+        <button onClick={() => fetchHealth(true)}
+          style={{ marginTop: '1rem', background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 8, padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+          Retry
+        </button>
+      </div>
+    )
   }
 
   const overallHealthy = data.totalIssues === 0

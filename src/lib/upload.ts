@@ -3,10 +3,12 @@ import path from 'path'
 
 const UPLOAD_ROOT = path.join(process.cwd(), 'public', 'media')
 
+const MAX_FILE_BYTES = 200 * 1024 * 1024
+
 const ALLOWED_EXT: Record<string, string[]> = {
-  images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.avif'],
+  images: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.avif', '.heic'],
   videos: ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.ogv'],
-  news: ['.html', '.htm', '.txt', '.md', '.pdf'],
+  news: ['.txt', '.md', '.pdf'],
   audio: ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'],
   documents: ['.pdf', '.doc', '.docx', '.txt', '.md', '.rtf', '.ppt', '.pptx'],
 }
@@ -21,6 +23,9 @@ export async function saveUploadedFile(file: File, type: string): Promise<{ loca
   const allowed = ALLOWED_EXT[type] || ALLOWED_EXT.images
   if (!allowed.includes(ext)) {
     throw new Error(`Unsupported file type: ${ext || '(none)'} for ${type}`)
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    throw new Error(`File too large (max ${Math.floor(MAX_FILE_BYTES / 1024 / 1024)}MB)`)
   }
 
   const dir = path.join(UPLOAD_ROOT, type)

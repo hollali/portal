@@ -3,8 +3,6 @@
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import PublicHeader from '@/components/PublicHeader'
-import PublicFooter from '@/components/PublicFooter'
 import { Search as SearchIcon, Mic, FileText, MessagesSquare, ScrollText, Award, Milestone as MilestoneIcon } from 'lucide-react'
 import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
 import { jsonFetch } from '@/lib/jsonFetch'
@@ -199,18 +197,14 @@ function SearchBox() {
 
 export default function PublicSearchPage() {
   return (
-    <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
-      <PublicHeader />
-      <main className="p-section" style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
-        <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Search</span>
-        <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 1.75rem', color: 'var(--p-text-1)' }}>
-          Search the library
-        </h1>
-        <Suspense fallback={null}>
-          <SearchBox />
-        </Suspense>
-      </main>
-      <PublicFooter />
+    <div style={{ maxWidth: 860 }}>
+      <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Search</span>
+      <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 1.75rem', color: 'var(--p-text-1)' }}>
+        Search the library
+      </h1>
+      <Suspense fallback={null}>
+        <SearchBox />
+      </Suspense>
     </div>
   )
 }

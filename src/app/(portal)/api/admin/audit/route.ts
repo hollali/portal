@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth'
+import { requireRole } from '@/lib/auth'
 import { getAuditLogs } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAuth()
+    await requireRole('admin', 'editor')
   } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { searchParams } = new URL(request.url)

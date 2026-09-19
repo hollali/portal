@@ -52,6 +52,26 @@ function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectEle
   return <select {...props} className={inputCls} style={{ ...inputStyle, paddingRight: '2rem' }}>{children}</select>
 }
 
+function PaginationBar({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  return (
+    <div className="flex items-center justify-center gap-2 mt-4">
+      <button disabled={page <= 1} onClick={() => onChange(Math.max(1, page - 1))}
+        className="rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}>
+        Prev
+      </button>
+      <span className="text-xs" style={{ color: 'var(--muted-foreground)', fontFamily: 'var(--font-mono), monospace' }}>
+        Page {page} of {totalPages}
+      </span>
+      <button disabled={page >= totalPages} onClick={() => onChange(Math.min(totalPages, page + 1))}
+        className="rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)', cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}>
+        Next
+      </button>
+    </div>
+  )
+}
+
 export default function ArchiveAdminPage() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('archive')
@@ -61,8 +81,11 @@ export default function ArchiveAdminPage() {
 
   const [archive, setArchive] = useState<ArchiveRow[]>([])
   const [milestones, setMilestones] = useState<MilestoneRow[]>([])
-  const [testimonials, setTestimonials] = useState<TestimonialRow[]>([])
+  const [testimonials, setTestimonialRows] = useState<TestimonialRow[]>([])
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [kindFilter, setKindFilter] = useState('')
 
   const [docModal, setDocModal] = useState<{ mode: 'create' | 'edit'; row?: ArchiveRow } | null>(null)
   const [docForm, setDocForm] = useState<Record<string, string>>({})
@@ -75,10 +98,15 @@ export default function ArchiveAdminPage() {
   const [testiForm, setTestiForm] = useState<Record<string, string>>({})
 
   const load = async (t: Tab) => {
-    const d = await jsonFetch<{ items?: ArchiveRow[] | MilestoneRow[] | TestimonialRow[] }>(`/api/admin/library?type=${t}&q=${encodeURIComponent(search)}`)
+    const params = new URLSearchParams({ type: t })
+    if (search) params.set('q', search)
+    if (t === 'archive' && kindFilter) params.set('kind', kindFilter)
+    params.set('page', String(Math.max(1, page)))
+    const d = await jsonFetch<{ items?: ArchiveRow[] | MilestoneRow[] | TestimonialRow[]; total?: number; perPage?: number }>(`/api/admin/library?${params.toString()}`)
     if (t === 'archive') setArchive((d?.items || []) as ArchiveRow[])
     else if (t === 'milestones') setMilestones((d?.items || []) as MilestoneRow[])
-    else setTestimonials((d?.items || []) as TestimonialRow[])
+    else setTestimonialRows((d?.items || []) as TestimonialRow[])
+    setTotalPages(Math.max(1, Math.ceil((d?.total || 0) / (d?.perPage || 20))))
     setLoaded(true)
   }
 
@@ -93,7 +121,15 @@ export default function ArchiveAdminPage() {
     if (!role) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(tab)
-  }, [role, tab, search])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, tab, search, page, kindFilter])
+
+  const switchTab = (t: Tab) => {
+    setTab(t)
+    setPage(1)
+    setSearch('')
+    setKindFilter('')
+  }
 
   const notify = (message: string, type?: 'success' | 'error') => setToast({ message, type })
 
@@ -155,6 +191,21 @@ export default function ArchiveAdminPage() {
     if (res.ok) load('archive')
   }
 
+  const publishDoc = async (row: ArchiveRow) => {
+    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set_status', type: 'archive', id: row.id, status: 'published' }) })
+    if (res.ok) { load('archive'); notify('Published') } else notify('Failed to publish', 'error')
+  }
+
+  const publishMile = async (row: MilestoneRow) => {
+    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set_status', type: 'milestones', id: row.id, status: 'published' }) })
+    if (res.ok) { load('milestones'); notify('Published') } else notify('Failed to publish', 'error')
+  }
+
+  const publishTesti = async (row: TestimonialRow) => {
+    const res = await fetch('/api/admin/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'set_status', type: 'testimonials', id: row.id, status: 'published' }) })
+    if (res.ok) { load('testimonials'); notify('Published') } else notify('Failed to publish', 'error')
+  }
+
   /* ── Milestones ── */
   const openMileModal = (mode: 'create' | 'edit', row?: MilestoneRow) => {
     setMileModal({ mode, row })
@@ -201,8 +252,13 @@ export default function ArchiveAdminPage() {
     load('testimonials'); notify('Deleted')
   }
 
-  const kindsByTab: Record<string, boolean> = {}
-  const visibleArchive = archive.filter(a => kindsByTab[a.kind] !== false)
+  const tabButton = (t: Tab, label: string, Icon: React.ElementType) => (
+    <button key={t} onClick={() => switchTab(t)}
+      className="inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-semibold transition-colors"
+      style={{ background: tab === t ? 'var(--primary)' : 'transparent', color: tab === t ? 'var(--primary-fg)' : 'var(--muted-foreground)', border: 'none', cursor: 'pointer' }}>
+      <Icon size={15} /> {label}
+    </button>
+  )
 
   return (
     <div className="page-enter">
@@ -216,13 +272,7 @@ export default function ArchiveAdminPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="flex flex-wrap gap-1 mb-6 rounded-lg p-1 w-fit" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-        {([['archive', 'Documents', FileText], ['milestones', 'Milestones', MilestoneIcon], ['testimonials', 'Testimonials', Award]] as [Tab, string, React.ElementType][]).map(([t, label, Icon]) => (
-          <button key={t} onClick={() => setTab(t)}
-            className="inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-semibold transition-colors"
-            style={{ background: tab === t ? 'var(--primary)' : 'transparent', color: tab === t ? 'var(--primary-fg)' : 'var(--muted-foreground)', border: 'none', cursor: 'pointer' }}>
-            <Icon size={15} /> {label}
-          </button>
-        ))}
+        {([['archive', 'Documents', FileText], ['milestones', 'Milestones', MilestoneIcon], ['testimonials', 'Testimonials', Award]] as [Tab, string, React.ElementType][]).map(([t, label, Icon]) => tabButton(t, label, Icon))}
       </div>
 
       {!loaded ? (
@@ -230,14 +280,17 @@ export default function ArchiveAdminPage() {
       ) : tab === 'archive' ? (
         <div className="space-y-4">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', color: 'var(--muted-foreground)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', color: 'var(--muted-foreground)', flexWrap: 'wrap' }}>
               <ListFilter size={14} />
+              <button onClick={() => { setKindFilter(''); setPage(1) }}
+                style={{ border: '1px solid var(--border)', borderRadius: 999, padding: '0.2rem 0.6rem', cursor: 'pointer', background: !kindFilter ? 'var(--primary)' : 'transparent', color: !kindFilter ? 'var(--primary-fg)' : 'var(--muted-foreground)' }}>all</button>
               {DOCUMENT_KINDS.map(k => (
-                <span key={k} style={{ border: '1px solid var(--border)', borderRadius: 999, padding: '0.2rem 0.6rem' }}>{k}</span>
+                <button key={k} onClick={() => { setKindFilter(kindFilter === k ? '' : k); setPage(1) }}
+                  style={{ border: '1px solid var(--border)', borderRadius: 999, padding: '0.2rem 0.6rem', cursor: 'pointer', background: kindFilter === k ? 'var(--primary)' : 'transparent', color: kindFilter === k ? 'var(--primary-fg)' : 'var(--muted-foreground)' }}>{k}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexGrow: 1, justifyContent: 'flex-end' }}>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search documents…"
+              <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Search documents…"
                 className={inputCls} style={{ ...inputStyle, maxWidth: 260 }} />
               <button onClick={() => openDocModal('create')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
                 style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
@@ -282,7 +335,7 @@ export default function ArchiveAdminPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             {a.status === 'draft' ? (
-                              <button onClick={() => submitDoc('published')} className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold"
+                              <button onClick={() => publishDoc(a)} className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold"
                                 style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
                                 <Eye size={12} /> Publish
                               </button>
@@ -307,11 +360,12 @@ export default function ArchiveAdminPage() {
               </div>
             </div>
           )}
+          <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
         </div>
       ) : tab === 'milestones' ? (
         <div className="space-y-4">
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search milestones…" className={inputCls} style={{ ...inputStyle, maxWidth: 280 }} />
+            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Search milestones…" className={inputCls} style={{ ...inputStyle, maxWidth: 280 }} />
             <button onClick={() => openMileModal('create')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
               style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
               <Plus size={14} /> New Milestone
@@ -341,7 +395,7 @@ export default function ArchiveAdminPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {m.status === 'draft' && (
-                              <button onClick={() => submitMile('published')} className="rounded-md px-2 py-1.5 text-xs font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>Publish</button>
+                              <button onClick={() => publishMile(m)} className="rounded-md px-2 py-1.5 text-xs font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>Publish</button>
                             )}
                             <AnimBtn onClick={() => openMileModal('edit', m)} className="p-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }}><Pencil size={14} /></AnimBtn>
                             <AnimBtn onClick={() => deleteMile(m)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }}><Trash2 size={14} /></AnimBtn>
@@ -354,11 +408,12 @@ export default function ArchiveAdminPage() {
               </div>
             </div>
           )}
+          <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
         </div>
       ) : (
         <div className="space-y-4">
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search testimonials…" className={inputCls} style={{ ...inputStyle, maxWidth: 280 }} />
+            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Search testimonials…" className={inputCls} style={{ ...inputStyle, maxWidth: 280 }} />
             <button onClick={() => openTestiModal('create')} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
               style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>
               <Plus size={14} /> New Testimonial
@@ -388,7 +443,7 @@ export default function ArchiveAdminPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {t.status === 'draft' && (
-                              <button onClick={() => submitTesti('published')} className="rounded-md px-2 py-1.5 text-xs font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>Publish</button>
+                              <button onClick={() => publishTesti(t)} className="rounded-md px-2 py-1.5 text-xs font-semibold" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', cursor: 'pointer' }}>Publish</button>
                             )}
                             <AnimBtn onClick={() => openTestiModal('edit', t)} className="p-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }}><Pencil size={14} /></AnimBtn>
                             <AnimBtn onClick={() => deleteTesti(t)} className="p-2" style={{ background: 'transparent', color: 'var(--danger)' }}><Trash2 size={14} /></AnimBtn>
@@ -401,6 +456,7 @@ export default function ArchiveAdminPage() {
               </div>
             </div>
           )}
+          <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
         </div>
       )}
 

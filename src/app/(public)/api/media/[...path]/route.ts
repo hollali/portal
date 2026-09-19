@@ -20,18 +20,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
   const ext = path.extname(filePath).toLowerCase()
   const mimeMap: Record<string, string> = {
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+    '.gif': 'image/gif', '.webp': 'image/webp',
     '.mp4': 'video/mp4', '.webm': 'video/webm', '.avi': 'video/x-msvideo',
     '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
     '.txt': 'text/plain', '.json': 'application/json',
   }
 
-  const contentType = mimeMap[ext] || 'application/octet-stream'
+  const inlineExts = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.avi', '.mp3', '.wav', '.ogg'])
+  const inline = inlineExts.has(ext)
+  const contentType = mimeMap[ext] && inline ? mimeMap[ext] : 'application/octet-stream'
   const buffer = fs.readFileSync(filePath)
 
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': contentType,
+      'Content-Disposition': inline ? 'inline' : `attachment; filename="${path.basename(filePath)}"`,
+      'X-Content-Type-Options': 'nosniff',
       'Content-Length': String(buffer.length),
       'Cache-Control': 'public, max-age=3600',
     },

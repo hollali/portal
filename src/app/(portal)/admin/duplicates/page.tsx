@@ -24,7 +24,11 @@ export default function DuplicatesPage() {
   const [errored, setErrored] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    jsonFetch<DuplicatesData>(`/api/admin/duplicates?page=${page}`).then(d => d && setData(d))
+    let ignore = false
+    jsonFetch<DuplicatesData>(`/api/admin/duplicates?page=${page}`).then(d => {
+      if (!ignore && d) setData(d)
+    })
+    return () => { ignore = true }
   }, [page])
 
   if (!data) return <div>Loading...</div>
@@ -73,7 +77,11 @@ export default function DuplicatesPage() {
                       <td><Link href={`/images/${img.id}`} style={{ fontWeight: 600 }}>{img.id}</Link></td>
                       <td>{img.source}</td>
                       <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <a href={img.url || '#'} target="_blank" rel="noopener noreferrer">{img.url}</a>
+                        {img.url ? (
+                          <a href={img.url} target="_blank" rel="noopener noreferrer">{img.url}</a>
+                        ) : (
+                          <span style={{ color: 'var(--muted)' }}>No URL</span>
+                        )}
                       </td>
                       <td style={{ fontSize: '0.8rem' }}>{img.collectedAt?.slice(0, 10)}</td>
                     </tr>

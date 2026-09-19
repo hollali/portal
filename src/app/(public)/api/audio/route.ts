@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveMediaSrc } from '@/lib/mediaServer'
 
-const SORTABLE = new Set(['id', 'source', 'query', 'title', 'artist', 'duration', 'collected_at'])
+const SORTABLE = new Set(['id', 'source', 'query', 'title', 'artist', 'duration', 'collectedAt'])
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '20')))
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
+  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '20') || 20))
   const query = searchParams.get('q') || ''
   const source = searchParams.get('source') || ''
   const sort = SORTABLE.has(searchParams.get('sort') || '') ? searchParams.get('sort')! : 'id'

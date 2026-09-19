@@ -30,6 +30,13 @@ export default function AudioDetailPage() {
   const mediaUrl = item.src && item.src.startsWith('/api/media') ? item.src : null
   const ytEmbed = item.url && isYouTubeUrl(item.url) ? getYouTubeEmbedUrl(item.url) : null
 
+  const formatDuration = (v: unknown) => {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return null
+    const m = Math.floor(v / 60)
+    const s = Math.round(v % 60)
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
   const getPlayer = () => {
     if (mediaUrl && !remoteError) {
       return <audio controls style={{ width: '100%' }}><source src={mediaUrl} /></audio>
@@ -84,7 +91,7 @@ export default function AudioDetailPage() {
                   {key.replace(/([A-Z])/g, ' $1')}
                 </th>
                 <td style={{ wordBreak: 'break-all' }}>
-                  {val === null || val === undefined ? '-' : String(val)}
+                  {val === null || val === undefined || val === '' ? '-' : /duration/i.test(key) ? (formatDuration(val) ?? '-') : String(val)}
                 </td>
               </tr>
             ))}

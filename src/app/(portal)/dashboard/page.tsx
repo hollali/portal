@@ -50,15 +50,25 @@ export default function Dashboard() {
   const [recent, setRecent] = useState<RecentData>({ images: [], videos: [], news: [], audio: [] })
   const [errored, setErrored] = useState<Set<number>>(new Set())
   const [animCount, setAnimCount] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
-    jsonFetch<Stats>('/api/stats').then(d => d && setStats(d))
+  const load = () => {
+    Promise.resolve()
+      .then(() => jsonFetch<Stats>('/api/stats'))
+      .then(d => {
+        if (d) setStats(d)
+        else setLoadError(true)
+      })
     Promise.all([
       jsonFetch<{ items: RecentImage[] }>('/api/images?perPage=8'),
       jsonFetch<{ items: RecentVideo[] }>('/api/videos?perPage=8'),
       jsonFetch<{ items: RecentNews[] }>('/api/news?perPage=8'),
       jsonFetch<{ items: RecentAudio[] }>('/api/audio?perPage=8'),
     ]).then(([i, v, n, a]) => setRecent({ images: i?.items ?? [], videos: v?.items ?? [], news: n?.items ?? [], audio: a?.items ?? [] }))
+  }
+
+  useEffect(() => {
+    load()
   }, [])
 
   useEffect(() => {
@@ -67,6 +77,21 @@ export default function Dashboard() {
       return () => clearTimeout(timeout)
     }
   }, [stats])
+
+  if (loadError && !stats) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Dashboard</h1>
+        <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
+          <p style={{ marginBottom: '1rem' }}>Could not load dashboard data.</p>
+          <button onClick={load}
+            style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 8, padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!stats) return <div>Loading...</div>
 
@@ -93,9 +118,7 @@ export default function Dashboard() {
                   right: '0.75rem',
                   opacity: 0.12,
                   color: c.color,
-                  display: 'none',
                 }}
-                className="show-sm-icon"
               />
               <div
                 className={`stat-count${animCount ? ' animate' : ''}`}
