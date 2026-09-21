@@ -7,7 +7,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!Number.isInteger(numericId) || numericId <= 0) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  const item = await prisma.news.findUnique({ where: { id: numericId } })
+  const item = await prisma.news.findUnique({
+    where: { id: numericId },
+    select: {
+      id: true,
+      title: true,
+      url: true,
+      source: true,
+      sourceName: true,
+      query: true,
+      date: true,
+      collectedAt: true,
+      snippet: true,
+      notes: true,
+      tags: true,
+    },
+  })
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(item)
 }

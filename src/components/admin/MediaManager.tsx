@@ -1546,9 +1546,10 @@ function DetailsView({
           {item.snippet && (
             <div
               className="p-4 rounded-lg text-sm leading-relaxed mb-4"
-              style={{ background: 'var(--muted)' }}
-              dangerouslySetInnerHTML={{ __html: item.snippet }}
-            />
+              style={{ background: 'var(--muted)', whiteSpace: 'pre-line', wordBreak: 'break-word' }}
+            >
+              {String(item.snippet).replace(/<[^>]*>/g, ' ')}
+            </div>
           )}
           <div className="flex gap-2 flex-wrap">
             {item.url && (

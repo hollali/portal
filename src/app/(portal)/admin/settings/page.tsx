@@ -16,7 +16,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     jsonFetch<{ role?: string }>('/api/me').then(d => {
-      if (d?.role !== 'admin' && d?.role !== 'editor') {
+      if (d?.role !== 'admin') {
         router.push('/admin')
         return
       }

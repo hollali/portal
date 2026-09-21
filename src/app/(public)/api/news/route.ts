@@ -27,6 +27,19 @@ export async function GET(request: NextRequest) {
   const [items, total] = await Promise.all([
     prisma.news.findMany({
       where,
+      select: {
+        id: true,
+        title: true,
+        url: true,
+        source: true,
+        sourceName: true,
+        query: true,
+        date: true,
+        collectedAt: true,
+        snippet: true,
+        notes: true,
+        tags: true,
+      },
       orderBy: { [sort]: dir },
       skip: (page - 1) * perPage,
       take: perPage,

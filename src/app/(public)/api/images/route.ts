@@ -23,19 +23,34 @@ export async function GET(request: NextRequest) {
   }
   if (source) where.source = source
 
-  const [rows, total] = await Promise.all([
-    prisma.image.findMany({
-      where,
-      orderBy: { [sort]: dir },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.image.count({ where }),
-  ])
+  const total = await prisma.image.count({ where })
+
+  const images = await prisma.image.findMany({
+    where,
+    select: {
+      id: true,
+      url: true,
+      localPath: true,
+      source: true,
+      query: true,
+      collectedAt: true,
+      faceDetected: true,
+      faceCount: true,
+      faceMatch: true,
+      faceMatchScore: true,
+    },
+    orderBy: { [sort]: dir },
+    skip: (page - 1) * perPage,
+    take: perPage,
+  })
+
+  const items = images.map(({ localPath, url, ...rest }) => ({
+    ...rest,
+    url,
+    src: resolveMediaSrc({ localPath, url }),
+  }))
 
   const sources = await prisma.image.findMany({ distinct: ['source'], select: { source: true }, orderBy: { source: 'asc' } })
-
-  const items = rows.map(row => ({ ...row, src: resolveMediaSrc(row) }))
 
   return NextResponse.json({ items, total, page, perPage, sources: sources.map(s => s.source).filter(Boolean) })
 }

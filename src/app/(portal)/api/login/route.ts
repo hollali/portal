@@ -4,21 +4,33 @@ import { prisma } from '@/lib/prisma'
 import { verifyPassword, signToken } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 
-const attempts = new Map<string, { count: number; until: number }>()
+const attempts = new Map<string, number[]>()
+const WINDOW_MS = 60_000
+const MAX_ATTEMPTS = 5
 
-function rateLimited(key: string): boolean {
+function pruneKey(key: string): void {
   const now = Date.now()
-  const entry = attempts.get(key)
-  if (entry && entry.until > now) return true
-  if (!entry || entry.until <= now) {
-    attempts.set(key, { count: 1, until: now + 60_000 })
-    return false
-  }
-  entry.count += 1
-  if (entry.count >= 5) {
-    entry.until = now + 60_000
-  }
-  return false
+  const list = attempts.get(key)
+  if (!list) return
+  const alive = list.filter(t => t > now - WINDOW_MS)
+  if (alive.length === 0) attempts.delete(key)
+  else attempts.set(key, alive)
+}
+
+function isRateLimited(key: string): boolean {
+  pruneKey(key)
+  return (attempts.get(key) || []).length >= MAX_ATTEMPTS
+}
+
+function recordFailure(key: string): void {
+  pruneKey(key)
+  const list = attempts.get(key) || []
+  list.push(Date.now())
+  attempts.set(key, list)
+}
+
+function clearKey(key: string): void {
+  attempts.delete(key)
 }
 
 export async function POST(request: Request) {
@@ -39,7 +51,7 @@ export async function POST(request: Request) {
   const forwarded = request.headers.get('x-forwarded-for')
   ip = (forwarded?.split(',')[0] || 'local').trim()
 
-  if (rateLimited(username) || rateLimited(`${ip}:${username}`)) {
+  if (isRateLimited(username) || isRateLimited(`${ip}:${username}`)) {
     return NextResponse.json({ error: 'Too many attempts, try again later' }, { status: 429 })
   }
 
@@ -50,8 +62,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Database unavailable, please retry' }, { status: 503 })
   }
   if (!user || !(await verifyPassword(password, user.password))) {
+    recordFailure(username)
+    recordFailure(`${ip}:${username}`)
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
+
+  clearKey(username)
+  clearKey(`${ip}:${username}`)
 
   const token = signToken({ userId: user.id, username: user.username, isAdmin: user.isAdmin, role: user.role })
   const cookieStore = await cookies()

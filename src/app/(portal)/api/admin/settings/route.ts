@@ -5,7 +5,7 @@ import { logAudit } from '@/lib/audit'
 
 export async function GET() {
   try {
-    await requireRole('admin', 'editor')
+    await requireRole('admin')
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

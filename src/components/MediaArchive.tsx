@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { jsonFetch } from '@/lib/jsonFetch'
 import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeThumbUrl } from '@/lib/media'
-import { Clapperboard, AudioLines, X, ChevronLeft, ChevronRight, Play, Search as SearchIcon, Filter } from 'lucide-react'
+import { Clapperboard, AudioLines, X, ChevronLeft, ChevronRight, Play, Search as SearchIcon } from 'lucide-react'
 
 type Kind = 'videos' | 'audio'
 
@@ -37,7 +37,6 @@ interface ListData {
 }
 
 const FACETS: { key: string; label: string }[] = [
-  { key: 'category', label: 'Category' },
   { key: 'year', label: 'Year' },
   { key: 'event', label: 'Event' },
   { key: 'location', label: 'Location' },
@@ -114,9 +113,9 @@ export default function MediaArchive({ kind, eyebrow, heading, sub, categories, 
       </section>
 
       <section className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2rem, 4vw, 3rem) 0' }}>
-        {/* Search + facet filters */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginBottom: '1rem' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+        {/* Search + facets + category chips on one line */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem' }}>
+          <div style={{ position: 'relative', flex: '1 1 200px' }}>
             <SearchIcon size={15} style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--p-text-4)' }} />
             <input
               value={q}
@@ -138,24 +137,17 @@ export default function MediaArchive({ kind, eyebrow, heading, sub, categories, 
               ))}
             </select>
           ))}
-        </div>
-
-        {/* Category chips */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: 'var(--p-text-4)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', alignSelf: 'center' }}>
-            <Filter size={12} /> Browse
-          </span>
           {activeCategories.map(c => {
-            const active = filters.category === c.value
+            const isActive = filters.category === c.value
             return (
               <button
                 key={c.value}
-                onClick={() => setFilter('category', active ? '' : c.value)}
+                onClick={() => setFilter('category', isActive ? '' : c.value)}
                 style={{
-                  fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.05em',
-                  color: active ? 'var(--primary-fg)' : 'var(--p-text-3)', textDecoration: 'none',
-                  background: active ? 'var(--primary)' : 'var(--p-surface)', border: '1px solid var(--p-border)', borderRadius: 999,
-                  padding: '0.35rem 0.85rem', cursor: 'pointer',
+                  fontSize: '0.72rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.05em',
+                  color: isActive ? 'var(--primary-fg)' : 'var(--p-text-3)', textDecoration: 'none',
+                  background: isActive ? 'var(--primary)' : 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999,
+                  padding: '0.55rem 0.85rem', cursor: 'pointer', flexShrink: 0,
                 }}
               >
                 {c.value}{c.count ? ` (${c.count})` : ''}

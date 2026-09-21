@@ -10,7 +10,6 @@ export interface AudioArchiveItem {
   title: string | null
   src: string | null
   url: string | null
-  localPath: string | null
   source: string | null
   artist: string | null
   duration: string | null
@@ -29,10 +28,8 @@ export async function GET(request: NextRequest) {
   const perPage = Math.min(120, Math.max(1, parseInt(searchParams.get('perPage') || '24') || 24))
   const query = searchParams.get('q') || ''
   const source = searchParams.get('source') || ''
-  const includeAll = searchParams.get('all') === '1'
 
-  const where: Record<string, unknown> = {}
-  if (!includeAll) where.status = 'published'
+  const where: Record<string, unknown> = { status: 'published' }
 
   const facetWhere: Record<string, unknown>[] = []
   let hasFacet = false
@@ -65,7 +62,7 @@ export async function GET(request: NextRequest) {
     }),
     prisma.audio.count({ where }),
     prisma.audio.findMany({ distinct: ['source'], select: { source: true }, orderBy: { source: 'asc' } }),
-    prisma.audio.findMany({ where: includeAll ? {} : { status: 'published' }, select: { category: true, year: true, event: true, location: true, theme: true } }),
+    prisma.audio.findMany({ where: { status: 'published' }, select: { category: true, year: true, event: true, location: true, theme: true } }),
   ])
 
   const items: AudioArchiveItem[] = rows.map(row => ({
@@ -73,7 +70,6 @@ export async function GET(request: NextRequest) {
     title: row.title,
     src: resolveMediaSrc({ localPath: row.localPath, url: row.url }),
     url: row.url,
-    localPath: row.localPath,
     source: row.source,
     artist: row.artist,
     duration: row.duration,
