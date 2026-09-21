@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { MEDIA_ROOT } from '@/lib/media'
 
 const PUBLIC_ROOT = path.join(process.cwd(), 'public')
 
@@ -9,10 +10,19 @@ export async function GET(request: NextRequest) {
   const file = searchParams.get('file') || ''
 
   const clean = file.replace(/^\/+/, '')
-  const filePath = path.join(PUBLIC_ROOT, clean)
+  const segments = clean.split('/').filter(Boolean)
 
-  if (!filePath.startsWith(PUBLIC_ROOT)) {
-    return new NextResponse('Forbidden', { status: 403 })
+  let filePath: string
+  if (clean.startsWith('api/media/')) {
+    filePath = path.resolve(MEDIA_ROOT, ...segments.slice(2))
+    if (!filePath.startsWith(MEDIA_ROOT)) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+  } else {
+    filePath = path.resolve(PUBLIC_ROOT, ...segments)
+    if (!filePath.startsWith(PUBLIC_ROOT)) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
   }
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     return new NextResponse('Not found', { status: 404 })

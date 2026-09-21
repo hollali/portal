@@ -172,6 +172,11 @@ export async function POST(request: Request) {
       await logAudit('create', type, item.id, session.userId, `Created ${type} #${item.id}`)
       return NextResponse.json({ success: true, item })
     } catch (e: unknown) {
+      const savedFile = typeof body.filePath === 'string' ? body.filePath : null
+      if (savedFile) {
+        const { deleteStoredFile } = await import('@/lib/mediaFiles')
+        deleteStoredFile(savedFile)
+      }
       if ((e as { code?: string }).code === 'P2002') {
         return NextResponse.json({ error: 'A record with that slug already exists' }, { status: 409 })
       }
@@ -186,6 +191,13 @@ export async function POST(request: Request) {
     if (Object.keys(data).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     if ('status' in data) data.status = validateStatus(data)
 
+    let staleFile: string | null = null
+    if (type === 'archive' && data.filePath) {
+      const row = await prisma.archiveItem.findUnique({ where: { id }, select: { filePath: true } })
+      const oldFile = row?.filePath
+      if (oldFile && oldFile !== data.filePath) staleFile = oldFile
+    }
+
     try {
       let item: { id: number }
       if (type === 'archive') item = await prisma.archiveItem.update({ where: { id }, data: data as never }) as never
@@ -193,8 +205,17 @@ export async function POST(request: Request) {
       else item = await prisma.testimonial.update({ where: { id }, data: data as never }) as never
 
       await logAudit('edit', type, id, session.userId, `Updated ${type} #${id}`)
+      if (staleFile) {
+        const { deleteStoredFile } = await import('@/lib/mediaFiles')
+        deleteStoredFile(staleFile)
+      }
       return NextResponse.json({ success: true, item })
     } catch (e: unknown) {
+      const newFile = typeof data.filePath === 'string' ? data.filePath : null
+      if (newFile) {
+        const { deleteStoredFile } = await import('@/lib/mediaFiles')
+        deleteStoredFile(newFile)
+      }
       if ((e as { code?: string }).code === 'P2025') {
         return NextResponse.json({ error: 'Record not found' }, { status: 404 })
       }
@@ -209,10 +230,21 @@ export async function POST(request: Request) {
     const id = Number(body.id)
     if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
     try {
-      if (type === 'archive') await prisma.archiveItem.delete({ where: { id } })
-      else if (type === 'milestones') await prisma.milestone.delete({ where: { id } })
-      else await prisma.testimonial.delete({ where: { id } })
+      let staleFile: string | null = null
+      if (type === 'archive') {
+        const row = await prisma.archiveItem.findUnique({ where: { id }, select: { filePath: true } })
+        staleFile = row?.filePath || null
+        await prisma.archiveItem.delete({ where: { id } })
+      } else if (type === 'milestones') {
+        await prisma.milestone.delete({ where: { id } })
+      } else {
+        await prisma.testimonial.delete({ where: { id } })
+      }
       await logAudit('delete', type, id, session.userId, `Deleted ${type} #${id}`)
+      if (staleFile) {
+        const { deleteStoredFile } = await import('@/lib/mediaFiles')
+        deleteStoredFile(staleFile)
+      }
       return NextResponse.json({ success: true })
     } catch (e: unknown) {
       if ((e as { code?: string }).code === 'P2025') {

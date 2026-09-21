@@ -1,7 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import { MEDIA_ROOT, localToMediaUrl } from '@/lib/media'
 
-const UPLOAD_ROOT = path.join(process.cwd(), 'public', 'media')
+const UPLOAD_ROOT = MEDIA_ROOT
 
 const MAX_FILE_BYTES = 200 * 1024 * 1024
 
@@ -34,11 +35,11 @@ export async function saveUploadedFile(file: File, type: string): Promise<{ loca
   const base = sanitizeName(path.basename(file.name, ext))
   const stamp = Date.now()
   const filename = `${base}-${stamp}${ext}`
-  const localPath = path.join(dir, filename)
+  const localPath = path.join(UPLOAD_ROOT, type, filename)
 
   const buffer = Buffer.from(await file.arrayBuffer())
   fs.writeFileSync(localPath, buffer)
 
-  const url = `/media/${type}/${filename}`
+  const url = localToMediaUrl(localPath) || `/api/media/${type}/${filename}`
   return { localPath, url }
 }

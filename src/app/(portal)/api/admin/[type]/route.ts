@@ -261,10 +261,17 @@ export async function POST(request: Request) {
     const ids = parseIds(formData.get('pks') as string | null)
     if (ids.length === 0) return NextResponse.json({ error: 'No IDs' }, { status: 400 })
 
+    const victims = await model.findMany({ where: { id: { in: ids } }, select: { localPath: true, url: true } as never })
     const result = await model.deleteMany({ where: { id: { in: ids } } })
 
     for (const id of ids) {
       await logAudit('delete', type, id, userId, `Deleted ${type} #${id}`)
+    }
+
+    const { deleteStoredFile } = await import('@/lib/mediaFiles')
+    for (const v of victims) {
+      deleteStoredFile(v.localPath as string | undefined)
+      deleteStoredFile(v.url as string | undefined)
     }
 
     return NextResponse.json({ success: true, deleted: result.count })
@@ -280,14 +287,21 @@ export async function POST(request: Request) {
       (formData.get('dateTo') as string) || '',
     )
 
-    const matching = await model.findMany({ where, select: { id: true } })
-    const ids = matching.map((r: MediaItem) => r.id).filter((id: unknown): id is number => typeof id === 'number')
+    const matching = await model.findMany({ where, select: { id: true, localPath: true, url: true } as never })
+    const victims = matching as unknown as MediaItem[]
+    const ids = victims.map((r: MediaItem) => r.id).filter((id: unknown): id is number => typeof id === 'number')
 
     if (ids.length === 0) return NextResponse.json({ success: true, deleted: 0 })
 
     await model.deleteMany({ where: { id: { in: ids } } })
     for (const id of ids) {
       await logAudit('delete', type, id, userId, `Deleted ${type} #${id} (filtered)` )
+    }
+
+    const { deleteStoredFile } = await import('@/lib/mediaFiles')
+    for (const v of victims) {
+      deleteStoredFile(v.localPath as string | undefined)
+      deleteStoredFile(v.url as string | undefined)
     }
 
     return NextResponse.json({ success: true, deleted: ids.length })
@@ -463,6 +477,8 @@ export async function POST(request: Request) {
       await logAudit('create', type, item.id, userId, `Created ${type} #${item.id}`)
       return NextResponse.json({ success: true, item })
     } catch (e: unknown) {
+      const { deleteStoredFile } = await import('@/lib/mediaFiles')
+      if (localPath) deleteStoredFile(localPath)
       if ((e as { code?: string }).code === 'P2002') {
         return NextResponse.json({ error: 'A record with that URL already exists' }, { status: 409 })
       }
