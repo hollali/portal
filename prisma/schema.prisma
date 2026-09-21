@@ -170,6 +170,7 @@ model News {
   snippet     String?
   collectedAt String?  @map("collected_at")
   localPath   String?  @map("local_path")
+  rawHtml     String?  @map("raw_html")
   notes       String?
   tags        String?
 

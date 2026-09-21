@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# archived news clippings (stored in the database as raw_html)
+public/media/news/

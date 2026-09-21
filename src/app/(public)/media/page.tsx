@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Clapperboard, FileAudio, ImageIcon, Landmark, Mic, Newspaper, Radio as RadioIcon, Video as VideoIcon, ArrowUpRight, Play, AudioLines, Globe2 } from 'lucide-react'
+import { ImageIcon, Newspaper, ArrowUpRight, AudioLines, Globe2, Video as VideoIcon } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
-import { SOCIAL_LINKS } from '@/lib/man'
 
 export const metadata: Metadata = {
   title: 'Media & Social',
@@ -38,15 +37,6 @@ function BrandIcon({ paths, size }: { paths: string; size: number }) {
       )}
     </svg>
   )
-}
-
-function brandIcon(label: string, size: number): React.ReactNode {
-  const key = label.trim().toLowerCase()
-  if (key === 'x (twitter)' || key.includes('twitter')) return <BrandIcon paths={BRAND_PATHS.x} size={size} />
-  if (key.includes('facebook')) return <BrandIcon paths={BRAND_PATHS.facebook} size={size} />
-  if (key.includes('instagram')) return <BrandIcon paths={BRAND_PATHS.instagram} size={size} />
-  if (key.includes('youtube')) return <BrandIcon paths={BRAND_PATHS.youtube} size={size} />
-  return <Globe2 size={size} />
 }
 
 const SOCIAL_CARDS: SocialLink[] = [
