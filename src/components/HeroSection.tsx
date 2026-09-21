@@ -159,7 +159,7 @@ export default function HeroSection({ stats }: HeroSectionProps) {
               fontFamily: 'var(--font-serif), Georgia, serif',
               fontStyle: 'italic', fontWeight: 520,
               fontSize: '0.94em', lineHeight: 1.08, letterSpacing: '-0.01em',
-              background: 'linear-gradient(92deg, #f9d06b 0%, #f2a900 38%, #ffe9b0 55%, #bf7f00 100%)',
+              background: 'linear-gradient(92deg, var(--shimmer-a) 0%, var(--shimmer-b) 38%, var(--shimmer-c) 55%, var(--shimmer-d) 100%)',
               WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
               backgroundSize: '200% 100%',
             }}>

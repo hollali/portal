@@ -23,7 +23,7 @@ export default function TheManPage() {
             <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.5rem, 6vw, 4rem)', letterSpacing: '-0.035em', lineHeight: 1.02, fontWeight: 800, margin: '1.25rem 0', color: 'var(--p-text-1)' }}>
               The life of a
               <br />
-              <span className="p-serif" style={{ background: 'linear-gradient(90deg,#f9d06b,#f2a900,#bf7f00)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>servant-leader</span>
+              <span className="p-serif" style={{ background: 'linear-gradient(90deg, var(--shimmer-a), var(--shimmer-b), var(--shimmer-d))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>servant-leader</span>
             </h1>
             <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '36rem', margin: 0 }}>
               Born in the fields of Sombo, schooled by dedication, called to the Bar, and returned to the people — four chapters trace the man behind the Speaker&apos;s chair.
