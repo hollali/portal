@@ -168,7 +168,7 @@ placeholder="Search captions…"
           if (totalPages <= 1) return null
           const start = Math.max(1, Math.min(page - 4, totalPages - 9))
           const nums = Array.from({ length: Math.min(10, totalPages) }, (_, i) => start + i)
-          const pageBtn = (label: string | number, target: number, opts?: { active?: boolean; disabled?: boolean; key?: number | string }) => (
+          const pageBtn = (label: React.ReactNode, target: number, opts?: { active?: boolean; disabled?: boolean; key?: number | string }) => (
             <button
               key={opts?.key}
               disabled={opts?.disabled}
@@ -185,9 +185,9 @@ placeholder="Search captions…"
           )
           return (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '2.25rem', flexWrap: 'wrap' }}>
-              {pageBtn('← Prev', page - 1, { disabled: page <= 1 })}
+              {pageBtn(<span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><ChevronLeft size={14} /> Prev</span>, page - 1, { disabled: page <= 1 })}
               {nums.map(p => pageBtn(p, p, { active: p === page, key: p }))}
-              {pageBtn('Next →', page + 1, { disabled: page >= totalPages })}
+              {pageBtn(<span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>Next <ChevronRight size={14} /></span>, page + 1, { disabled: page >= totalPages })}
             </div>
           )
         })()}

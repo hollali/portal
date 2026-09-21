@@ -38,7 +38,6 @@
   --p-border: rgba(255, 255, 255, 0.08);
   --p-border-2: rgba(255, 255, 255, 0.06);
   --p-border-3: rgba(255, 255, 255, 0.12);
-  --p-grid-line: rgba(255, 255, 255, 0.035);
   --p-img-bg: #0f1117;
   --p-cta-bg: linear-gradient(120deg, #0e1b30 0%, #14284a 45%, #314d77 100%);
   --p-cta-text: #d8b75a;
@@ -85,7 +84,6 @@
   --p-border: rgba(0, 0, 0, 0.09);
   --p-border-2: rgba(0, 0, 0, 0.06);
   --p-border-3: rgba(0, 0, 0, 0.12);
-  --p-grid-line: rgba(0, 0, 0, 0.045);
   --p-img-bg: #ececea;
   --p-cta-bg: linear-gradient(120deg, #eef3fb 0%, #e3ebf7 45%, #f7f0dd 100%);
   --p-cta-text: #1d4289;
@@ -191,6 +189,46 @@ html[data-motion="js"] [data-motion-entry][data-motion-reveal] {
   }
 }
 
+/* ─── Hero entrance & ambient motion (public landing) ─── */
+@keyframes heroRise {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: none; }
+}
+html[data-motion="js"] .hero-rise {
+  animation: heroRise 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes heroPortraitFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+html[data-motion="js"] .hero-float {
+  animation: heroPortraitFloat 7s ease-in-out infinite;
+}
+@keyframes heroShimmer {
+  from { background-position: 220% 0; }
+  to   { background-position: -120% 0; }
+}
+html[data-motion="js"] .hero-shimmer {
+  background-size: 200% 100%;
+  animation: heroShimmer 5.5s ease-in-out infinite;
+}
+html[data-motion="js"] .hero-cta {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+html[data-motion="js"] .hero-cta:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-motion="js"] .hero-rise,
+  html[data-motion="js"] .hero-float,
+  html[data-motion="js"] .hero-shimmer,
+  html[data-motion="js"] .hero-cta {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* ─── Smart public header states ─── */
 .p-header {
   position: sticky;
@@ -264,12 +302,6 @@ html[data-motion="js"] [data-motion-entry][data-motion-reveal] {
 }
 
 /* ─── Golden ratio grid backdrop (public landing) ─── */
-.grid-bg {
-  background-image:
-    linear-gradient(var(--p-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--p-grid-line) 1px, transparent 1px);
-  background-size: 56px 56px;
-}
 
 /* ─── Orange glow orb (public landing) ─── */
 @keyframes floatOrb {
@@ -293,6 +325,12 @@ html[data-motion="js"] [data-motion-entry][data-motion-reveal] {
     gap: 0.5rem !important;
   }
   .p-brand-word {
+    display: none;
+  }
+  .p-brand-tag {
+    display: none;
+  }
+  .p-admin-label {
     display: none;
   }
   .p-section {
@@ -679,4 +717,103 @@ a:hover {
 .p-chip:hover {
   color: var(--primary);
   border-color: var(--primary);
+}
+
+/* ─── Mobile slide-in drawer (public header) ─── */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 75;
+  width: min(340px, 88vw);
+  background: var(--p-surface);
+  border-left: 1px solid var(--p-border-3);
+  box-shadow: var(--p-shadow);
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.drawer.open {
+  transform: translateX(0);
+}
+.drawer-group {
+  display: flex;
+  flex-direction: column;
+}
+.drawer-label {
+  margin: 1.1rem 0 0.35rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-text-4);
+  padding: 0 0.6rem;
+}
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  color: var(--p-text-1);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.drawer-link svg {
+  color: var(--p-text-4);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.drawer-link:hover {
+  background: var(--p-surface-2);
+}
+.drawer-link[data-accent] {
+  color: var(--primary);
+  font-weight: 600;
+}
+.drawer-link[data-accent] svg {
+  color: var(--primary);
+}
+.drawer-hub {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+.drawer-hub:hover {
+  color: var(--p-text-1);
+}
+@media (min-width: 768px) {
+  .drawer-backdrop,
+  .drawer {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-backdrop,
+  .drawer {
+    transition: none;
+  }
 }

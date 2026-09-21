@@ -80,6 +80,10 @@ model ArchiveItem {
   filePath    String?  @map("file_path")
   fileName    String?  @map("file_name")
   coverUrl    String?  @map("cover_url")
+  occasion    String?
+  videoUrl    String?  @map("video_url")
+  audioUrl    String?  @map("audio_url")
+  photoUrl    String?  @map("photo_url")
   featured    Boolean  @default(false)
   status      String   @default("published")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -135,9 +139,23 @@ model Video {
   notes       String?
   tags        String?
 
+  // Digital-library video facets
+  category  String?
+  caption   String?
+  date      String?
+  year      Int?
+  event     String?
+  location  String?
+  theme     String?
+  featured  Boolean  @default(false)
+  status    String   @default("published")
+
   @@index([source])
   @@index([platform])
   @@index([collectedAt])
+  @@index([category])
+  @@index([year])
+  @@index([status])
   @@map("videos")
 }
 
@@ -175,9 +193,23 @@ model Audio {
   notes       String?
   tags        String?
 
+  // Digital-library audio facets
+  category  String?
+  caption   String?
+  date      String?
+  year      Int?
+  event     String?
+  location  String?
+  theme     String?
+  featured  Boolean  @default(false)
+  status    String   @default("published")
+
   @@index([source])
   @@index([artist])
   @@index([collectedAt])
+  @@index([category])
+  @@index([year])
+  @@index([status])
   @@map("audio")
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { jsonFetch } from '@/lib/jsonFetch'
+import { ArrowLeft } from 'lucide-react'
 
 export default function NewsDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -25,7 +26,7 @@ export default function NewsDetailPage() {
 
   return (
     <div>
-      <Link href="/news" style={{ fontSize: '0.875rem', marginBottom: '1rem', display: 'inline-block' }}>&larr; Back to News</Link>
+      <Link href="/news" style={{ fontSize: '0.875rem', marginBottom: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--p-text-3)', textDecoration: 'none' }}><ArrowLeft size={16} /> Back to News</Link>
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>{item.title || `News #${item.id}`}</h1>
 
       <div className="card">

@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Calendar, Download, ExternalLink, FileText, Mic, MessagesSquare, ScrollText, MapPin, Building2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Download, ExternalLink, FileText, Mic, MessagesSquare, ScrollText, MapPin, Building2, Video, AudioLines, Image as ImageIcon } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { renderMarkdown } from '@/lib/markdown'
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { LIST_ROUTE_KINDS } from '@/lib/library'
@@ -46,6 +47,7 @@ export default async function ArchiveDetailPage({ params }: Props) {
   const bodyHtml = item.body ? renderMarkdown(item.body) : null
   const facets = [
     item.year && { label: 'Year', value: String(item.year), icon: Calendar },
+    item.occasion && { label: 'Occasion', value: item.occasion, icon: null },
     item.event && { label: 'Event', value: item.event, icon: null },
     item.location && { label: 'Location', value: item.location, icon: MapPin },
     item.person && { label: 'Person', value: item.person, icon: null },
@@ -53,6 +55,9 @@ export default async function ArchiveDetailPage({ params }: Props) {
     item.parliament && { label: 'Parliament', value: item.parliament, icon: null },
     item.theme && { label: 'Theme', value: item.theme, icon: null },
   ].filter(Boolean) as { label: string; value: string; icon: React.ElementType | null }[]
+
+  const videoEmbed = item.videoUrl ? getYouTubeEmbedUrl(item.videoUrl) : null
+  const hasMedia = !!(item.videoUrl || item.audioUrl || item.photoUrl)
 
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
@@ -100,6 +105,54 @@ export default async function ArchiveDetailPage({ params }: Props) {
             <p style={{ width: '100%', color: 'var(--p-text-2)', fontSize: '1.05rem', lineHeight: 1.7, fontStyle: 'italic', margin: 0 }}>{item.excerpt}</p>
           )}
         </div>
+
+        {hasMedia && (
+          <section style={{ borderTop: '1px solid var(--p-border)', paddingTop: '1.5rem', marginBottom: '2.5rem' }}>
+            <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The record in motion</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '1rem', marginTop: '1rem' }}>
+              {item.videoUrl && (
+                <div style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.1rem' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.66rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--p-text-4)', marginBottom: '0.6rem' }}>
+                    <Video size={13} style={{ color: 'var(--primary)' }} /> Video
+                  </span>
+                  {videoEmbed ? (
+                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+                      <iframe src={videoEmbed} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen allow="autoplay" />
+                    </div>
+                  ) : (
+                    <a href={item.videoUrl} target="_blank" rel="noopener noreferrer" className="p-link-primary" style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>Play / open video <ExternalLink size={14} /></a>
+                  )}
+                </div>
+              )}
+              {item.audioUrl && (
+                <div style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.1rem' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.66rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--p-text-4)', marginBottom: '0.6rem' }}>
+                    <AudioLines size={13} style={{ color: 'var(--primary)' }} /> Audio
+                  </span>
+                  {isYouTubeUrl(item.audioUrl) ? (
+                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+                      <iframe src={getYouTubeEmbedUrl(item.audioUrl)!} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen allow="autoplay" />
+                    </div>
+                  ) : (
+                    <audio controls style={{ width: '100%' }}>
+                      <source src={item.audioUrl} />
+                    </audio>
+                  )}
+                </div>
+              )}
+              {item.photoUrl && (
+                <div style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.1rem' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.66rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--p-text-4)', marginBottom: '0.6rem' }}>
+                    <ImageIcon size={13} style={{ color: 'var(--primary)' }} /> Photograph
+                  </span>
+                  <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+                    <img src={item.photoUrl} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', borderRadius: 10, border: '1px solid var(--p-border-2)' }} />
+                  </a>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {bodyHtml && (
           <article className="cms-prose" style={{ borderTop: '1px solid var(--p-border)', paddingTop: '2rem' }} dangerouslySetInnerHTML={{ __html: bodyHtml }} />

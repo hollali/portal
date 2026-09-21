@@ -2,7 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Landmark, LogIn, Menu, X, ChevronDown, Search } from 'lucide-react'
+import {
+  Landmark, LogIn, Menu, X, ChevronDown, Search, Sparkles, ArrowRight,
+  Home, UserRound, Milestone, Mic, FileText, MessagesSquare, ScrollText,
+  Award, Image as ImageIcon, Lightbulb, Newspaper, Clapperboard, Video,
+  AudioLines, type LucideIcon,
+} from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
 
@@ -26,6 +31,33 @@ const MEDIA_LINKS = [
   { href: '/audio', label: 'Audio' },
   { href: '/news', label: 'News' },
 ]
+
+const MOBILE_PRIMARY = [
+  { href: '/', label: 'Home' },
+  { href: '/the-man', label: 'The Man' },
+  { href: '/timeline', label: 'Timeline' },
+]
+
+const MOBILE_ICONS: Record<string, LucideIcon> = {
+  '/': Home,
+  '/the-man': UserRound,
+  '/timeline': Milestone,
+  '/ask': Sparkles,
+  '/archives/speeches': Mic,
+  '/archives/papers': FileText,
+  '/archives/interviews': MessagesSquare,
+  '/archives/notes': ScrollText,
+  '/archives/milestones': Milestone,
+  '/archives/testimonials': Award,
+  '/archives/photos': ImageIcon,
+  '/parliament': Landmark,
+  '/themes': Lightbulb,
+  '/news': Newspaper,
+  '/media': Clapperboard,
+  '/videos': Video,
+  '/audio': AudioLines,
+  '/search': Search,
+}
 
 export default function PublicHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -52,12 +84,26 @@ export default function PublicHeader() {
       const goingDown = y > lastYRef.current
       lastYRef.current = y
       el.dataset.scrolled = y > 4 ? 'true' : 'false'
-      el.dataset.hidden = y < 90 || openMenu || searchOpen || !goingDown ? 'false' : 'true'
+      el.dataset.hidden = y < 90 || openMenu || searchOpen || menuOpen || !goingDown ? 'false' : 'true'
     }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [openMenu, searchOpen])
+  }, [openMenu, searchOpen, menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -116,8 +162,8 @@ export default function PublicHeader() {
         ))}
         <div style={{ borderTop: '1px solid var(--p-border)', margin: '0.25rem 0.2rem 0', paddingTop: '0.35rem' }}>
           <Link href={hub} onClick={() => setOpenMenu(null)}
-            style={{ display: 'inline-block', color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8125rem', fontWeight: 600, padding: '0.35rem 0.85rem' }}>
-            {hubLabel} →
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8125rem', fontWeight: 600, padding: '0.35rem 0.85rem' }}>
+            {hubLabel} <ArrowRight size={13} />
           </Link>
         </div>
       </div>
@@ -169,6 +215,14 @@ export default function PublicHeader() {
             {dropdownPanel('media', MEDIA_LINKS, '/media', 'Open the media hub')}
           </div>
           {navLink('/timeline', 'Timeline')}
+          <Link
+            href="/ask"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.875rem', color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--p-text-1)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--primary)')}
+          >
+            <Sparkles size={14} /> Ask
+          </Link>
           <button
             onClick={() => setSearchOpen(o => !o)}
             aria-expanded={searchOpen}
@@ -193,7 +247,7 @@ export default function PublicHeader() {
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--p-text-1)'; e.currentTarget.style.borderColor = 'var(--p-text-3)' }}
             onMouseLeave={e => { e.currentTarget.style.color = 'var(--p-text-2)'; e.currentTarget.style.borderColor = 'var(--p-border)' }}
           >
-            <LogIn size={14} /> Sign in
+            <LogIn size={14} /> <span className="p-admin-label">Sign in</span>
           </Link>
           <button onClick={() => setMenuOpen(o => !o)} className="show-sm" aria-expanded={menuOpen} aria-controls="mobile-menu" style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -218,18 +272,83 @@ export default function PublicHeader() {
         </div>
       )}
 
-      {menuOpen && (
-        <div id="mobile-menu" style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-bg)', padding: '0.75rem 1.25rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          {[{ href: '/', label: 'Home' }, { href: '/the-man', label: 'The Man' }, { href: '/timeline', label: 'Timeline' }, ...[...ARCHIVE_LINKS, ...MEDIA_LINKS].filter((item, idx, arr) => arr.findIndex(i => i.href === item.href) === idx)].map(item => (
-            <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} style={{ color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '1rem', padding: '0.5rem 0' }}>
-              {item.label}
-            </Link>
-          ))}
-          <Link href="/search" onClick={() => setMenuOpen(false)} style={{ color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '1rem', padding: '0.5rem 0' }}>Search</Link>
-          <div style={{ padding: '0.5rem 0' }}><ThemeToggle /></div>
+      </header>
+
+      <div className={`drawer-backdrop${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden={!menuOpen} />
+      <div id="mobile-menu" className={`drawer${menuOpen ? ' open' : ''}`} aria-hidden={!menuOpen} role="dialog" aria-modal="true">
+        <div style={{ position: 'sticky', top: 0, background: 'var(--p-surface)', borderBottom: '1px solid var(--p-border)', padding: '0.9rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-fg)' }}>
+              <Landmark size={16} strokeWidth={2.4} />
+            </span>
+            <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.02em', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif' }}>AlbanBagbin</span>
+          </div>
+          <button
+            onClick={() => setMenuOpen(false)}
+            aria-label="Close menu"
+            style={{ background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.45rem', color: 'var(--p-text-1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <X size={18} />
+          </button>
         </div>
-      )}
-    </header>
+
+        <div style={{ padding: '0.75rem 1rem 2rem' }}>
+          <div className="drawer-group">
+            {[...MOBILE_PRIMARY, { href: '/ask', label: 'Ask Bagbin Archive' }].map(item => {
+              const Icon = MOBILE_ICONS[item.href] || Home
+              const accent = item.href === '/ask'
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="drawer-link" data-accent={accent || undefined}>
+                  <Icon size={17} />
+                  <span>{item.label}</span>
+                  {accent && <Sparkles size={13} style={{ marginLeft: 'auto' }} />}
+                </Link>
+              )
+            })}
+          </div>
+
+          <p className="drawer-label">Archives</p>
+          <div className="drawer-group">
+            {ARCHIVE_LINKS.map(item => {
+              const Icon = MOBILE_ICONS[item.href] || ScrollText
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="drawer-link">
+                  <Icon size={17} />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+
+          <p className="drawer-label">Media</p>
+          <div className="drawer-group">
+            {[MEDIA_LINKS.find(m => m.href === '/media'), MEDIA_LINKS.find(m => m.href === '/videos'), MEDIA_LINKS.find(m => m.href === '/audio')].map(item => {
+              if (!item) return null
+              const Icon = MOBILE_ICONS[item.href] || Clapperboard
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="drawer-link">
+                  <Icon size={17} />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+
+          <Link href="/search" onClick={() => setMenuOpen(false)} className="drawer-link">
+            <Search size={17} />
+            <span>Search the library</span>
+          </Link>
+
+          <Link href="/archives" onClick={() => setMenuOpen(false)} className="drawer-hub">
+            Browse all collections <ArrowRight size={14} />
+          </Link>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--p-border)', marginTop: '0.75rem', paddingTop: '0.9rem' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--p-text-3)' }}>Appearance</span>
+            <ThemeToggle />
+          </div>
+        </div>
+      </div>
     </>
   )
 }

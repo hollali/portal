@@ -1,42 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveMediaSrc } from '@/lib/mediaServer'
+import { AUDIO_CATEGORIES } from '@/lib/library'
 
-const SORTABLE = new Set(['id', 'source', 'query', 'title', 'artist', 'duration', 'collectedAt'])
+const FACET_KEYS = ['category', 'year', 'event', 'location', 'theme'] as const
+
+export interface AudioArchiveItem {
+  id: number
+  title: string | null
+  src: string | null
+  url: string | null
+  localPath: string | null
+  source: string | null
+  artist: string | null
+  duration: string | null
+  category: string | null
+  caption: string | null
+  date: string | null
+  year: number | null
+  event: string | null
+  location: string | null
+  theme: string | null
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1)
-  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('perPage') || '20') || 20))
+  const perPage = Math.min(120, Math.max(1, parseInt(searchParams.get('perPage') || '24') || 24))
   const query = searchParams.get('q') || ''
   const source = searchParams.get('source') || ''
-  const sort = SORTABLE.has(searchParams.get('sort') || '') ? searchParams.get('sort')! : 'id'
-  const dir = searchParams.get('dir') === 'asc' ? 'asc' : 'desc'
+  const includeAll = searchParams.get('all') === '1'
 
   const where: Record<string, unknown> = {}
+  if (!includeAll) where.status = 'published'
+
+  const facetWhere: Record<string, unknown>[] = []
+  let hasFacet = false
+  for (const key of FACET_KEYS) {
+    const val = searchParams.get(key) || ''
+    if (!val) continue
+    hasFacet = true
+    facetWhere.push({ [key]: key === 'year' ? parseInt(val) || undefined : val })
+  }
+  if (hasFacet) where.AND = facetWhere
+
   if (query) {
     where.OR = [
-      { title: { contains: query } },
+      { title: { contains: query, mode: 'insensitive' } },
       { url: { contains: query } },
-      { source: { contains: query } },
-      { artist: { contains: query } },
+      { source: { contains: query, mode: 'insensitive' } },
+      { artist: { contains: query, mode: 'insensitive' } },
+      { caption: { contains: query, mode: 'insensitive' } },
+      { category: { contains: query, mode: 'insensitive' } },
     ]
   }
   if (source) where.source = source
 
-  const [rows, total] = await Promise.all([
+  const [rows, total, sources, allRows] = await Promise.all([
     prisma.audio.findMany({
       where,
-      orderBy: { [sort]: dir },
+      orderBy: [{ year: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * perPage,
       take: perPage,
     }),
     prisma.audio.count({ where }),
+    prisma.audio.findMany({ distinct: ['source'], select: { source: true }, orderBy: { source: 'asc' } }),
+    prisma.audio.findMany({ where: includeAll ? {} : { status: 'published' }, select: { category: true, year: true, event: true, location: true, theme: true } }),
   ])
 
-  const sources = await prisma.audio.findMany({ distinct: ['source'], select: { source: true }, orderBy: { source: 'asc' } })
+  const items: AudioArchiveItem[] = rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    src: resolveMediaSrc({ localPath: row.localPath, url: row.url }),
+    url: row.url,
+    localPath: row.localPath,
+    source: row.source,
+    artist: row.artist,
+    duration: row.duration,
+    category: row.category,
+    caption: row.caption,
+    date: row.date,
+    year: row.year,
+    event: row.event,
+    location: row.location,
+    theme: row.theme,
+  }))
 
-  const items = rows.map(row => ({ ...row, src: resolveMediaSrc(row) }))
+  const facets: Record<string, { value: string; count: number }[]> = {}
+  for (const key of FACET_KEYS) {
+    const counts = new Map<string, number>()
+    for (const row of allRows) {
+      const rowVal = (row as Record<string, unknown>)[key]
+      if (rowVal === null || rowVal === undefined || rowVal === '') continue
+      const v = String(rowVal)
+      counts.set(v, (counts.get(v) || 0) + 1)
+    }
+    facets[key] = Array.from(counts.entries()).map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count)
+  }
 
-  return NextResponse.json({ items, total, page, perPage, sources: sources.map(s => s.source).filter(Boolean) })
+  const categories = AUDIO_CATEGORIES
+    .map(c => ({ value: c, count: facets.category?.find(f => f.value === c)?.count || 0 }))
+    .filter(c => c.count > 0)
+
+  return NextResponse.json({ items, total, page, perPage, sources: sources.map(s => s.source).filter(Boolean), facets, categories })
 }

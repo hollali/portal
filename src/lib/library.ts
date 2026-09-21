@@ -223,6 +223,22 @@ export function resolveThemeSlug(label: string | null | undefined): string | nul
   return match ? match.slug : null
 }
 
+export const VIDEO_CATEGORIES = [
+  'Parliamentary speeches',
+  'Interviews',
+  'International engagements',
+  'Conferences',
+  'Parliamentary events',
+  'Documentaries',
+] as const
+
+export const AUDIO_CATEGORIES = [
+  'Speeches',
+  'Interviews',
+  'Radio programmes',
+  'Parliamentary addresses',
+] as const
+
 export type SourceType = 'unverified' | 'parliamentary-record' | 'official-document' | 'press' | 'publication' | 'family'
 
 export const SOURCE_TYPES: SourceType[] = ['unverified', 'parliamentary-record', 'official-document', 'press', 'publication', 'family']

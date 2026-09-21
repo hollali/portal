@@ -24,3 +24,8 @@ export function getYouTubeEmbedUrl(url: string): string | null {
   const match = url.match(/(?:v=|youtu\.be\/)([\w-]+)/)
   return match ? `https://www.youtube.com/embed/${match[1]}` : null
 }
+
+export function getYouTubeThumbUrl(url: string): string | null {
+  const match = url.match(/(?:v=|youtu\.be\/)([\w-]+)/)
+  return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : null
+}

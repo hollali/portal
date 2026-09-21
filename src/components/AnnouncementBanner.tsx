@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Megaphone, X } from 'lucide-react'
+import { Megaphone, X, ArrowRight } from 'lucide-react'
 
 const STORAGE_KEY = 'ab-announcement-dismissed'
 
@@ -49,9 +49,9 @@ export default function AnnouncementBanner({ announcement }: { announcement: Ann
       <span>{announcement.message}</span>
       <Link
         href={announcement.href}
-        style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}
-      >
-        {announcement.hrefLabel} →
+style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+        >
+          {announcement.hrefLabel} <ArrowRight size={14} />
       </Link>
       <button
         onClick={() => {

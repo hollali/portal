@@ -252,6 +252,21 @@ async function main() {
     await prisma.archiveItem.createMany({ data: archiveData })
     console.log(`  ${archiveData.length} archive items seeded`)
 
+    const OCCASIONS: Record<string, string> = {
+      'Statement on the Ghana Poverty Reduction Strategy': 'Budget debate',
+      'Address on the State of the Nation': 'State of the Nation address',
+      'Remarks at the Opening of the 2nd Meeting of the 8th Parliament': 'Opening of Parliament',
+      'The Legislature and the Imperative of Independence': 'International conference',
+      'Digital Democracy and the Modern Parliament': 'Conference address',
+      'One-on-One with the Speaker on the 8th Parliament': 'Media engagement',
+      'Notice Recalling Parliament from Recess': 'Official notice',
+      'Letter to the President on National Security': 'Official correspondence',
+    }
+    for (const [title, occasion] of Object.entries(OCCASIONS)) {
+      await prisma.archiveItem.updateMany({ where: { title }, data: { occasion } })
+    }
+    console.log(`  ${Object.keys(OCCASIONS).length} archive occasions assigned`)
+
     await prisma.milestone.createMany({ data: SEED_MILESTONES as Array<Record<string, unknown>> })
     console.log(`  ${SEED_MILESTONES.length} milestones seeded`)
 

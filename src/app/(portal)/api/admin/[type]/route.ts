@@ -35,23 +35,23 @@ function getModel(type: string): MediaModelApi | null {
 
 const SORTABLE: Record<string, string[]> = {
   images: ['id', 'source', 'query', 'url', 'collectedAt', 'faceDetected', 'year', 'curated'],
-  videos: ['id', 'source', 'platform', 'title', 'url', 'collectedAt', 'duration', 'views'],
+  videos: ['id', 'source', 'platform', 'title', 'url', 'collectedAt', 'duration', 'views', 'year', 'category', 'featured', 'status'],
   news: ['id', 'source', 'title', 'url', 'sourceName', 'date', 'collectedAt'],
-  audio: ['id', 'source', 'title', 'url', 'artist', 'collectedAt'],
+  audio: ['id', 'source', 'title', 'url', 'artist', 'collectedAt', 'year', 'category', 'featured', 'status'],
 }
 
 const EDITABLE_FIELDS: Record<string, string[]> = {
   images: ['source', 'query', 'url', 'faceDetected', 'faceCount', 'faceMatch', 'faceMatchScore', 'faceMatchDistance', 'dateTaken', 'year', 'event', 'location', 'person', 'institution', 'parliament', 'theme', 'caption', 'notes', 'tags', 'curated'],
-  videos: ['source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'notes', 'tags'],
+  videos: ['source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'notes', 'tags', 'category', 'caption', 'date', 'year', 'event', 'location', 'theme', 'featured', 'status'],
   news: ['source', 'query', 'title', 'url', 'sourceName', 'date', 'snippet', 'notes', 'tags'],
-  audio: ['source', 'query', 'title', 'url', 'artist', 'duration', 'notes', 'tags'],
+  audio: ['source', 'query', 'title', 'url', 'artist', 'duration', 'notes', 'tags', 'category', 'caption', 'date', 'year', 'event', 'location', 'theme', 'featured', 'status'],
 }
 
 const INT_FIELDS: Record<string, string[]> = {
   images: ['faceDetected', 'faceCount', 'faceMatch', 'year'],
-  videos: ['duration', 'views'],
+  videos: ['duration', 'views', 'year'],
   news: [],
-  audio: [],
+  audio: ['year'],
 }
 
 const FLOAT_FIELDS: Record<string, string[]> = {
@@ -63,9 +63,9 @@ const FLOAT_FIELDS: Record<string, string[]> = {
 
 const BOOL_FIELDS: Record<string, string[]> = {
   images: ['curated'],
-  videos: [],
+  videos: ['featured'],
   news: [],
-  audio: [],
+  audio: ['featured'],
 }
 
 function cleanData(type: string, raw: Record<string, unknown>): DataInput {

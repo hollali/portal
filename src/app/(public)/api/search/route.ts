@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       { url: { contains: q } },
       { source: { contains: q } },
       { query: { contains: q } },
+      { caption: { contains: q } },
     ],
   }
 
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest) {
       { source: { contains: q } },
       { channel: { contains: q } },
       { platform: { contains: q } },
+      { caption: { contains: q } },
+      { category: { contains: q } },
     ],
   }
 
@@ -47,6 +50,8 @@ export async function GET(request: NextRequest) {
       { url: { contains: q } },
       { source: { contains: q } },
       { artist: { contains: q } },
+      { caption: { contains: q } },
+      { category: { contains: q } },
     ],
   }
 
@@ -56,9 +61,11 @@ export async function GET(request: NextRequest) {
       { excerpt: { contains: q } },
       { body: { contains: q } },
       { event: { contains: q } },
+      { occasion: { contains: q } },
       { location: { contains: q } },
       { person: { contains: q } },
       { institution: { contains: q } },
+      { parliament: { contains: q } },
       { theme: { contains: q } },
       { source: { contains: q } },
     ],

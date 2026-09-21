@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { jsonFetch } from '@/lib/jsonFetch'
+import { ArrowRight } from 'lucide-react'
 
 interface ImageRow {
   id: number
@@ -117,7 +118,7 @@ export default function ImageListPage() {
             />
             <div style={{ color: 'white', marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
               <span>#{lightboxImg.id} — {lightboxImg.source}</span>
-              <a href={`/images/${lightboxImg.id}`} style={{ color: '#55beff' }}>Details &rarr;</a>
+              <a href={`/images/${lightboxImg.id}`} style={{ color: '#55beff', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>Details <ArrowRight size={14} /></a>
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ import {
   FileText,
   Search,
   ChevronDown,
+  ChevronUp,
   Pencil,
   Monitor,
   Save,
@@ -761,7 +762,7 @@ export default function MediaManager({
                       onClick={() => handleSort('id')}
                       className="flex items-center gap-1 hover:underline"
                     >
-                      ID {sort === 'id' && (sortDir === 'asc' ? '↑' : '↓')}
+                      ID {sort === 'id' && (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                     </button>
                   </th>
                   <th style={{ width: '80px' }}>Preview</th>
@@ -1825,8 +1826,8 @@ function PublicPreview({ type, item }: { type: MediaType; item: MediaItem }) {
           )}
           {item.url && (
             <div className="mt-3 text-sm">
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
-                Open source URL &rarr;
+              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                Open source URL <ExternalLink size={13} />
               </a>
             </div>
           )}
@@ -1852,8 +1853,8 @@ function PublicPreview({ type, item }: { type: MediaType; item: MediaItem }) {
           )}
           {item.url && (
             <div className="mt-3 text-sm">
-              <a href={item.url} target="_blank" rel="noopener noreferrer">
-                Open source URL &rarr;
+              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                Open source URL <ExternalLink size={13} />
               </a>
             </div>
           )}
@@ -1878,9 +1879,9 @@ function PublicPreview({ type, item }: { type: MediaType; item: MediaItem }) {
 
 const EDITABLE_FIELDS: Record<MediaType, string[]> = {
   images: ['source', 'query', 'url', 'faceDetected', 'faceCount', 'faceMatch', 'faceMatchScore', 'faceMatchDistance'],
-  videos: ['source', 'platform', 'title', 'url', 'channel', 'duration', 'views'],
+  videos: ['source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'category', 'caption', 'date', 'year', 'event', 'location', 'theme', 'featured', 'status'],
   news: ['source', 'query', 'title', 'url', 'sourceName', 'date', 'snippet'],
-  audio: ['source', 'query', 'title', 'url', 'artist', 'duration'],
+  audio: ['source', 'query', 'title', 'url', 'artist', 'duration', 'category', 'caption', 'date', 'year', 'event', 'location', 'theme', 'featured', 'status'],
 }
 
 function EditForm({
@@ -1914,14 +1915,14 @@ function EditForm({
           {fields.map(f => (
             <div key={f}>
               <label className="block text-xs font-semibold mb-1">
-                {f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                {f === 'videoUrl' || f === 'audioUrl' || f === 'photoUrl' ? f.replace(/Url$/, ' URL').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()) : f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
               </label>
-              {f === 'snippet' ? (
+              {f === 'snippet' || f === 'caption' ? (
                 <textarea
                   name={f}
                   value={values[f] || ''}
                   onChange={e => setValues(v => ({ ...v, [f]: e.target.value }))}
-                  rows={4}
+                  rows={f === 'snippet' ? 4 : 3}
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                   style={{
                     background: 'var(--background)',
@@ -1929,9 +1930,31 @@ function EditForm({
                     color: 'var(--foreground)',
                   }}
                 />
+              ) : f === 'status' ? (
+                <select
+                  name={f}
+                  value={values[f] || 'published'}
+                  onChange={e => setValues(v => ({ ...v, [f]: e.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                >
+                  {['published', 'draft', 'archived'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : f === 'featured' ? (
+                <select
+                  name={f}
+                  value={values[f] === 'true' ? 'true' : 'false'}
+                  onChange={e => setValues(v => ({ ...v, [f]: e.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
               ) : (
                 <input
                   name={f}
+                  type={f === 'year' ? 'number' : 'text'}
                   value={values[f] || ''}
                   onChange={e => setValues(v => ({ ...v, [f]: e.target.value }))}
                   className="w-full rounded-lg border px-3 py-2 text-sm"

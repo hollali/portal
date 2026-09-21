@@ -12,7 +12,7 @@ import { KIND_CONFIG, DOCUMENT_KINDS, FACET_LABELS, type ArchiveKind } from '@/l
 
 type Tab = 'archive' | 'milestones' | 'testimonials'
 
-interface ArchiveRow { id: number; kind: string; title: string; slug: string; date: string | null; year: number | null; event: string | null; location: string | null; person: string | null; institution: string | null; parliament: string | null; theme: string | null; excerpt: string | null; body: string | null; filePath: string | null; fileName: string | null; source: string | null; sourceUrl: string | null; venue: string | null; featured: boolean; status: string; updatedAt: string }
+interface ArchiveRow { id: number; kind: string; title: string; slug: string; date: string | null; year: number | null; event: string | null; location: string | null; person: string | null; institution: string | null; parliament: string | null; theme: string | null; venue: string | null; occasion: string | null; excerpt: string | null; body: string | null; filePath: string | null; fileName: string | null; source: string | null; sourceUrl: string | null; videoUrl: string | null; audioUrl: string | null; photoUrl: string | null; featured: boolean; status: string; updatedAt: string }
 interface MilestoneRow { id: number; year: string; period: string | null; title: string; description: string | null; category: string; order: number; status: string }
 interface TestimonialRow { id: number; author: string; role: string | null; quote: string; source: string | null; year: number | null; photoUrl: string | null; sortOrder: number; status: string }
 
@@ -154,8 +154,12 @@ export default function ArchiveAdminPage() {
       parliament: row?.parliament || '',
       theme: row?.theme || '',
       venue: row?.venue || '',
+      occasion: row?.occasion || '',
       source: row?.source || '',
       sourceUrl: row?.sourceUrl || '',
+      videoUrl: row?.videoUrl || '',
+      audioUrl: row?.audioUrl || '',
+      photoUrl: row?.photoUrl || '',
       excerpt: row?.excerpt || '',
       body: row?.body || '',
       status: row?.status || 'draft',
@@ -526,9 +530,15 @@ export default function ArchiveAdminPage() {
                   <TextInput value={docForm[k]} onChange={e => setDocForm(f => ({ ...f, [k]: e.target.value }))} />
                 </Field>
               ))}
-              <Field label="Venue"><TextInput value={docForm.venue} onChange={e => setDocForm(f => ({ ...f, venue: e.target.value }))} /></Field>
+              <Field label="Venue"><TextInput value={docForm.venue} onChange={e => setDocForm(f => ({ ...f, venue: e.target.value }))} placeholder="Parliament House, Accra" /></Field>
+              <Field label="Occasion" hint="e.g. State of the Nation debate, Commissioning ceremony, Budget reading"><TextInput value={docForm.occasion} onChange={e => setDocForm(f => ({ ...f, occasion: e.target.value }))} /></Field>
               <Field label="Source name"><TextInput value={docForm.source} onChange={e => setDocForm(f => ({ ...f, source: e.target.value }))} /></Field>
               <Field label="Source URL"><TextInput value={docForm.sourceUrl} onChange={e => setDocForm(f => ({ ...f, sourceUrl: e.target.value }))} /></Field>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field label="Video URL" hint="YouTube link or media URL for this speech."><TextInput value={docForm.videoUrl} onChange={e => setDocForm(f => ({ ...f, videoUrl: e.target.value }))} placeholder="https://youtube.com/watch?v=…" /></Field>
+              <Field label="Audio URL" hint="Recording of the address."><TextInput value={docForm.audioUrl} onChange={e => setDocForm(f => ({ ...f, audioUrl: e.target.value }))} placeholder="https://… or /api/media/…" /></Field>
+              <Field label="Photograph URL" hint="Photo of the occasion."><TextInput value={docForm.photoUrl} onChange={e => setDocForm(f => ({ ...f, photoUrl: e.target.value }))} placeholder="https://… or /api/media/…" /></Field>
             </div>
             <Field label="Excerpt / short description"><TextArea value={docForm.excerpt} onChange={e => setDocForm(f => ({ ...f, excerpt: e.target.value }))} /></Field>
             <Field label="Body / transcript (markdown)" hint="Optional. Rendered on the public detail page.">

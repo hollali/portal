@@ -92,28 +92,28 @@ export default async function LibraryHome() {
         <div className="orb" style={{ position: 'absolute', top: -140, right: -120, width: 460, height: 460, borderRadius: '50%', background: 'radial-gradient(circle, rgba(242,169,0,0.22) 0%, rgba(29,66,137,0.18) 45%, transparent 70%)', filter: 'blur(10px)', pointerEvents: 'none' }} />
         <div className="p-hero p-section" data-motion-entry style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(4rem, 9vw, 7rem) 1.5rem clamp(2.5rem, 5vw, 4rem)', display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', alignItems: 'center', gap: '3rem' }}>
           <div>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.375rem 0.75rem', borderRadius: 999 }}>
+            <span className="hero-rise" style={{ animationDelay: '60ms', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.375rem 0.75rem', borderRadius: 999 }}>
               <Landmark size={12} /> Speaker of the Parliament of Ghana
             </span>
-            <h1 style={{ fontFamily: 'var(--font-display), var(--font-inter), sans-serif', fontSize: 'clamp(2.75rem, 7vw, 5rem)', lineHeight: 0.98, letterSpacing: '-0.035em', fontWeight: 800, margin: '1.5rem 0', color: 'var(--p-text-1)' }}>
+            <h1 className="hero-rise" style={{ animationDelay: '140ms', fontFamily: 'var(--font-display), var(--font-inter), sans-serif', fontSize: 'clamp(2.75rem, 7vw, 5rem)', lineHeight: 0.98, letterSpacing: '-0.035em', fontWeight: 800, margin: '1.5rem 0', color: 'var(--p-text-1)' }}>
               The Digital Library of
               <br />
-              <span style={{ background: 'linear-gradient(90deg,#f9d06b,#f2a900,#bf7f00)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+              <span className="hero-shimmer" style={{ background: 'linear-gradient(90deg,#f9d06b,#f2a900,#bf7f00)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
                 Rt. Hon. Alban S. K. Bagbin
               </span>
             </h1>
-            <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '34rem', margin: '0 0 2rem' }}>
+            <p className="hero-rise" style={{ animationDelay: '220ms', fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '34rem', margin: '0 0 2rem' }}>
               His speeches, public papers, interviews, personal correspondence, photographs and milestones — collected in one place as a record of a thirty-year career in service to Ghana&apos;s democracy.
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <Link href="/archives" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary)', color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9375rem' }}>
+            <div className="hero-rise" style={{ animationDelay: '300ms', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <Link href="/archives" className="hero-cta" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary)', color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9375rem' }}>
                 Explore the archives <ArrowUpRight size={16} />
               </Link>
-              <Link href="/the-man" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--p-text-1)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9375rem', border: '1px solid color-mix(in srgb, var(--foreground) 20%, transparent)' }}>
+              <Link href="/the-man" className="hero-cta" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--p-text-1)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9375rem', border: '1px solid color-mix(in srgb, var(--foreground) 20%, transparent)' }}>
                 The Man
               </Link>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '2.75rem' }}>
+            <div className="hero-rise" style={{ animationDelay: '380ms', display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '2.75rem' }}>
               {quickStats.map(s => (
                 <div key={s.label}>
                   <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif', lineHeight: 1 }}>{s.value}</div>
@@ -123,7 +123,7 @@ export default async function LibraryHome() {
             </div>
           </div>
 
-          <div style={{ position: 'relative', justifySelf: 'center', width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'center' }}>
+          <div className="hero-float" style={{ position: 'relative', justifySelf: 'center', width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'center' }}>
             <img
               src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Speaker_Alban_Bagbin-2_%28cropped%29.jpg"
               alt="Alban Bagbin, Speaker of the Parliament of Ghana"

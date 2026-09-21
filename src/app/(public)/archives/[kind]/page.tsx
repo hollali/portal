@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ kind: string }>
-  searchParams: Promise<{ q?: string; year?: string; theme?: string }>
+  searchParams: Promise<{ q?: string; year?: string; theme?: string; occasion?: string; parliament?: string }>
 }
 
 const KIND_ICON: Record<string, React.ElementType> = {
@@ -49,6 +49,8 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
   const q = sp.q?.trim() || ''
   const year = sp.year?.trim() || ''
   const theme = sp.theme?.trim() || ''
+  const occasion = sp.occasion?.trim() || ''
+  const parliament = sp.parliament?.trim() || ''
 
   const where: {
     status: string
@@ -56,6 +58,8 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
     OR?: Record<string, unknown>[]
     year?: number
     theme?: string
+    occasion?: string
+    parliament?: string
   } = { status: 'published', kind: { in: kinds } }
 
   if (q) {
@@ -64,6 +68,7 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
       { excerpt: { contains: q, mode: 'insensitive' } },
       { body: { contains: q, mode: 'insensitive' } },
       { event: { contains: q, mode: 'insensitive' } },
+      { occasion: { contains: q, mode: 'insensitive' } },
       { location: { contains: q, mode: 'insensitive' } },
       { person: { contains: q, mode: 'insensitive' } },
       { institution: { contains: q, mode: 'insensitive' } },
@@ -72,6 +77,8 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
   }
   if (year) where.year = parseInt(year) || undefined
   if (theme) where.theme = theme
+  if (occasion) where.occasion = occasion
+  if (parliament) where.parliament = parliament
 
   const [items, counts, years] = await Promise.all([
     prisma.archiveItem.findMany({ where, orderBy: [{ year: 'desc' }, { date: 'desc' }, { updatedAt: 'desc' }] }),
@@ -80,6 +87,8 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
   ])
 
   const themes = Array.from(new Set(items.map(i => i.theme).filter((t): t is string => !!t))).slice(0, 12)
+  const occasions = Array.from(new Set(items.map(i => i.occasion).filter((o): o is string => !!o))).slice(0, 24)
+  const parliaments = Array.from(new Set(items.map(i => i.parliament).filter((p): p is string => !!p))).slice(0, 24)
   const marginCount = counts.speeches + counts.papers + counts.interviews + counts.notes
 
   return (
@@ -110,8 +119,20 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
               {themes.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           )}
+          {occasions.length > 0 && (
+            <select name="occasion" defaultValue={occasion} style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
+              <option value="">All occasions</option>
+              {occasions.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          )}
+          {parliaments.length > 0 && (
+            <select name="parliament" defaultValue={parliament} style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
+              <option value="">All parliaments</option>
+              {parliaments.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
           <button type="submit" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 999, padding: '0.6rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Filter</button>
-          {(q || year || theme) && <Link href={`/archives/${kind}`} style={{ alignSelf: 'center', fontSize: '0.8125rem', color: 'var(--p-text-3)' }}>Clear</Link>}
+          {(q || year || theme || occasion || parliament) && <Link href={`/archives/${kind}`} style={{ alignSelf: 'center', fontSize: '0.8125rem', color: 'var(--p-text-3)' }}>Clear</Link>}
         </form>
 
         {/* Other collections quick-links */}

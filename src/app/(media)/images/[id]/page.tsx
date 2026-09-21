@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { jsonFetch } from '@/lib/jsonFetch'
+import { ArrowLeft, Download, ExternalLink } from 'lucide-react'
 
 export default function ImageDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,7 +31,7 @@ export default function ImageDetailPage() {
 
   return (
     <div>
-      <Link href="/images" style={{ fontSize: '0.875rem', marginBottom: '1rem', display: 'inline-block' }}>&larr; Back to Images</Link>
+      <Link href="/images" style={{ fontSize: '0.875rem', marginBottom: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--p-text-3)', textDecoration: 'none' }}><ArrowLeft size={16} /> Back to Images</Link>
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>Image #{item.id}</h1>
 
       <div className="card grid-2-sm" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
@@ -49,8 +50,8 @@ export default function ImageDetailPage() {
           )}
           {item.url && localUrl && (
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem' }}>
-              {localUrl && <a href={localUrl} download style={{ fontSize: '0.875rem' }}>Download &darr;</a>}
-              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.875rem' }}>Open source URL &rarr;</a>
+              {localUrl && <a href={localUrl} download style={{ fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Download size={14} /> Download</a>}
+              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>Open source URL <ExternalLink size={13} /></a>
             </div>
           )}
         </div>
