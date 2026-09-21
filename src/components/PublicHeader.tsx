@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Landmark, LogIn, Menu, X, ChevronDown, Search, Sparkles, ArrowRight,
+  Landmark, Menu, X, ChevronDown, Search, Sparkles, ArrowRight,
   Home, UserRound, Milestone, Mic, FileText, MessagesSquare, ScrollText,
   Award, Image as ImageIcon, Lightbulb, Newspaper, Clapperboard, Video,
   AudioLines, type LucideIcon,
@@ -236,19 +236,16 @@ export default function PublicHeader() {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className="hide-sm"><ThemeToggle /></div>
-          <Link href="/login"
-            className="p-admin-btn"
-            style={{
-              fontSize: '0.8125rem', fontWeight: 500, color: 'var(--p-text-2)', background: 'transparent',
-              padding: '0.5rem 0.75rem', borderRadius: 999, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem',
-              border: '1px solid var(--p-border)', transition: 'color 0.2s, border-color 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--p-text-1)'; e.currentTarget.style.borderColor = 'var(--p-text-3)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--p-text-2)'; e.currentTarget.style.borderColor = 'var(--p-border)' }}
+          <button
+            onClick={() => setSearchOpen(o => !o)}
+            aria-expanded={searchOpen}
+            aria-controls="site-search"
+            className="show-sm"
+            style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}
           >
-            <LogIn size={14} /> <span className="p-admin-label">Sign in</span>
-          </Link>
+            <Search size={18} />
+          </button>
+          <ThemeToggle square />
           <button onClick={() => setMenuOpen(o => !o)} className="show-sm" aria-expanded={menuOpen} aria-controls="mobile-menu" style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -342,11 +339,6 @@ export default function PublicHeader() {
           <Link href="/archives" onClick={() => setMenuOpen(false)} className="drawer-hub">
             Browse all collections <ArrowRight size={14} />
           </Link>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--p-border)', marginTop: '0.75rem', paddingTop: '0.9rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--p-text-3)' }}>Appearance</span>
-            <ThemeToggle />
-          </div>
         </div>
       </div>
     </>
