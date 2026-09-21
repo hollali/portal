@@ -1,22 +1,13 @@
-'use client'
+import type { Metadata } from 'next'
+import NewsArchive from '@/components/NewsArchive'
 
-import ListPage from '@/components/ListPage'
+export const metadata: Metadata = {
+  title: 'News Archive',
+  description: 'Press coverage of Rt. Hon. Alban Bagbin collected and archived by source — searchable and exportable.',
+}
+
+export const dynamic = 'force-dynamic'
 
 export default function NewsListPage() {
-  return (
-    <ListPage
-      type="news"
-      apiPath="/api/news"
-      title="News"
-      searchPlaceholder="Search news by title, URL, source, snippet..."
-      detailPrefix="/news/"
-      columns={[
-        { key: 'id', label: 'ID', sortable: true },
-        { key: 'title', label: 'Title', sortable: true },
-        { key: 'sourceName', label: 'Source', sortable: true },
-        { key: 'date', label: 'Date', sortable: true },
-        { key: 'collectedAt', label: 'Collected', sortable: true },
-      ]}
-    />
-  )
+  return <NewsArchive />
 }

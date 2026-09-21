@@ -719,6 +719,34 @@ a:hover {
   border-color: var(--primary);
 }
 
+/* ─── News archive responsive (editorial grid) ─── */
+.news-hero {
+  background: var(--p-bg);
+}
+@media (max-width: 767px) {
+  main .news-hero {
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+    padding: 2rem 1rem 2.25rem !important;
+  }
+}
+@media (max-width: 640px) {
+  main .news-hero {
+    margin-left: -1.25rem !important;
+    margin-right: -1.25rem !important;
+    padding: 1.75rem 1.25rem 2.25rem !important;
+  }
+}
+@media (max-width: 500px) {
+  .news-toolbar {
+    flex-direction: column;
+  }
+  .news-toolbar > * {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+}
+
 /* ─── Mobile slide-in drawer (public header) ─── */
 .drawer-backdrop {
   position: fixed;
