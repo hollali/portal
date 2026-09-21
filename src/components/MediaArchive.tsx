@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
 import { jsonFetch } from '@/lib/jsonFetch'
 import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeThumbUrl } from '@/lib/media'
 import { Clapperboard, AudioLines, X, ChevronLeft, ChevronRight, Play, Search as SearchIcon } from 'lucide-react'
@@ -46,7 +46,7 @@ const FACETS: { key: string; label: string }[] = [
 export interface MediaArchiveProps {
   kind: Kind
   eyebrow: string
-  heading: string
+  heading: ReactNode
   sub: string
   categories: readonly string[]
   defaultCategory?: string

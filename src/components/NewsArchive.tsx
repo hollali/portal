@@ -145,7 +145,7 @@ export default function NewsArchive() {
             <Newspaper size={12} /> News Archive · Clippings
           </span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.9rem 0 0.6rem', color: 'var(--p-text-1)' }}>
-            The news in his story
+            The news in <span className="p-serif">his story</span>
           </h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--p-text-2)', margin: 0, maxWidth: '40rem' }}>
             Press coverage of Rt. Hon. Alban Bagbin as it was reported — collected daily and archived by source, ready to read or export.

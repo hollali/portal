@@ -200,7 +200,7 @@ export default function PublicSearchPage() {
     <div style={{ maxWidth: 860 }}>
       <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Search</span>
       <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 1.75rem', color: 'var(--p-text-1)' }}>
-        Search the library
+        Search <span className="p-serif">the library</span>
       </h1>
       <Suspense fallback={null}>
         <SearchBox />

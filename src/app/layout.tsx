@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Inter, Inter_Tight, Geist_Mono } from "next/font/google";
+import { Inter, Inter_Tight, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import MotionInit from "@/components/MotionInit";
 
@@ -12,6 +12,12 @@ const inter = Inter({
 const interTight = Inter_Tight({
   variable: "--font-display",
   subsets: ["latin"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-serif",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
 });
 
 const geistMono = Geist_Mono({
@@ -30,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} ${interTight.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} ${interTight.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full">
         <Script
           id="motion-init"

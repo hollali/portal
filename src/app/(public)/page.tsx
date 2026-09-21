@@ -11,13 +11,12 @@ import {
   Newspaper,
   Video,
   Headphones,
-  Landmark,
-  Quote,
   Milestone,
   type LucideIcon,
 } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
+import HeroSection from '@/components/HeroSection'
 import TestimonialCarousel from '@/components/TestimonialCarousel'
 import { MAN_SECTIONS, ARCHIVE_LINKS } from '@/lib/man'
 import { getLibraryCounts, getLatestArchiveItems } from '@/lib/libraryQueries'
@@ -76,71 +75,17 @@ export default async function LibraryHome() {
   const latest = await getLatestArchiveItems(8)
 
   const quickStats = [
-    { value: counts.speeches.toLocaleString(), label: 'Speeches' },
-    { value: counts.notes.toLocaleString(), label: 'Letters & memos' },
-    { value: counts.photos.toLocaleString(), label: 'Photos' },
-    { value: counts.testimonials.toLocaleString(), label: 'Testimonials' },
+    { value: counts.speeches, label: 'Speeches' },
+    { value: counts.notes, label: 'Letters & memos' },
+    { value: counts.photos, label: 'Photos' },
+    { value: counts.testimonials, label: 'Testimonials' },
   ]
 
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh', overflowX: 'hidden' }}>
       <PublicHeader />
 
-      {/* ── Hero ───────────────────────────────────────── */}
-      <section id="content" style={{ position: 'relative', overflow: 'hidden' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
-        <div className="orb" style={{ position: 'absolute', top: -140, right: -120, width: 460, height: 460, borderRadius: '50%', background: 'radial-gradient(circle, rgba(242,169,0,0.22) 0%, rgba(29,66,137,0.18) 45%, transparent 70%)', filter: 'blur(10px)', pointerEvents: 'none' }} />
-        <div className="p-hero p-section" data-motion-entry style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(4rem, 9vw, 7rem) 1.5rem clamp(2.5rem, 5vw, 4rem)', display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', alignItems: 'center', gap: '3rem' }}>
-          <div>
-            <span className="hero-rise" style={{ animationDelay: '60ms', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.375rem 0.75rem', borderRadius: 999 }}>
-              <Landmark size={12} /> Speaker of the Parliament of Ghana
-            </span>
-            <h1 className="hero-rise" style={{ animationDelay: '140ms', fontFamily: 'var(--font-display), var(--font-inter), sans-serif', fontSize: 'clamp(2.75rem, 7vw, 5rem)', lineHeight: 0.98, letterSpacing: '-0.035em', fontWeight: 800, margin: '1.5rem 0', color: 'var(--p-text-1)' }}>
-              The Digital Library of
-              <br />
-              <span className="hero-shimmer" style={{ background: 'linear-gradient(90deg,#f9d06b,#f2a900,#bf7f00)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-                Rt. Hon. Alban S. K. Bagbin
-              </span>
-            </h1>
-            <p className="hero-rise" style={{ animationDelay: '220ms', fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '34rem', margin: '0 0 2rem' }}>
-              His speeches, public papers, interviews, personal correspondence, photographs and milestones — collected in one place as a record of a thirty-year career in service to Ghana&apos;s democracy.
-            </p>
-            <div className="hero-rise" style={{ animationDelay: '300ms', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <Link href="/archives" className="hero-cta" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary)', color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9375rem' }}>
-                Explore the archives <ArrowUpRight size={16} />
-              </Link>
-              <Link href="/the-man" className="hero-cta" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--p-text-1)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9375rem', border: '1px solid color-mix(in srgb, var(--foreground) 20%, transparent)' }}>
-                The Man
-              </Link>
-            </div>
-            <div className="hero-rise" style={{ animationDelay: '380ms', display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '2.75rem' }}>
-              {quickStats.map(s => (
-                <div key={s.label}>
-                  <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif', lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="hero-float" style={{ position: 'relative', justifySelf: 'center', width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'center' }}>
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Speaker_Alban_Bagbin-2_%28cropped%29.jpg"
-              alt="Alban Bagbin, Speaker of the Parliament of Ghana"
-              width={400}
-              height={500}
-              style={{ width: '100%', maxWidth: 400, borderRadius: 16, objectFit: 'cover', aspectRatio: '4/5', border: '1px solid var(--p-border-3)', boxShadow: 'var(--p-shadow), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent)' }}
-            />
-            <div style={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', width: '86%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'color-mix(in srgb, var(--p-surface-2) 82%, transparent)', backdropFilter: 'blur(10px)', border: '1px solid var(--p-border-3)', borderRadius: 12, padding: '0.7rem 1rem' }}>
-              <div>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Speaker since</div>
-                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--p-text-1)' }}>7 January 2021</div>
-              </div>
-              <Quote size={20} style={{ color: 'var(--primary)' }} />
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroSection stats={quickStats} />
 
       {/* ── Schools attended marquee ─────────────────── */}
       <div className="marquee-paused" style={{ borderTop: '1px solid var(--p-border)', borderBottom: '1px solid var(--p-border)', overflow: 'hidden', padding: '1rem 0', background: 'var(--p-surface-2)' }}>
@@ -159,7 +104,7 @@ export default async function LibraryHome() {
       <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
         <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The digital archives</span>
         <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 0.5rem', color: 'var(--p-text-1)' }}>
-          Explore the collections
+          Explore <span className="p-serif">the collections</span>
         </h2>
         <p style={{ color: 'var(--p-text-3)', maxWidth: '42rem', margin: '0 0 2.5rem' }}>
           Every item in the library — in his own words and in the words of others — organised for research and reference.
@@ -194,7 +139,7 @@ export default async function LibraryHome() {
             <div>
               <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The Man</span>
               <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 0', color: 'var(--p-text-1)' }}>
-                The life behind the office
+                The life <span className="p-serif">behind the office</span>
               </h2>
             </div>
             <Link href="/the-man" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderBottom: '1px solid var(--primary)', paddingBottom: '0.25rem' }}>
@@ -223,7 +168,7 @@ export default async function LibraryHome() {
           <div>
             <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Recently added</span>
             <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 0', color: 'var(--p-text-1)' }}>
-              Latest to the archive
+              Latest to <span className="p-serif">the archive</span>
             </h2>
           </div>
           <Link href="/archives" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderBottom: '1px solid var(--primary)', paddingBottom: '0.25rem' }}>

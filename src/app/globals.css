@@ -229,6 +229,38 @@ html[data-motion="js"] .hero-cta:hover {
   }
 }
 
+/* ─── Hero 2026: spotlight, watermark, stamp, scroll cue ─── */
+.hero-spotlit {
+  opacity: 1 !important;
+}
+@keyframes heroStampSpin {
+  to { transform: rotate(360deg); }
+}
+.hero-stamp {
+  animation: heroStampSpin 26s linear infinite;
+}
+.hero-stamp svg {
+  animation: heroStampSpin 26s linear infinite reverse;
+}
+@keyframes heroCueDrop {
+  0%   { transform: scaleY(0); transform-origin: top; opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: scaleY(1); transform-origin: top; opacity: 0; }
+}
+.hero-scrollcue-line {
+  animation: heroCueDrop 2.1s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-spotlit {
+    opacity: 0 !important;
+  }
+  .hero-stamp,
+  .hero-stamp svg,
+  .hero-scrollcue-line {
+    animation: none;
+  }
+}
+
 /* ─── Smart public header states ─── */
 .p-header {
   position: sticky;
@@ -317,9 +349,22 @@ html[data-motion="js"] .hero-cta:hover {
   .p-hero {
     grid-template-columns: 1fr !important;
   }
+  .hero-watermark {
+    right: -6rem !important;
+    font-size: clamp(9rem, 40vw, 14rem) !important;
+  }
 }
 
 @media (max-width: 640px) {
+  .hero-watermark {
+    display: none !important;
+  }
+  .hero-stamp {
+    display: none !important;
+  }
+  .hero-scrollcue {
+    display: none !important;
+  }
   .p-header-inner {
     padding: 0 1rem !important;
     gap: 0.5rem !important;
@@ -684,6 +729,14 @@ a:hover {
 }
 .cms-prose img { max-width: 100%; border-radius: 12px; margin: 0.5rem 0; }
 .cms-prose hr { border: none; border-top: 1px solid var(--p-border); margin: 2rem 0; }
+
+/* ─── Editorial serif accent for display headings ─── */
+.p-serif {
+  font-family: var(--font-serif), Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 520;
+  letter-spacing: -0.01em;
+}
 
 /* ─── Public library hover utilities (server-render safe) ─── */
 .p-card {

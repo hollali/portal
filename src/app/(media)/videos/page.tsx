@@ -14,7 +14,7 @@ export default function VideoArchivePage() {
     <MediaArchive
       kind="videos"
       eyebrow="Archive · Video Library"
-      heading="The video archive"
+      heading={<>The <span className="p-serif">video archive</span></>}
       sub="Parliamentary speeches, interviews, international engagements, conferences, parliamentary events and documentaries — watched in motion, indexed for research."
       categories={VIDEO_CATEGORIES}
     />

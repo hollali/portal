@@ -45,7 +45,7 @@ export default async function ArchivesHub() {
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Digital archives</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.5rem, 6vw, 4rem)', letterSpacing: '-0.035em', lineHeight: 1.02, fontWeight: 800, margin: '1rem 0', color: 'var(--p-text-1)' }}>
-            The archive collections
+            The archive <span className="p-serif">collections</span>
           </h1>
           <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '40rem', margin: 0 }}>
             Speeches, papers, interviews, correspondence, milestones, testimonials, photographs and press coverage — a growing record of the Speaker&apos;s public life, in his own words and the words of others.

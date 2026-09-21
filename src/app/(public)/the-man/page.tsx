@@ -23,7 +23,7 @@ export default function TheManPage() {
             <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.5rem, 6vw, 4rem)', letterSpacing: '-0.035em', lineHeight: 1.02, fontWeight: 800, margin: '1.25rem 0', color: 'var(--p-text-1)' }}>
               The life of a
               <br />
-              <span style={{ background: 'linear-gradient(90deg,#f9d06b,#f2a900,#bf7f00)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>servant-leader</span>
+              <span className="p-serif" style={{ background: 'linear-gradient(90deg,#f9d06b,#f2a900,#bf7f00)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>servant-leader</span>
             </h1>
             <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '36rem', margin: 0 }}>
               Born in the fields of Sombo, schooled by dedication, called to the Bar, and returned to the people — four chapters trace the man behind the Speaker&apos;s chair.
@@ -93,7 +93,7 @@ export default function TheManPage() {
         <div style={{ borderRadius: 20, border: '1px solid color-mix(in srgb, var(--primary) 35%, transparent)', background: 'var(--p-cta-bg)', padding: 'clamp(2rem, 4vw, 3rem)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
           <div>
             <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Continue exploring</span>
-            <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(1.5rem, 3.5vw, 2.25rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 0', color: 'var(--p-text-1)' }}>Read him in his own words</h2>
+            <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(1.5rem, 3.5vw, 2.25rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 0', color: 'var(--p-text-1)' }}>Read him in <span className="p-serif">his own words</span></h2>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
             <Link href="/archives/speeches" style={{ background: 'var(--primary)', color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 600, padding: '0.75rem 1.4rem', borderRadius: 999, fontSize: '0.9rem' }}>Browse speeches</Link>

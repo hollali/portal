@@ -230,7 +230,7 @@ export default function AskPage() {
               color: "var(--p-text-1)",
             }}
           >
-            Ask Bagbin Archive
+            Ask <span className="p-serif">Bagbin Archive</span>
           </h1>
           <p
             style={{

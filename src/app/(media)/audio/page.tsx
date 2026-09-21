@@ -14,7 +14,7 @@ export default function AudioArchivePage() {
     <MediaArchive
       kind="audio"
       eyebrow="Archive · Audio Library"
-      heading="The audio archive"
+      heading={<>The <span className="p-serif">audio archive</span></>}
       sub="Speeches, interviews, radio programmes and parliamentary addresses — the Speaker in sound, indexed for research."
       categories={AUDIO_CATEGORIES}
     />
