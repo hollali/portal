@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { jsonFetch } from '@/lib/jsonFetch'
-import { ArrowLeft, Image as ImageIcon, Download, ExternalLink, Calendar, Globe, UserRound, Search, ArrowRight, FileText, Hash } from 'lucide-react'
+import { ArrowLeft, Image as ImageIcon, Download, ExternalLink, Calendar, Globe, UserRound, Search, ArrowRight, Hash } from 'lucide-react'
 
 interface ImageDetail {
   id: number
@@ -82,9 +82,14 @@ export default function ImageDetailPage() {
 
   return (
     <div>
-      <Link href="/images" style={{ fontSize: '0.85rem', color: 'var(--p-text-3)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem' }}>
-        <ArrowLeft size={16} /> Back to photo archive
-      </Link>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <Link href="/images" style={{ fontSize: '0.85rem', color: 'var(--p-text-3)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <ArrowLeft size={14} /> Back to photo archive
+        </Link>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.3rem 0.7rem', borderRadius: 999 }}>
+          <ImageIcon size={12} strokeWidth={2.25} /> Photo record
+        </span>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.9rem', marginBottom: '1.5rem' }}>
         <span style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: 'color-mix(in srgb, var(--primary) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
@@ -92,9 +97,6 @@ export default function ImageDetailPage() {
         </span>
         <div>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 8%, transparent)', padding: '0.25rem 0.6rem', borderRadius: 999 }}>
-              <FileText size={11} /> Photo record
-            </span>
             {item.collectedAt && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--p-text-3)' }}><Calendar size={13} /> {item.collectedAt}</span>}
             {isFaceMatch && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: 'var(--success)', border: '1px solid color-mix(in srgb, var(--success) 50%, transparent)', background: 'color-mix(in srgb, var(--success) 10%, transparent)', padding: '0.2rem 0.65rem', borderRadius: 999, fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

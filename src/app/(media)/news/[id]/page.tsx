@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { jsonFetch } from '@/lib/jsonFetch'
-import { ArrowLeft, Newspaper, ExternalLink, Calendar, ArrowRight, Globe, Tag, FileText } from 'lucide-react'
+import { ArrowLeft, Newspaper, ExternalLink, Calendar, ArrowRight, Globe, Tag } from 'lucide-react'
 
 interface NewsDetail {
   id: number
@@ -74,9 +74,14 @@ export default function NewsDetailPage() {
 
   return (
     <div>
-      <Link href="/news" style={{ fontSize: '0.85rem', color: 'var(--p-text-3)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem' }}>
-        <ArrowLeft size={16} /> Back to news archive
-      </Link>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <Link href="/news" style={{ fontSize: '0.85rem', color: 'var(--p-text-3)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <ArrowLeft size={14} /> Back to news archive
+        </Link>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.3rem 0.7rem', borderRadius: 999 }}>
+          <Newspaper size={12} strokeWidth={2.25} /> News record
+        </span>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.9rem', marginBottom: '1.25rem' }}>
         <span style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: 'color-mix(in srgb, var(--primary) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
@@ -84,9 +89,6 @@ export default function NewsDetailPage() {
         </span>
         <div>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 8%, transparent)', padding: '0.25rem 0.6rem', borderRadius: 999 }}>
-              <FileText size={11} /> News record
-            </span>
             {date && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--p-text-3)' }}><Calendar size={13} /> {date}</span>}
           </div>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(1.6rem, 3.6vw, 2.6rem)', letterSpacing: '-0.03em', lineHeight: 1.15, margin: 0, color: 'var(--p-text-1)', maxWidth: '44rem' }}>
