@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Calendar, Download, ExternalLink, FileText, Mic, MessagesSquare, ScrollText, MapPin, Building2, Video, AudioLines, Image as ImageIcon, BookOpen, CircleCheck, Info } from 'lucide-react'
+import { ArrowLeft, Calendar, Download, ExternalLink, FileText, MapPin, Building2, Video, AudioLines, Image as ImageIcon, BookOpen, CircleCheck, Info } from 'lucide-react'
+import { KIND_ICON } from '@/lib/kindIcon'
 import { prisma } from '@/lib/prisma'
 import { renderMarkdown } from '@/lib/markdown'
 import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
@@ -13,15 +14,6 @@ export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ kind: string; slug: string }>
-}
-
-const KIND_ICON: Record<string, React.ElementType> = {
-  speech: Mic,
-  paper: FileText,
-  interview: MessagesSquare,
-  note: ScrollText,
-  letter: ScrollText,
-  memo: ScrollText,
 }
 
 const KIND_NAME: Record<string, string> = {
@@ -61,7 +53,7 @@ export default async function ArchiveDetailPage({ params }: Props) {
   const item = await prisma.archiveItem.findUnique({ where: { slug } })
   if (!item || item.status !== 'published' || !kinds.includes(item.kind as never)) notFound()
 
-  const Icon = KIND_ICON[item.kind] || FileText
+  const Icon = KIND_ICON[item.kind] ?? FileText
   const kindName = KIND_NAME[item.kind] || kind
   const backLabel = KIND_PLURAL[item.kind] || KIND_PLURAL[kind] || kind
   const bodyHtml = item.body ? renderMarkdown(item.body) : null

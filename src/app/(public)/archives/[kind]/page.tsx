@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Download, FileText, Mic, MessagesSquare, ScrollText, SearchX } from 'lucide-react'
+import { Download, FileText, SearchX } from 'lucide-react'
+import { KIND_ICON } from '@/lib/kindIcon'
 import { prisma } from '@/lib/prisma'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
@@ -13,15 +14,6 @@ export const dynamic = 'force-dynamic'
 interface Props {
   params: Promise<{ kind: string }>
   searchParams: Promise<{ q?: string; year?: string; theme?: string; occasion?: string; parliament?: string }>
-}
-
-const KIND_ICON: Record<string, React.ElementType> = {
-  speech: Mic,
-  paper: FileText,
-  interview: MessagesSquare,
-  note: ScrollText,
-  letter: ScrollText,
-  memo: ScrollText,
 }
 
 const LIST_COPY: Record<ListRouteKind, { eyebrow: string; heading: string; sub: string }> = {
@@ -156,7 +148,7 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1rem' }}>
             {items.map(item => {
-              const Icon = KIND_ICON[item.kind] || FileText
+              const Icon = KIND_ICON[item.kind] ?? FileText
               const cfg = KIND_CONFIG[item.kind as ArchiveKind]
               return (
                 <Link key={item.id} href={`/archives/${kind}/${item.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>

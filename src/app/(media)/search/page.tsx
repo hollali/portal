@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search as SearchIcon, Mic, FileText, MessagesSquare, ScrollText, Award, Milestone as MilestoneIcon } from 'lucide-react'
+import { Search as SearchIcon, FileText, Award, Milestone as MilestoneIcon } from 'lucide-react'
+import { KIND_ICON } from '@/lib/kindIcon'
 import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
 import { jsonFetch } from '@/lib/jsonFetch'
 
@@ -22,8 +23,6 @@ interface SearchResults {
   news: { items: MediaHit[]; total: number }
   audio: { items: MediaHit[]; total: number }
 }
-
-const KIND_ICON: Record<string, React.ElementType> = { speech: Mic, paper: FileText, interview: MessagesSquare, note: ScrollText, letter: ScrollText, memo: ScrollText }
 
 function SearchBox() {
   const searchParams = useSearchParams()
@@ -86,7 +85,7 @@ function SearchBox() {
               {groupTitle('Archives', '/archives', results.archive.total)}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {results.archive.items.map(a => {
-                  const Icon = KIND_ICON[a.kind] || FileText
+                  const Icon = KIND_ICON[a.kind] ?? FileText
                   const cfg = KIND_CONFIG[a.kind as ArchiveKind]
                   const route = archiveRouteForKind(a.kind)
                   return (
