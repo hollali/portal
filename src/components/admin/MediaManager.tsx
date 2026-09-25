@@ -21,6 +21,8 @@ import {
   ListPlus,
   Tags,
   FileInput,
+  Image,
+  ImageOff,
   type LucideIcon,
 } from 'lucide-react'
 import { Modal, AnimBtn, AnimLink, Toast, SkeletonTable, EmptyState, ConfirmDialog } from '@/components/ui'
@@ -28,6 +30,9 @@ import { Pagination } from '@/components/ui/Pagination'
 import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 
 export type MediaType = 'images' | 'videos' | 'news' | 'audio'
+
+const PER_PAGE = 20
+const SEARCH_DEBOUNCE_MS = 300
 
 export const MEDIA_TYPES: MediaType[] = ['images', 'videos', 'news', 'audio']
 
@@ -39,7 +44,7 @@ export const MEDIA_LABELS: Record<MediaType, string> = {
 }
 
 export const MEDIA_ICONS: Record<MediaType, LucideIcon> = {
-  images: FileText,
+  images: Image,
   videos: Play,
   news: FileText,
   audio: Music,
@@ -94,6 +99,86 @@ function singular(type: MediaType): string {
   return type.slice(0, -1)
 }
 
+/**
+ * The thumbnail is the primary way into a record, so it is a real button with
+ * an accessible name. The image inside is decorative — the button's own label
+ * carries the identification — and a load failure falls back to a visible
+ * placeholder instead of silently collapsing the box.
+ */
+function MediaThumb({ item, onOpen }: { item: MediaItem; onOpen: () => void }) {
+  const [failed, setFailed] = useState(false)
+  const src = getMediaUrl(item)
+  const label = item.title?.slice(0, 60) || item.source || `Image #${item.id}`
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`View ${label}`}
+      aria-label={`View details for ${label}`}
+      style={{
+        width: 64,
+        height: 64,
+        borderRadius: '0.5rem',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        background: 'var(--muted)',
+        border: '1px solid var(--border)',
+        padding: 0,
+        display: 'block',
+      }}
+    >
+      {src && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          width={64}
+          height={64}
+          className="w-full h-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="flex w-full h-full items-center justify-center"
+          style={{ color: 'var(--muted-foreground)' }}
+        >
+          <ImageOff size={18} />
+        </span>
+      )}
+    </button>
+  )
+}
+
+/** A record's title, doubling as the keyboard-operable way to open it. */
+function TitleButton({ children, onOpen }: { children: ReactNode; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{
+        fontWeight: 600,
+        textAlign: 'left',
+        cursor: 'pointer',
+        color: 'inherit',
+        padding: 0,
+        border: 'none',
+        background: 'none',
+        textDecoration: 'underline',
+        textDecorationColor: 'transparent',
+        textUnderlineOffset: '2px',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.textDecorationColor = 'currentColor' }}
+      onMouseLeave={e => { e.currentTarget.style.textDecorationColor = 'transparent' }}
+      onFocus={e => { e.currentTarget.style.textDecorationColor = 'currentColor' }}
+      onBlur={e => { e.currentTarget.style.textDecorationColor = 'transparent' }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function MediaManager({
   type,
   canManage,
@@ -110,6 +195,8 @@ export default function MediaManager({
   const [viewMode, setViewMode] = useState<ViewMode>('details')
   const [deleting, setDeleting] = useState(false)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
   const [source, setSource] = useState('')
   const [tags, setTags] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -131,12 +218,12 @@ export default function MediaManager({
   const confirmBusy = deleting
 
   const buildParams = useCallback(
-    () =>
+    (searchTerm: string) =>
       new URLSearchParams({
         type,
         page: String(page),
-        perPage: '20',
-        search,
+        perPage: String(PER_PAGE),
+        search: searchTerm,
         source,
         tags,
         dateFrom,
@@ -144,31 +231,50 @@ export default function MediaManager({
         sort,
         dir: sortDir,
       }),
-    [type, page, search, source, tags, dateFrom, dateTo, sort, sortDir],
+    [type, page, source, tags, dateFrom, dateTo, sort, sortDir],
   )
 
   const fetchData = useCallback(async () => {
-    const d = await jsonFetch<AdminData>(`/api/admin/${type}?${buildParams()}`)
+    const d = await jsonFetch<AdminData>(`/api/admin/${type}?${buildParams(debouncedSearch)}`)
     if (d) setData(d)
-  }, [type, buildParams])
+  }, [type, buildParams, debouncedSearch])
 
   useEffect(() => {
-    let active = true
+    // Typing should not fire a request per keystroke: wait for a pause in input.
+    const timer = window.setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let cancelled = false
     Promise.resolve()
-      .then(() => setLoading(true))
-      .then(() => jsonFetch<AdminData>(`/api/admin/${type}?${buildParams()}`))
+      .then(() => {
+        if (cancelled) return null
+        setRefreshing(true)
+        setLoading(data === null)
+        return jsonFetch<AdminData>(`/api/admin/${type}?${buildParams(debouncedSearch)}`, {
+          signal: controller.signal,
+        })
+      })
       .then((d: AdminData | null) => {
-        if (active && d) setData(d)
+        if (!cancelled && d) setData(d)
       })
       .finally(() => {
-        if (active) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setRefreshing(false)
+        }
       })
     return () => {
-      active = false
+      cancelled = true
+      controller.abort()
     }
-  }, [type, buildParams])
+    // `data` is read for the initial-load distinction only; excluded to avoid a refetch loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, buildParams, debouncedSearch])
 
-  const filterKey = `${type}|${search}|${source}|${tags}|${dateFrom}|${dateTo}`
+  const filterKey = `${type}|${debouncedSearch}|${source}|${tags}|${dateFrom}|${dateTo}`
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey)
@@ -461,9 +567,17 @@ export default function MediaManager({
     setViewMode('details')
   }
 
+  const hasFilters = Boolean(search || source || tags || dateFrom || dateTo)
+  const clearFilters = () => {
+    setSearch('')
+    setSource('')
+    setTags('')
+    setDateFrom('')
+    setDateTo('')
+  }
   const allIds = data?.items.map(i => i.id) || []
   const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id))
-  const totalPages = data ? Math.ceil(data.total / 20) : 1
+  const totalPages = data ? Math.ceil(data.total / PER_PAGE) : 1
   const showManagement = canManage
 
   return (
@@ -716,13 +830,9 @@ export default function MediaManager({
             color: 'var(--foreground)',
           }}
         />
-        {(dateFrom || dateTo || tags) && (
+        {hasFilters && (
           <AnimBtn
-            onClick={() => {
-              setDateFrom('')
-              setDateTo('')
-              setTags('')
-            }}
+            onClick={clearFilters}
             style={{
               padding: '0.4rem 0.75rem',
               background: 'var(--card)',
@@ -736,38 +846,96 @@ export default function MediaManager({
         )}
       </div>
 
+      {/* Result summary */}
+      {!loading && data && data.items.length > 0 && (
+        <p
+          aria-live="polite"
+          className="mb-3 text-xs"
+          style={{ color: 'var(--muted-foreground)' }}
+        >
+          {refreshing
+            ? 'Updating…'
+            : `Showing ${data.items.length} of ${data.total} ${type}${
+                data.total > data.items.length ? ` · page ${page} of ${totalPages}` : ''
+              }`}
+        </p>
+      )}
+
       {/* Table */}
       {loading ? (
         <SkeletonTable rows={8} cols={5} />
       ) : !data || data.items.length === 0 ? (
-        <EmptyState message={`No ${type} found.`} icon={<FileText size={48} />} />
+        <EmptyState
+          message={hasFilters ? `No ${type} match these filters.` : `No ${type} found.`}
+          icon={<FileText size={48} />}
+          action={
+            hasFilters ? (
+              <AnimBtn
+                onClick={clearFilters}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--foreground)',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                }}
+              >
+                Clear filters
+              </AnimBtn>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           <div className="card overflow-x-auto">
             <table style={{ minWidth: type === 'images' ? '600px' : '800px' }}>
+              <caption className="sr-only">
+                {MEDIA_LABELS[type]} records,{' '}
+                {data.total === 0
+                  ? 'none'
+                  : `page ${page} of ${totalPages}, ${data.total} total`}
+              </caption>
               <thead>
                 <tr>
                   {showManagement && (
-                    <th style={{ width: '40px' }}>
+                    <th scope="col" style={{ width: '40px' }}>
                       <input
                         type="checkbox"
                         checked={allSelected}
                         onChange={toggleSelectAll}
+                        aria-label={
+                          allSelected
+                            ? `Deselect all ${type} on this page`
+                            : `Select all ${type} on this page`
+                        }
                         className="cursor-pointer"
                       />
                     </th>
                   )}
-                  <th style={{ width: '50px' }}>
+                  <th
+                    scope="col"
+                    style={{ width: '50px' }}
+                    aria-sort={
+                      sort === 'id' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
+                    }
+                  >
                     <button
                       onClick={() => handleSort('id')}
                       className="flex items-center gap-1 hover:underline"
                     >
-                      ID {sort === 'id' && (sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                      ID <span className="sr-only">— click to sort</span>
+                      {sort === 'id' &&
+                        (sortDir === 'asc' ? (
+                          <ChevronUp size={14} aria-hidden />
+                        ) : (
+                          <ChevronDown size={14} aria-hidden />
+                        ))}
                     </button>
                   </th>
-                  <th style={{ width: '80px' }}>Preview</th>
-                  <th>Details</th>
-                  <th style={{ width: '150px', textAlign: 'right' }}>Actions</th>
+                  <th scope="col" style={{ width: '80px' }}>Preview</th>
+                  <th scope="col">Details</th>
+                  <th scope="col" style={{ width: '150px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -785,6 +953,7 @@ export default function MediaManager({
                           type="checkbox"
                           checked={selected.has(item.id)}
                           onChange={() => toggleSelect(item.id)}
+                          aria-label={`Select record #${item.id}`}
                           className="cursor-pointer"
                         />
                       </td>
@@ -792,28 +961,13 @@ export default function MediaManager({
                     <td className="font-semibold">{item.id}</td>
                     <td>
                       {type === 'images' && (
-                        <div
-                          onClick={() => openView(item)}
-                          className="w-16 h-16 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105 hover:shadow-lg"
-                          style={{ background: 'var(--muted)' }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={getMediaUrl(item) || ''}
-                            alt=""
-                            width={64}
-                            height={64}
-                            className="w-full h-full object-cover"
-                            onError={e => {
-                              ;(e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                          />
-                        </div>
+                        <MediaThumb item={item} onOpen={() => openView(item)} />
                       )}
                       {type === 'videos' && (
                         <AnimBtn
                           onClick={() => openView(item)}
                           title="View video"
+                          aria-label={`View video ${item.title?.slice(0, 60) || `#${item.id}`}`}
                           style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}
                         >
                           <Play size={20} />
@@ -823,6 +977,7 @@ export default function MediaManager({
                         <AnimBtn
                           onClick={() => openView(item)}
                           title="View audio"
+                          aria-label={`View audio ${item.title?.slice(0, 60) || `#${item.id}`}`}
                           style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}
                         >
                           <Music size={20} />
@@ -832,6 +987,7 @@ export default function MediaManager({
                         <AnimBtn
                           onClick={() => openView(item)}
                           title="View article"
+                          aria-label={`View article ${item.title?.slice(0, 60) || `#${item.id}`}`}
                           style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}
                         >
                           <FileText size={20} />
@@ -865,11 +1021,10 @@ export default function MediaManager({
                       )}
                       {type === 'videos' && (
                         <div>
-                          <div
-                            className="font-semibold cursor-pointer hover:underline"
-                            onClick={() => openView(item)}
-                          >
-                            {item.title?.slice(0, 80) || 'Untitled'}
+                          <div className="font-semibold">
+                            <TitleButton onOpen={() => openView(item)}>
+                              {item.title?.slice(0, 80) || 'Untitled'}
+                            </TitleButton>
                           </div>
                           <div style={{ color: 'var(--muted-foreground)' }}>
                             {item.channel && <span>Channel: {item.channel}</span>}
@@ -882,11 +1037,10 @@ export default function MediaManager({
                       )}
                       {type === 'news' && (
                         <div>
-                          <div
-                            className="font-semibold cursor-pointer hover:underline"
-                            onClick={() => openView(item)}
-                          >
-                            {item.title?.slice(0, 80) || 'Untitled'}
+                          <div className="font-semibold">
+                            <TitleButton onOpen={() => openView(item)}>
+                              {item.title?.slice(0, 80) || 'Untitled'}
+                            </TitleButton>
                           </div>
                           {item.sourceName && (
                             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
@@ -905,11 +1059,10 @@ export default function MediaManager({
                       )}
                       {type === 'audio' && (
                         <div>
-                          <div
-                            className="font-semibold cursor-pointer hover:underline"
-                            onClick={() => openView(item)}
-                          >
-                            {item.title?.slice(0, 80) || 'Untitled'}
+                          <div className="font-semibold">
+                            <TitleButton onOpen={() => openView(item)}>
+                              {item.title?.slice(0, 80) || 'Untitled'}
+                            </TitleButton>
                           </div>
                           {item.artist && (
                             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
@@ -924,6 +1077,7 @@ export default function MediaManager({
                         <AnimBtn
                           onClick={() => openView(item)}
                           title="View"
+                          aria-label={`View record #${item.id}`}
                           style={{
                             padding: '0.375rem',
                             background: 'var(--card)',
@@ -941,6 +1095,7 @@ export default function MediaManager({
                                 setViewMode('edit')
                               }}
                               title="Edit"
+                              aria-label={`Edit record #${item.id}`}
                               style={{
                                 padding: '0.375rem',
                                 background: 'var(--card)',
@@ -956,6 +1111,7 @@ export default function MediaManager({
                                 setViewMode('public')
                               }}
                               title="Public preview"
+                              aria-label={`Public preview of record #${item.id}`}
                               style={{
                                 padding: '0.375rem',
                                 background: 'var(--card)',
@@ -987,6 +1143,7 @@ export default function MediaManager({
                           <AnimBtn
                             onClick={() => askDelete(item.id)}
                             title="Delete"
+                            aria-label={`Delete record #${item.id}`}
                             style={{ padding: '0.375rem', background: 'var(--danger)', color: 'white' }}
                           >
                             <Trash2 size={14} />
@@ -1383,7 +1540,15 @@ export default function MediaManager({
             </div>
 
             {viewMode === 'edit' ? (
-              <EditForm type={type} item={viewItem} onSave={handleEdit} saving={editing} />
+              // `key` remounts the form when the record changes, so its local
+              // field state can never show a previous item's values.
+              <EditForm
+                key={viewItem.id}
+                type={type}
+                item={viewItem}
+                onSave={handleEdit}
+                saving={editing}
+              />
             ) : viewMode === 'public' ? (
               <div className="p-6">
                 <PublicPreview type={type} item={viewItem} />
@@ -1878,8 +2043,20 @@ function PublicPreview({ type, item }: { type: MediaType; item: MediaItem }) {
 
 /* ---------- Edit form ---------- */
 
+/**
+ * Derived provenance values computed by the ingest pipeline. They are shown in
+ * the editor for context but are not hand-editable — letting an editor retype a
+ * face-match score would silently corrupt the record.
+ */
+const READONLY_FIELDS: Record<MediaType, string[]> = {
+  images: ['faceDetected', 'faceCount', 'faceMatch', 'faceMatchScore', 'faceMatchDistance'],
+  videos: [],
+  news: [],
+  audio: [],
+}
+
 const EDITABLE_FIELDS: Record<MediaType, string[]> = {
-  images: ['source', 'query', 'url', 'faceDetected', 'faceCount', 'faceMatch', 'faceMatchScore', 'faceMatchDistance'],
+  images: ['source', 'query', 'url'],
   videos: ['source', 'platform', 'title', 'url', 'channel', 'duration', 'views', 'category', 'caption', 'date', 'year', 'event', 'location', 'theme', 'featured', 'status'],
   news: ['source', 'query', 'title', 'url', 'sourceName', 'date', 'snippet'],
   audio: ['source', 'query', 'title', 'url', 'artist', 'duration', 'category', 'caption', 'date', 'year', 'event', 'location', 'theme', 'featured', 'status'],
@@ -1897,6 +2074,7 @@ function EditForm({
   saving: boolean
 }) {
   const fields = EDITABLE_FIELDS[type]
+  const readOnly = READONLY_FIELDS[type].filter(f => item[f] !== null && item[f] !== undefined && item[f] !== '')
   const [values, setValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {}
     for (const f of fields) init[f] = item[f] === null || item[f] === undefined ? '' : String(item[f])
@@ -1969,6 +2147,31 @@ function EditForm({
             </div>
           ))}
         </div>
+
+        {readOnly.length > 0 && (
+          <fieldset
+            disabled
+            className="mb-4 rounded-lg border p-3"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <legend className="px-1 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>
+              Derived by the ingest pipeline — not editable
+            </legend>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {readOnly.map(f => (
+                <div key={f} className="flex items-baseline gap-2 text-xs">
+                  <span style={{ color: 'var(--muted-foreground)' }}>
+                    {f.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                  </span>
+                  <span className="font-mono" style={{ color: 'var(--foreground)' }}>
+                    {String(item[f])}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        )}
+
         <div className="flex gap-2 justify-end">
           <button
             type="submit"

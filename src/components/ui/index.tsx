@@ -260,13 +260,15 @@ interface AnimBtnProps {
   children: ReactNode
   onClick?: (e: ReactMouseEvent<HTMLButtonElement>) => void
   title?: string
+  /** Required when the button renders an icon only — `title` alone is not announced reliably. */
+  'aria-label'?: string
   disabled?: boolean
   className?: string
   style?: React.CSSProperties
   type?: 'button' | 'submit' | 'reset'
 }
 
-export function AnimBtn({ children, onClick, title, disabled, className = '', style, type = 'button' }: AnimBtnProps) {
+export function AnimBtn({ children, onClick, title, disabled, className = '', style, type = 'button', ...rest }: AnimBtnProps) {
   const [hover, setHover] = useState(false)
   return (
     <button
@@ -274,6 +276,7 @@ export function AnimBtn({ children, onClick, title, disabled, className = '', st
       title={title}
       disabled={disabled}
       onClick={onClick}
+      {...rest}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={`inline-flex items-center justify-center transition-all duration-200 ease-out ${className}`}
@@ -296,11 +299,12 @@ interface AnimLinkProps {
   target?: string
   rel?: string
   title?: string
+  'aria-label'?: string
   className?: string
   style?: React.CSSProperties
 }
 
-export function AnimLink({ children, href, target, rel, title, className = '', style }: AnimLinkProps) {
+export function AnimLink({ children, href, target, rel, title, className = '', style, ...rest }: AnimLinkProps) {
   const [hover, setHover] = useState(false)
   return (
     <a
@@ -308,6 +312,7 @@ export function AnimLink({ children, href, target, rel, title, className = '', s
       target={target}
       rel={rel}
       title={title}
+      {...rest}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={`inline-flex items-center justify-center transition-all duration-200 ease-out no-underline ${className}`}
@@ -378,13 +383,15 @@ export function Toast({ message, type = 'success', onClose }: ToastProps) {
 interface EmptyStateProps {
   message: string
   icon?: ReactNode
+  action?: ReactNode
 }
 
-export function EmptyState({ message, icon }: EmptyStateProps) {
+export function EmptyState({ message, icon, action }: EmptyStateProps) {
   return (
     <div className="card flex flex-col items-center justify-center py-12 px-4 text-center">
       {icon && <div className="mb-4 opacity-30">{icon}</div>}
       <p style={{ color: 'var(--muted-foreground)' }}>{message}</p>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   )
 }
