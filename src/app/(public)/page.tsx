@@ -17,21 +17,12 @@ import {
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import HeroSection from '@/components/HeroSection'
+import LatestToArchive from '@/components/LatestToArchive'
 import TestimonialCarousel from '@/components/TestimonialCarousel'
 import { MAN_SECTIONS, ARCHIVE_LINKS } from '@/lib/man'
 import { getLibraryCounts, getLatestArchiveItems } from '@/lib/libraryQueries'
-import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
 
 export const dynamic = 'force-dynamic'
-
-const KIND_ICON: Record<string, LucideIcon> = {
-  speech: Mic,
-  paper: FileText,
-  interview: MessagesSquare,
-  note: ScrollText,
-  letter: ScrollText,
-  memo: ScrollText,
-}
 
 const COUNT_KEYS: Record<string, [keyof Awaited<ReturnType<typeof getLibraryCounts>>, string]> = {
   speeches: ['speeches', 'Speeches'],
@@ -163,47 +154,8 @@ export default async function LibraryHome() {
       </section>
 
       {/* ── Latest additions ───────────────────────────── */}
-      <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
-          <div>
-            <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Recently added</span>
-            <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 0', color: 'var(--p-text-1)' }}>
-              Latest to <span className="p-serif">the archive</span>
-            </h2>
-          </div>
-          <Link href="/archives" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderBottom: '1px solid var(--primary)', paddingBottom: '0.25rem' }}>
-            View everything <ArrowUpRight size={15} style={{ color: 'var(--primary)' }} />
-          </Link>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1rem' }}>
-          {latest.length === 0 && (
-            <p style={{ color: 'var(--p-text-3)' }}>New archive items will appear here as they are digitised.</p>
-          )}
-          {latest.map(item => {
-            const Icon = KIND_ICON[item.kind] || FileText
-            const cfg = KIND_CONFIG[item.kind as ArchiveKind]
-            const route = archiveRouteForKind(item.kind)
-            return (
-              <Link key={item.id} href={`/archives/${route}/${item.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="p-card-lift" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.4rem', height: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.7rem' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.6875rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary)' }}>
-                      <Icon size={13} /> {cfg?.label || item.kind}
-                    </span>
-                    <span style={{ fontSize: '0.6875rem', color: 'var(--p-text-4)', fontFamily: 'var(--font-mono), monospace' }}>{item.date || item.year || ''}</span>
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif', lineHeight: 1.35, marginBottom: '0.5rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    {[item.event, item.location, item.theme].filter(Boolean).slice(0, 3).map(f => (
-                      <span key={f} style={{ fontSize: '0.6875rem', color: 'var(--p-text-3)', border: '1px solid var(--p-border-2)', background: 'var(--p-surface-2)', borderRadius: 999, padding: '0.2rem 0.6rem' }}>{f}</span>
-                    ))}
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </section>
+      <LatestToArchive items={latest} />
+
 
       {/* ── Testimonial band ───────────────────────────── */}
       <section style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-3)' }}>

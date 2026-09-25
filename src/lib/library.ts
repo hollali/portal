@@ -103,6 +103,50 @@ export function formatYear(year: number | null | undefined): string {
   return year ? String(year) : '—'
 }
 
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+export function formatArchiveDate(date: string | null | undefined, year?: number | null): string {
+  const raw = (date ?? '').trim()
+  const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (isoDay) {
+    const month = Number(isoDay[2])
+    if (month >= 1 && month <= 12) return `${Number(isoDay[3])} ${MONTH_ABBR[month - 1]} ${isoDay[1]}`
+  }
+  const isoMonth = /^(\d{4})-(\d{2})$/.exec(raw)
+  if (isoMonth) {
+    const month = Number(isoMonth[2])
+    if (month >= 1 && month <= 12) return `${MONTH_ABBR[month - 1]} ${isoMonth[1]}`
+  }
+  if (raw) return raw
+  return year ? String(year) : ''
+}
+
+export function isoDateAttr(date: string | null | undefined): string | undefined {
+  const raw = (date ?? '').trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined
+}
+
+export interface ArchiveFacets {
+  theme?: string | null
+  event?: string | null
+  location?: string | null
+}
+
+export function archiveFacets(item: ArchiveFacets, limit: number): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const field of [item.theme, item.event, item.location]) {
+    const value = (field ?? '').trim()
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 export interface CoreTheme {
   slug: string
   name: string

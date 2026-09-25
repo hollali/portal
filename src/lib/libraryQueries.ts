@@ -97,7 +97,7 @@ const getLatestArchiveItemsCached = memCache(async (limit: number) => {
   try {
     const items = await prisma.archiveItem.findMany({
       where: { status: 'published' },
-      orderBy: [{ year: 'desc' }, { date: 'desc' }, { updatedAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }, { year: 'desc' }, { date: 'desc' }],
       take: limit,
     })
     return items.map(i => ({
