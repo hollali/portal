@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Fragment, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { PHOTO_FACET_FIELDS } from '@/lib/library'
 import { jsonFetch } from '@/lib/jsonFetch'
-import { X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, ImageOff } from 'lucide-react'
 
 interface PhotoItem {
   id: number
@@ -19,6 +19,21 @@ interface PhotoItem {
   theme: string | null
   caption: string | null
   source: string | null
+  sourceUrl: string | null
+  query: string | null
+  collectedAt: string | null
+  dateTaken: string | null
+  notes: string | null
+  tags: string | null
+  curated: boolean
+  storedLocally: boolean
+  imageHash: string | null
+  faceDetected: number | null
+  faceCount: number | null
+  faceMatch: number | null
+  faceMatchScore: number | null
+  faceMatchDistance: number | null
+  bestReferencePath: string | null
 }
 
 interface FacetOption {
@@ -35,6 +50,372 @@ interface PhotosData {
 }
 
 type FilterMap = Record<string, string>
+
+type DetailRow = { label: string; value: React.ReactNode }
+
+/** Tags are stored comma-separated, matching the other media detail pages. */
+function parseTags(tags: string | null): string[] {
+  return String(tags || '')
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean)
+}
+
+const mono = { fontFamily: 'var(--font-mono), monospace' } as const
+const detailLabel = {
+  fontFamily: 'var(--font-mono), monospace',
+  textTransform: 'uppercase',
+  fontSize: '0.6rem',
+  letterSpacing: '0.05em',
+  color: 'var(--p-text-4)',
+} as const
+
+function isPresent(v: unknown): boolean {
+  return v !== null && v !== undefined && v !== ''
+}
+
+/** `collectedAt` is stored as a raw ISO timestamp; show a readable date instead. */
+function formatTimestamp(value: string | null): string | null {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function DetailGroup({ title, rows }: { title: string; rows: DetailRow[] }) {
+  const present = rows.filter(r => isPresent(r.value))
+  if (present.length === 0) return null
+  return (
+    <div style={{ marginBottom: '1.1rem' }}>
+      <h3 style={{ ...mono, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', margin: '0 0 0.5rem' }}>
+        {title}
+      </h3>
+      <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.4rem 0.9rem', margin: 0, fontSize: '0.82rem' }}>
+        {present.map(r => (
+          <Fragment key={r.label}>
+            <dt style={{ ...detailLabel, alignSelf: 'center' }}>{r.label}</dt>
+            <dd style={{ margin: 0, color: 'var(--p-text-1)', wordBreak: 'break-word' }}>{r.value}</dd>
+          </Fragment>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+/**
+ * Every field the catalogue holds for a photograph, grouped so the archival
+ * description reads first and the ingest diagnostics stay out of the way.
+ */
+function PhotoDetails({ photo }: { photo: PhotoItem }) {
+  const tags = parseTags(photo.tags)
+  const num = (v: number | null | undefined, digits?: number) =>
+    isPresent(v) ? (digits !== undefined ? v!.toFixed(digits) : String(v)) : null
+
+  const about: DetailRow[] = [
+    { label: 'Catalogue ID', value: `#${photo.id}` },
+    { label: 'Year', value: photo.year },
+    { label: 'Date taken', value: photo.dateTaken },
+    { label: 'Event', value: photo.event },
+    { label: 'Location', value: photo.location },
+    { label: 'Person', value: photo.person },
+    { label: 'Institution', value: photo.institution },
+    { label: 'Parliament', value: photo.parliament },
+    { label: 'Theme', value: photo.theme },
+    { label: 'Curated', value: photo.curated ? 'Yes' : 'No' },
+  ]
+
+  const provenance: DetailRow[] = [
+    { label: 'Source', value: photo.source },
+    {
+      label: 'Original',
+      value: photo.sourceUrl ? (
+        <a
+          href={photo.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+        >
+          View on the web
+        </a>
+      ) : null,
+    },
+    { label: 'Collected', value: formatTimestamp(photo.collectedAt) },
+    { label: 'Search query', value: photo.query },
+    { label: 'Held in', value: photo.storedLocally ? 'Local media store' : 'Remote (original URL)' },
+  ]
+
+  const technical: DetailRow[] = [
+    { label: 'Image hash', value: photo.imageHash },
+    { label: 'Faces detected', value: num(photo.faceDetected) },
+    { label: 'Face count', value: num(photo.faceCount) },
+    { label: 'Face match', value: photo.faceMatch ? 'Matched' : 'No match' },
+    { label: 'Match score', value: num(photo.faceMatchScore, 3) },
+    { label: 'Match distance', value: num(photo.faceMatchDistance, 3) },
+    { label: 'Reference image', value: photo.bestReferencePath },
+  ]
+
+  const describedCount = about.filter(r => isPresent(r.value)).length
+
+  return (
+    <div>
+      <DetailGroup title="About this photograph" rows={about} />
+      {describedCount <= 2 && (
+        <p style={{ fontSize: '0.78rem', color: 'var(--p-text-3)', margin: '-0.6rem 0 1.1rem' }}>
+          Only the catalogue ID and curation status are recorded so far — this photograph
+          has not been fully described.
+        </p>
+      )}
+      <DetailGroup title="Provenance" rows={provenance} />
+      {tags.length > 0 && (
+        <div style={{ marginBottom: '1.1rem' }}>
+          <h3 style={{ ...mono, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', margin: '0 0 0.5rem' }}>
+            Tags
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+            {tags.map(t => (
+              <span key={t} style={{ fontSize: '0.7rem', color: 'var(--p-text-2)', border: '1px solid var(--p-border-2)', background: 'var(--p-surface-2)', borderRadius: 999, padding: '0.15rem 0.55rem' }}>
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {photo.notes && photo.notes !== photo.caption && (
+        <div style={{ marginBottom: '1.1rem' }}>
+          <h3 style={{ ...mono, fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', margin: '0 0 0.4rem' }}>
+            Notes
+          </h3>
+          <p style={{ fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--p-text-2)', margin: 0 }}>{photo.notes}</p>
+        </div>
+      )}
+
+      <details style={{ borderTop: '1px solid var(--p-border)', paddingTop: '0.75rem' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '0.75rem', ...mono, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--p-text-3)' }}>
+          Technical details
+        </summary>
+        <div style={{ marginTop: '0.75rem' }}>
+          <DetailGroup title="Ingest record" rows={technical} />
+        </div>
+      </details>
+    </div>
+  )
+}
+
+function photoTitle(photo: PhotoItem): string {
+  return photo.caption || photo.event || `Photograph #${photo.id}`
+}
+
+/**
+ * Full-screen photo viewer.
+ *
+ * The overlay scrolls (`overflow: auto` + `margin: auto` on the panel) so a tall
+ * details block stays reachable on short viewports — `align-items: center` alone
+ * would clip both ends of an overflowing flex child. Background scroll is locked,
+ * focus is moved in and restored, Tab is trapped, and Escape/arrows are handled.
+ */
+export function PhotoLightbox({
+  photo,
+  index,
+  total,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  photo: PhotoItem
+  index: number
+  total: number
+  onClose: () => void
+  onPrev: () => void
+  onNext: () => void
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  // Keyed by photo id: a status recorded for a different photo simply does not
+  // apply, which resets the image state without an effect or a remount.
+  const [imgStatus, setImgStatus] = useState({ id: photo.id, failed: false, loaded: false })
+  const imgFailed = imgStatus.failed && imgStatus.id === photo.id
+  const imgLoaded = imgStatus.loaded && imgStatus.id === photo.id
+  const setImgStatusFor = (patch: { failed?: boolean; loaded?: boolean }) =>
+    setImgStatus({ id: photo.id, failed: false, loaded: false, ...patch })
+
+  // Lock background scroll for as long as the viewer is open.
+  useEffect(() => {
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key === 'ArrowLeft' && index > 0) {
+        e.preventDefault()
+        onPrev()
+        return
+      }
+      if (e.key === 'ArrowRight' && index < total - 1) {
+        e.preventDefault()
+        onNext()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const node = dialogRef.current
+      if (!node) return
+      const focusable = node.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, onPrev, onNext, index, total])
+
+  // Move focus into the dialog on open, and hand it back to the trigger on close.
+  useEffect(() => {
+    const node = dialogRef.current
+    if (!node) return
+    const trigger = document.activeElement as HTMLElement | null
+    const target = node.querySelector<HTMLElement>('[data-autofocus]')
+    if (target) target.focus()
+    else node.focus()
+    return () => trigger?.focus?.({ preventScroll: true })
+  }, [])
+
+  const title = photoTitle(photo)
+  const roundBtn: React.CSSProperties = {
+    background: 'var(--p-surface)',
+    border: '1px solid var(--p-border-3)',
+    color: 'var(--p-text-1)',
+    borderRadius: 999,
+    width: 40,
+    height: 40,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  }
+
+  return (
+    <div
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        background: 'rgba(0,0,0,0.88)',
+        display: 'flex',
+        overflow: 'auto',
+        padding: 'clamp(0.75rem, 2.5vw, 2rem)',
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        style={{ maxWidth: 900, width: '100%', margin: 'auto', outline: 'none' }}
+      >
+        <button
+          onClick={onClose}
+          data-autofocus
+          aria-label="Close photo viewer"
+          style={{ ...roundBtn, position: 'fixed', top: '1.25rem', right: '1.25rem' }}
+        >
+          <X size={18} />
+        </button>
+        {index > 0 && (
+          <button
+            onClick={onPrev}
+            aria-label="Previous photo"
+            style={{ ...roundBtn, position: 'absolute', left: '0.5rem', top: '0.5rem', zIndex: 1 }}
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        {index < total - 1 && (
+          <button
+            onClick={onNext}
+            aria-label="Next photo"
+            style={{ ...roundBtn, position: 'absolute', right: '0.5rem', top: '0.5rem', zIndex: 1 }}
+          >
+            <ChevronRight size={20} />
+          </button>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '18vh' }}>
+          {photo.src && !imgFailed ? (
+            <img
+              src={photo.src}
+              alt={photo.caption || `Photograph #${photo.id}`}
+              onError={() => setImgStatusFor({ failed: true })}
+              onLoad={() => setImgStatusFor({ loaded: true })}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '62vh',
+                objectFit: 'contain',
+                borderRadius: 12,
+                display: 'block',
+              }}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '3rem 1rem', color: 'var(--p-text-3)' }}>
+              <ImageOff size={28} />
+              <span style={{ fontSize: '0.85rem' }}>Image unavailable</span>
+              {photo.sourceUrl && (
+                <a
+                  href={photo.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.8rem', color: 'var(--primary)' }}
+                >
+                  Try the original source
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+        {!imgLoaded && !imgFailed && photo.src && (
+          <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--p-text-4)', margin: '0.4rem 0 0' }}>
+            Loading image…
+          </p>
+        )}
+
+        <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.35, color: 'var(--p-text-1)', marginBottom: '0.2rem' }}>
+            {title}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--p-text-3)', marginBottom: '1.1rem' }}>
+            {photo.source ? `Source: ${photo.source}` : 'Source not recorded'}
+            {photo.year ? ` · ${photo.year}` : ''}
+            {` · ${index + 1} of ${total}`}
+          </div>
+          <PhotoDetails photo={photo} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function PhotosPage() {
   const [data, setData] = useState<PhotosData | null>(null)
@@ -152,6 +533,11 @@ placeholder="Search captions…"
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                       {p.year && <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontFamily: 'var(--font-mono), monospace', fontWeight: 700 }}>{p.year}</span>}
+                      {p.source && (
+                        <span title={`Source: ${p.source}`} style={{ fontSize: '0.62rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', border: '1px solid var(--p-border-2)', borderRadius: 999, padding: '0.08rem 0.45rem' }}>
+                          {p.source}
+                        </span>
+                      )}
                       {[p.event, p.location, p.theme].filter(Boolean).slice(0, 2).map(t => (
                         <span key={t} style={{ fontSize: '0.62rem', color: 'var(--p-text-4)', border: '1px solid var(--p-border-2)', borderRadius: 999, padding: '0.08rem 0.45rem' }}>{t}</span>
                       ))}
@@ -195,41 +581,14 @@ placeholder="Search captions…"
 
       {/* Lightbox */}
       {activePhoto && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }} onClick={() => setActive(null)}>
-          <button onClick={() => setActive(null)} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', color: 'var(--p-text-1)', borderRadius: 999, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <X size={18} />
-          </button>
-          {activeIndex > 0 && (
-            <button onClick={e => { e.stopPropagation(); setActive(activeItems[activeIndex - 1].id) }} style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', color: 'var(--p-text-1)', borderRadius: 999, width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          {activeIndex < activeItems.length - 1 && (
-            <button onClick={e => { e.stopPropagation(); setActive(activeItems[activeIndex + 1].id) }} style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)', background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', color: 'var(--p-text-1)', borderRadius: 999, width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <ChevronRight size={20} />
-            </button>
-          )}
-          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 900, width: '100%' }}>
-            {activePhoto.src && (
-              <img src={activePhoto.src} alt={activePhoto.caption || ''} style={{ maxWidth: '100%', maxHeight: '74vh', objectFit: 'contain', borderRadius: 12, margin: '0 auto', display: 'block' }} />
-            )}
-            <div style={{ marginTop: '1rem', padding: '1.25rem', background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--p-text-1)', marginBottom: '0.4rem' }}>
-                {activePhoto.caption || (activePhoto.event || `Photograph #${activePhoto.id}`)}
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {[
-                  ['Year', activePhoto.year], ['Event', activePhoto.event], ['Location', activePhoto.location],
-                  ['Person', activePhoto.person], ['Institution', activePhoto.institution], ['Parliament', activePhoto.parliament], ['Theme', activePhoto.theme],
-                ].filter(([, v]) => v).map(([label, value]) => (
-                  <span key={label} style={{ fontSize: '0.78rem', color: 'var(--p-text-2)', border: '1px solid var(--p-border)', background: 'var(--p-surface-2)', borderRadius: 999, padding: '0.3rem 0.8rem' }}>
-                    <span style={{ fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.05em', color: 'var(--p-text-4)', marginRight: '0.3rem' }}>{label}:</span> {value}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PhotoLightbox
+          photo={activePhoto}
+          index={activeIndex}
+          total={activeItems.length}
+          onClose={() => setActive(null)}
+          onPrev={() => setActive(activeItems[activeIndex - 1].id)}
+          onNext={() => setActive(activeItems[activeIndex + 1].id)}
+        />
       )}
 
       <PublicFooter />

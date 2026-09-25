@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { PHOTO_FACET_FIELDS } from '@/lib/library'
-import { resolveMediaSrc } from '@/lib/mediaServer'
+import { localMediaExists, resolveMediaSrc } from '@/lib/mediaServer'
 
 export interface PhotoItem {
   id: number
@@ -15,6 +15,24 @@ export interface PhotoItem {
   theme: string | null
   caption: string | null
   source: string | null
+  /** Original remote image URL from the collector, independent of `src`. */
+  sourceUrl: string | null
+  query: string | null
+  collectedAt: string | null
+  dateTaken: string | null
+  notes: string | null
+  tags: string | null
+  curated: boolean
+  /** True when the file is served from the local media store rather than remotely. */
+  storedLocally: boolean
+  // Ingest/technical provenance, surfaced in the "Technical details" disclosure.
+  imageHash: string | null
+  faceDetected: number | null
+  faceCount: number | null
+  faceMatch: number | null
+  faceMatchScore: number | null
+  faceMatchDistance: number | null
+  bestReferencePath: string | null
 }
 
 const FIELD_MAP: Record<string, string> = {
@@ -68,6 +86,22 @@ export async function GET(request: NextRequest) {
       theme: img.theme,
       caption: img.caption || img.notes || null,
       source: img.source,
+      sourceUrl: img.url,
+      query: img.query,
+      collectedAt: img.collectedAt,
+      dateTaken: img.dateTaken,
+      notes: img.notes,
+      tags: img.tags,
+      curated: img.curated,
+      storedLocally: localMediaExists(img.localPath),
+      imageHash: img.imageHash,
+      faceDetected: img.faceDetected,
+      faceCount: img.faceCount,
+      faceMatch: img.faceMatch,
+      faceMatchScore: img.faceMatchScore,
+      faceMatchDistance: img.faceMatchDistance,
+      // Only the best-matching reference image, never the server-side paths.
+      bestReferencePath: img.bestReferencePath ? img.bestReferencePath.split(/[\\/]/).pop() || null : null,
     }))
     .filter(p => p.src)
 
