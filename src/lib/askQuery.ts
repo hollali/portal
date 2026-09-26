@@ -27,7 +27,24 @@ const STOPWORDS = new Set([
   'will', 'with', 'would', 'you', 'your', 'yours',
   // Near-universal within this corpus: present in almost every record, so they
   // add no discriminating power and would break a strict AND.
-  'bagbin', 'parliament', 'speaker', 'speech', 'speeches', 'archive', 'library', 'document',
+  //
+  // The subject's full name belongs here too, and measurably so: every one of
+  // the 430 published videos, 254 audio rows and 134 news clippings carries
+  // "Alban Sumana Kingsford Bagbin" in its title, and all 283 photographs carry
+  // nothing but that name in their scrape query. Searching any of those tokens
+  // returned ~250 "matches" that were really just the subject's own name, and
+  // the top of the list was scraper noise. A name question now reduces to no
+  // searchable terms, which the page answers by routing to /the-man — a better
+  // answer than ten headline cards that all contain the same three words.
+  'bagbin', 'alban', 'sumana', 'kingsford',
+  'parliament', 'parliamentary', 'speaker', 'speech', 'speeches', 'archive', 'library', 'document',
+  // Question framing rather than subject matter. These survive ordinary
+  // stopwording and were being treated as search terms, which forced an AND
+  // down to the loose `any` path — e.g. "the Speaker's position on X" matched
+  // the word "position" and reported a partial answer for a good question.
+  'happen', 'happens', 'happened', 'position', 'positions', 'view', 'views', 'opinion',
+  'opinions', 'much', 'many', 'lot', 'lots', 'currently', 'today', 'recently', 'recent',
+  'tells', 'told', 'give', 'gives', 'given', 'want', 'wants', 'need', 'needs', 'know',
 ])
 
 /** Words that should also be tried when a term appears, to bridge vocabulary gaps. */
@@ -48,11 +65,48 @@ function foldPlural(term: string): string | null {
   return null
 }
 
+/**
+ * Suffixes worth folding, longest first so `ations` is not eaten as `ation`.
+ *
+ * Deliberately conservative: no `ly`, no `tional`/`ational` (which would over-stem
+ * already-equivalent forms), and nothing that can turn a stem into a different
+ * word. The result is only ever used as a *prefix*, so the risk of a short stem
+ * is bounded — see `matchTerm` in askSearch.
+ */
+const SUFFIXES = [
+  'ations', 'ation', 'ments', 'ment', 'nesses', 'ness', 'ities', 'ity',
+  'ances', 'ance', 'ences', 'ence', 'ions', 'ion', 'ings', 'ing', 'ers', 'ed',
+]
+
+/** A folded stem has to stay long enough to stay specific. */
+const MIN_STEM = 4
+
+/**
+ * Collapse a regular English suffix to the shared root, e.g.
+ * `independence` -> `independ` (so `independent` is also found) and
+ * `corruption` -> `corrupt` (so `corrupt` and `corruption` share a term).
+ *
+ * Returns null when the word is too short to fold safely.
+ */
+export function foldSuffix(term: string): string | null {
+  for (const suffix of SUFFIXES) {
+    if (!term.endsWith(suffix) || term.length - suffix.length < MIN_STEM) continue
+    const stem = term.slice(0, -suffix.length)
+    // Never fold to something that isn't a prefix of the original: the stem is
+    // matched as a prefix, so "ed" on "united" giving "unit" is fine, but a fold
+    // that changes the first letter would silently match unrelated words.
+    if (stem !== term && term.startsWith(stem)) return stem
+  }
+  return null
+}
+
 /** Every surface form worth trying in the database for a single query term. */
 export function termVariants(term: string): string[] {
   const out = new Set<string>([term])
   const singular = foldPlural(term)
   if (singular) out.add(singular)
+  const folded = foldSuffix(term)
+  if (folded) out.add(folded)
   for (const alias of ALIASES[term] ?? []) out.add(alias)
   return [...out]
 }
@@ -96,11 +150,19 @@ export const ASK_SUGGESTIONS = [
 export interface AskCitation {
   kind: string
   kindLabel: string
+  /** Which collection the record came from, e.g. `documents`, `videos`. */
+  collection: string
+  collectionLabel: string
   title: string
   href: string
   year: number | null
   excerpt: string | null
   hasTranscript: boolean
+  /**
+   * The query terms this record actually matched. Absent from the answer means
+   * the ranking is a black box, so it travels with every citation.
+   */
+  matched: string[]
 }
 
 export interface AskTimelineEntry {
@@ -117,6 +179,24 @@ export interface AskTestimonial {
 /** `all` = every term matched; `any` = the AND pass found nothing, relaxed to OR. */
 export type AskMatchMode = 'all' | 'any' | 'none'
 
+/** How many matches a single collection contributed to one answer. */
+export interface AskCollectionCount {
+  collection: string
+  label: string
+  /**
+   * Records in this collection that satisfy the same bar the results were
+   * selected under — every term, or at least one, depending on the mode. Counted
+   * by the database, not by the rows that happened to be fetched.
+   */
+  count: number
+  /**
+   * Records matching at least one term, reported only when it is the larger
+   * number. 3 records covering your whole question and 1,340 that each mention
+   * a piece of it are not the same claim, and the count should not blur them.
+   */
+  broader?: number
+}
+
 export interface AskResult {
   summary: string
   terms: string[]
@@ -124,5 +204,27 @@ export interface AskResult {
   citations: AskCitation[]
   timeline: AskTimelineEntry[]
   testimonials: AskTestimonial[]
+  /** Breadth of the answer: which collections it drew on, and how often. */
+  collectionCounts: AskCollectionCount[]
+  /**
+   * Every term that matched something anywhere in the archive, deduplicated
+   * across all records. The client highlights against this rather than
+   * against `terms`, so a term that found nothing is never marked as if it had.
+   */
+  matchedTerms: string[]
+  /** Terms no published record covers — the honest limit of a partial answer. */
+  unmatched: string[]
+  /**
+   * How many records the search reached, counted in the database rather than
+   * from the rows we happened to fetch. Used for "N more not shown", so it has
+   * to be the real total and not the size of the candidate pool.
+   */
+  totalMatched: number
+  /**
+   * How many records mention at least one term, when that is more than
+   * `totalMatched`. Present only for a partial answer, where the gap between the
+   * two is the honest limit of what the archive can say.
+   */
+  broaderMatched?: number
   suggested: string[]
 }

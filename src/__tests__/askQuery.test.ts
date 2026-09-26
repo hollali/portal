@@ -23,7 +23,27 @@ describe('queryTerms', () => {
   })
 
   it('strips possessive suffixes so "Speaker\'s" is not a distinct term', () => {
-    expect(queryTerms("What is the Speaker's position?")).toEqual(['position'])
+    // "position" is now question framing rather than subject matter, so this
+    // question reduces to nothing at all — see the framing-stopword tests below.
+    expect(queryTerms("What is the Speaker's position?")).toEqual([])
+    expect(queryTerms("What is the Speaker's position on digitalisation?")).toEqual(['digitalisation'])
+  })
+
+  it('drops question-framing words that would otherwise break a strict AND', () => {
+    // Each of these used to survive stopwording and drag an otherwise good
+    // question down the loose `any` path, producing a partial answer.
+    expect(queryTerms('What is the Speaker position on digitalisation?')).toEqual(['digitalisation'])
+    expect(queryTerms('What happened at the opening of Parliament?')).toEqual(['opening'])
+    // A count question carries no content at all, which is why it is answered
+    // from the corpus totals rather than by searching for "many".
+    expect(queryTerms('How many speeches are there?')).toEqual([])
+  })
+
+  it('keeps genuine subject matter that merely looks like framing', () => {
+    // "view" and "position" are framing in a question, but the corpus may still
+    // discuss them; only the question-shaped usage is pruned, never mid-phrase
+    // content that is itself the thing being asked about.
+    expect(queryTerms('poverty reduction strategies')).toEqual(['poverty', 'reduction', 'strategies'])
   })
 
   it('drops stopwords that carry no discriminating power in this corpus', () => {
