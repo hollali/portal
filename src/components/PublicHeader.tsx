@@ -240,13 +240,27 @@ export default function PublicHeader() {
             onClick={() => setSearchOpen(o => !o)}
             aria-expanded={searchOpen}
             aria-controls="site-search"
+            aria-label="Search"
+            title="Search"
             className="show-sm"
-            style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}
+            style={{ display: 'none', background: 'none', border: 'none', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer', transition: 'background 0.2s, color 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--p-surface-2)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--p-text-1)' }}
           >
             <Search size={18} />
           </button>
           <ThemeToggle square />
-          <button onClick={() => setMenuOpen(o => !o)} className="show-sm" aria-expanded={menuOpen} aria-controls="mobile-menu" style={{ display: 'none', background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer' }}>
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="show-sm"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            title={menuOpen ? 'Close menu' : 'Open menu'}
+            style={{ display: 'none', background: 'none', border: 'none', borderRadius: 8, padding: '0.5rem', color: 'var(--p-text-1)', cursor: 'pointer', transition: 'background 0.2s, color 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--p-surface-2)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--p-text-1)' }}
+          >
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
@@ -283,7 +297,9 @@ export default function PublicHeader() {
           <button
             onClick={() => setMenuOpen(false)}
             aria-label="Close menu"
-            style={{ background: 'none', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.45rem', color: 'var(--p-text-1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ background: 'none', border: 'none', borderRadius: 8, padding: '0.45rem', color: 'var(--p-text-1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s, color 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--p-surface-2)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--p-text-1)' }}
           >
             <X size={18} />
           </button>
