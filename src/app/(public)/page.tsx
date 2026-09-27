@@ -20,7 +20,7 @@ import HeroSection from '@/components/HeroSection'
 import LatestToArchive from '@/components/LatestToArchive'
 import TestimonialCarousel from '@/components/TestimonialCarousel'
 import { MAN_SECTIONS, ARCHIVE_LINKS } from '@/lib/man'
-import { getLibraryCounts, getLatestArchiveItems } from '@/lib/libraryQueries'
+import { getLibraryCounts, getLatestArchiveItems, getHeroContent } from '@/lib/libraryQueries'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +64,7 @@ const SCHOOLS = (MAN_SECTIONS.find(s => s.id === 'education')?.items ?? [])
 export default async function LibraryHome() {
   const counts = await getLibraryCounts()
   const latest = await getLatestArchiveItems(8)
+  const heroContent = await getHeroContent()
 
   const quickStats = [
     { value: counts.speeches, label: 'Speeches' },
@@ -76,7 +77,7 @@ export default async function LibraryHome() {
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh', overflowX: 'hidden' }}>
       <PublicHeader />
 
-      <HeroSection stats={quickStats} />
+      <HeroSection stats={quickStats} content={heroContent} />
 
       {/* ── Schools attended marquee ─────────────────── */}
       <div className="marquee-paused" style={{ borderTop: '1px solid var(--p-border)', borderBottom: '1px solid var(--p-border)', overflow: 'hidden', padding: '1rem 0', background: 'var(--p-surface-2)' }}>

@@ -267,6 +267,43 @@ export function resolveThemeSlug(label: string | null | undefined): string | nul
   return match ? match.slug : null
 }
 
+/** Cross-navigation between the archive document collections, shared by the pages inside the archive. */
+export const ARCHIVE_COLLECTION_NAV = [
+  { href: '/archives/speeches', label: 'Speeches & addresses' },
+  { href: '/archives/papers', label: 'Public papers' },
+  { href: '/archives/interviews', label: 'Interviews' },
+  { href: '/archives/notes', label: 'Notes & correspondence' },
+  { href: '/archives/milestones', label: 'Milestones' },
+  { href: '/archives/testimonials', label: 'Testimonials' },
+  { href: '/archives/photos', label: 'Photos' },
+] as const
+
+/** Cross-navigation between the media archive collections, shared by /videos, /audio and /news. */
+export const MEDIA_COLLECTION_NAV = [
+  { href: '/archives/photos', label: 'Photos' },
+  { href: '/videos', label: 'Videos' },
+  { href: '/audio', label: 'Audio' },
+  { href: '/news', label: 'News' },
+  { href: '/media', label: 'Media Hub' },
+] as const
+
+/**
+ * Best-effort four-digit year for loosely formatted record dates.
+ * Handles ISO timestamps, `YYYY-MM-DD`, and RFC 2822 strings like
+ * `Mon, 06 Jul 2026 17:00:00 GMT` — returns the first fallback that yields a year.
+ */
+export function parseYearFromDate(...values: (string | null | undefined)[]): string | null {
+  for (const value of values) {
+    const raw = (value || '').trim()
+    if (!raw) continue
+    const iso = /^(\d{4})-\d{2}(-\d{2})?/.exec(raw)
+    if (iso) return iso[1]
+    const loose = /\b(\d{4})\b/.exec(raw)
+    if (loose) return loose[1]
+  }
+  return null
+}
+
 export const VIDEO_CATEGORIES = [
   'Parliamentary speeches',
   'Interviews',

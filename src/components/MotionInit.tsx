@@ -1,50 +1,18 @@
-'use client'
-
-import { useEffect } from 'react'
-
+// Scroll reveals are driven by CSS `animation-timeline: view()` in
+// globals.css — see the "Scroll reveal" block there. This component used
+// to run an IntersectionObserver that set `data-motion-reveal` directly on
+// the rendered nodes.
+//
+// That was a hydration hazard: on routes whose archive content streams in
+// inside a <Suspense> boundary, the observer's first callback landed before
+// React finished hydrating that boundary, so React found an attribute on the
+// DOM that it had never rendered and reported a mismatch. Keeping the effect
+// purely declarative in CSS removes the race, the MutationObserver, and the
+// per-element JS work, and it keeps working for entries added by client-side
+// navigation without any rescan.
+//
+// The flag itself is set by the `motion-init` inline script in src/app/layout.tsx
+// so that the hero keyframes stay inert when JavaScript is unavailable.
 export default function MotionInit() {
-  useEffect(() => {
-    const root = document.documentElement
-    root.dataset.motionReady = '1'
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            ;(entry.target as HTMLElement).dataset.motionReveal = 'true'
-            observer.unobserve(entry.target)
-          }
-        }
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -10% 0px' },
-    )
-
-    const scan = () => {
-      document
-        .querySelectorAll<HTMLElement>('[data-motion-entry]:not([data-motion-reveal])')
-        .forEach(el => observer.observe(el))
-    }
-
-    const mutation = new MutationObserver(mutations => {
-      for (const m of mutations) {
-        if (m.type !== 'childList') continue
-        const hasEntry = Array.from(m.addedNodes).some(
-          node =>
-            node instanceof HTMLElement &&
-            (node.hasAttribute('data-motion-entry') || node.querySelector('[data-motion-entry]')),
-        )
-        if (hasEntry) {
-          scan()
-          return
-        }
-      }
-    })
-    mutation.observe(document.body, { childList: true, subtree: true })
-
-    scan()
-    return () => {
-      observer.disconnect()
-      mutation.disconnect()
-    }
-  }, [])
   return null
 }

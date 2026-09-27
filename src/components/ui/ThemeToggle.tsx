@@ -48,12 +48,12 @@ export function ThemeToggle({ square = false }: { square?: boolean }) {
           borderRadius: 8,
           cursor: 'pointer',
           background: 'none',
-          border: '1px solid var(--p-border-3)',
+          border: 'none',
           color: 'var(--p-text-1)',
-          transition: 'color 0.2s, border-color 0.2s, background 0.2s',
+          transition: 'color 0.2s, background 0.2s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--p-text-3)' }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'var(--p-text-1)'; e.currentTarget.style.borderColor = 'var(--p-border-3)' }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--primary)' }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--p-text-1)' }}
       >
         <Icon size={18} />
       </button>
@@ -73,17 +73,15 @@ export function ThemeToggle({ square = false }: { square?: boolean }) {
         borderRadius: 999,
         cursor: 'pointer',
         background: 'var(--card)',
-        border: '1px solid var(--border)',
+        border: 'none',
         color: 'var(--foreground)',
-        transition: 'color 0.2s, border-color 0.2s, background 0.2s',
+        transition: 'color 0.2s, background 0.2s',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.color = 'var(--primary)'
-        e.currentTarget.style.borderColor = 'var(--border-strong)'
       }}
       onMouseLeave={e => {
         e.currentTarget.style.color = 'var(--foreground)'
-        e.currentTarget.style.borderColor = 'var(--border)'
       }}
     >
       <Icon size={14} />

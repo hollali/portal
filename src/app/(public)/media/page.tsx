@@ -9,7 +9,8 @@ export const metadata: Metadata = {
   description: 'Photos, video, audio, news clippings and the social channels that connect the Speaker to Ghana and the world.',
 }
 
-export const dynamic = 'force-dynamic'
+// No `force-dynamic`: this page reads no database and takes no request input,
+// so it is prerendered at build time and served from the full-route cache.
 
 interface SocialLink {
   label: string

@@ -65,11 +65,19 @@
   --p-surface-3: #10131a;
   --p-text-1: #eef0f5;
   --p-text-2: #b9bdc9;
-  --p-text-3: #7c8190;
-  --p-text-4: #4c5160;
+  /* Lowest-emphasis text is still body text, so the ramp bottoms out at
+     5.1:1 on the darkest surface rather than fading into the background.
+     Measured on #0f1117 / #15171e / #0d0f14 — all clear WCAG AA (4.5:1). */
+  --p-text-3: #9c9fab;
+  --p-text-4: #82889c;
   --p-border: rgba(255, 255, 255, 0.08);
   --p-border-2: rgba(255, 255, 255, 0.06);
-  --p-border-3: rgba(255, 255, 255, 0.12);
+  /* --p-border-3 is the CONTROL boundary token (inputs, selects, buttons).
+     0.40 clears 3:1 against every surface it can sit on, which is what
+     WCAG 1.4.11 asks of anything needed to identify a control. The two
+     weaker tokens above stay hairlines on purpose: purely decorative
+     separators are exempt. */
+  --p-border-3: rgba(255, 255, 255, 0.40);
   --p-img-bg: #0f1117;
   --p-cta-bg: linear-gradient(120deg, #0e1b30 0%, #14284a 45%, #314d77 100%);
   --p-cta-text: #d8b75a;
@@ -122,7 +130,7 @@
   --p-text-4: #5f6675;
   --p-border: rgba(0, 0, 0, 0.10);
   --p-border-2: rgba(0, 0, 0, 0.08);
-  --p-border-3: rgba(15, 17, 23, 0.46);
+  --p-border-3: rgba(15, 17, 23, 0.54);
   --p-img-bg: #e9e9e6;
   --p-cta-bg: linear-gradient(120deg, #eef3fb 0%, #e3ebf7 45%, #f7f0dd 100%);
   --p-cta-text: #1d4289;
@@ -302,25 +310,33 @@ html {
   }
 }
 
-/* ─── Scroll reveal (Sanity-style, fail-open) ─── */
-[data-motion-entry] {
-  opacity: 1;
+/* ─── Scroll reveal (scroll-driven, fail-open) ───
+   Driven entirely by CSS `animation-timeline: view()`. Nothing writes
+   `data-motion-reveal` onto these nodes any more: a post-hydration DOM
+   mutation of an attribute React never rendered is exactly what produced
+   the "tree hydrated but attributes didn't match" error whenever the
+   entry lived inside a streamed <Suspense> boundary (photo library,
+   testimonials, news, media). Letting CSS own the effect means the
+   server HTML and the hydrated tree stay byte-identical.
+   Browsers without view() never match the @supports block, so the
+   entries simply stay visible — the reveal is strictly additive. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-motion-entry] {
+      animation: motionEntry linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
 }
-html[data-motion="js"] [data-motion-entry] {
-  opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
-  will-change: opacity, transform;
-}
-html[data-motion="js"] [data-motion-entry][data-motion-reveal] {
-  opacity: 1;
-  transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  html[data-motion="js"] [data-motion-entry] {
+@keyframes motionEntry {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
     opacity: 1;
     transform: none;
-    transition: none;
   }
 }
 
@@ -376,6 +392,10 @@ html[data-motion="js"] .hero-cta:hover {
 }
 .hero-stamp svg {
   animation: heroStampSpin 26s linear infinite reverse;
+}
+[data-hero-visible='false'] .hero-stamp,
+[data-hero-visible='false'] .hero-stamp svg {
+  animation-play-state: paused;
 }
 @keyframes heroCueDrop {
   0%   { transform: scaleY(0); transform-origin: top; opacity: 0; }
@@ -477,6 +497,17 @@ html[data-motion="js"] .hero-cta:hover {
 }
 .orb {
   animation: floatOrb 9s ease-in-out infinite;
+}
+
+/* ─── Section grid texture (used by .grid-bg on archive/media heroes) ─── */
+.grid-bg {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--p-text-1) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--p-text-1) 5%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(820px 460px at 18% 0%, black, transparent 76%);
+  -webkit-mask-image: radial-gradient(820px 460px at 18% 0%, black, transparent 76%);
+  pointer-events: none;
 }
 
 /* ─── Public landing responsive ─── */
@@ -1007,6 +1038,14 @@ a:hover {
   border-color: color-mix(in srgb, var(--primary) 50%, transparent);
   transform: translateY(-3px);
 }
+.photo-card-img,
+.media-card-img {
+  transform: scale(1);
+}
+.p-card-lift:hover .photo-card-img,
+.p-card-lift:hover .media-card-img {
+  transform: scale(1.04);
+}
 .p-link-strong {
   transition: color 0.2s;
 }
@@ -1153,3 +1192,14 @@ a:hover {
     transition: none;
   }
 }
+
+/* ─── Archival photo / media lightbox modal responsive ─── */
+@media (max-width: 900px) {
+  .photo-lightbox-modal,
+  .media-lightbox-modal {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 45vh 1fr !important;
+    max-height: 96vh !important;
+  }
+}
+

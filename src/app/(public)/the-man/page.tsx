@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowDown, Landmark, Quote } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
@@ -5,7 +7,16 @@ import PublicFooter from '@/components/PublicFooter'
 import ChapterNav from '@/components/ChapterNav'
 import { MAN_SECTIONS } from '@/lib/man'
 
-export const dynamic = 'force-dynamic'
+// No `force-dynamic`: the whole page is MAN_SECTIONS, a static constant, with
+// no Prisma / cookies / headers / searchParams anywhere in the tree. It is
+// therefore prerendered at build time and served from the full-route cache,
+// which is what `Cache-Control: no-cache, must-revalidate` was preventing.
+
+export const metadata: Metadata = {
+  title: 'The Man · AlbanBagbin Archives',
+  description:
+    'Born in the fields of Sombo, schooled by dedication, called to the Bar, and returned to the people — the life of Rt. Hon. Alban S. K. Bagbin in four chapters.',
+}
 
 export default function TheManPage() {
   return (
@@ -37,12 +48,17 @@ export default function TheManPage() {
             </div>
           </div>
           <div style={{ justifySelf: 'center' }}>
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/8/8b/Speaker_Alban_Bagbin-2_%28cropped%29.jpg"
+            {/* next/image: this is the LCP element, so it is preloaded and gets
+                srcset/sizes + AVIF-WebP negotiation. `upload.wikimedia.org` is
+                already allowed by images.remotePatterns in next.config.ts. */}
+            <Image
+              src="/images/bagbin-speaker.jpg"
               alt="Portrait of Alban Bagbin"
-              width={380}
-              height={470}
-              style={{ width: '100%', maxWidth: 380, borderRadius: 16, objectFit: 'cover', aspectRatio: '4/5', border: '1px solid var(--p-border-3)', boxShadow: 'var(--p-shadow)' }}
+              width={779}
+              height={917}
+              priority
+              sizes="(max-width: 700px) 92vw, 380px"
+              style={{ width: '100%', maxWidth: 380, height: 'auto', borderRadius: 16, objectFit: 'cover', aspectRatio: '4/5', border: '1px solid var(--p-border-3)', boxShadow: 'var(--p-shadow)' }}
             />
             <div style={{ marginTop: '0.75rem', padding: '1rem 1.25rem', border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 12, maxWidth: 380 }}>
               <Quote size={16} style={{ color: 'var(--primary)' }} />

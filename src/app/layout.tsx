@@ -42,8 +42,12 @@ export default function RootLayout({
           id="motion-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
+            // Marks that scripting is available, which is what the hero
+            // keyframes in globals.css are gated on. The scroll reveals are
+            // CSS scroll-driven animations and no longer read this flag, so
+            // there is no ready-handshake (and no 2s timer) to keep in sync.
             __html:
-              "(function(){try{if('IntersectionObserver' in window){var r=document.documentElement;r.dataset.motion='js';setTimeout(function(){if(!r.dataset.motionReady){r.removeAttribute('data-motion')}},2000)}}catch(e){}})();",
+              "(function(){try{document.documentElement.dataset.motion='js'}catch(e){}})();",
           }}
         />
         <Script

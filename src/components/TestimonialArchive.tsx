@@ -12,53 +12,31 @@ import {
 } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { jsonFetch } from '@/lib/jsonFetch'
-import { isYouTubeUrl, getYouTubeEmbedUrl, getYouTubeThumbUrl } from '@/lib/media'
-import { formatArchiveDate, MEDIA_COLLECTION_NAV } from '@/lib/library'
+import { ARCHIVE_COLLECTION_NAV } from '@/lib/library'
 import {
-  ArrowRight,
-  AudioLines,
   Calendar,
   Check,
   ChevronLeft,
   ChevronRight,
-  Clapperboard,
-  ExternalLink,
   LayoutGrid,
-  MapPin,
-  Play,
+  Quote,
   RotateCcw,
   Search,
   Share2,
   SlidersHorizontal,
-  Tag,
+  User,
   X,
   ZoomIn,
 } from 'lucide-react'
 
-type Kind = 'videos' | 'audio'
-type ViewMode = 'grid' | 'chronological'
-
-interface ArchiveItem {
+export interface TestimonialRecord {
   id: number
-  title: string | null
-  src: string | null
-  url: string | null
+  author: string
+  role: string | null
+  quote: string
   source: string | null
-  channel: string | null
-  artist: string | null
-  platform: string | null
-  views: number | null
-  duration: number | string | null
-  category: string | null
-  caption: string | null
-  date: string | null
   year: number | null
-  event: string | null
-  location: string | null
-  theme: string | null
-  notes: string | null
-  tags: string | null
+  photoUrl: string | null
 }
 
 interface FacetOption {
@@ -66,15 +44,10 @@ interface FacetOption {
   count: number
 }
 
-interface ListData {
-  items: ArchiveItem[]
-  total: number
-  categories: FacetOption[]
-  facets: Record<string, FacetOption[]>
-  sources: string[]
-}
+type ViewMode = 'grid' | 'chronological'
+type DetailRow = { label: string; value: ReactNode }
 
-const PER_PAGE = 48
+const ROUTE = '/archives/testimonials'
 
 const mono = { fontFamily: 'var(--font-mono), monospace' } as const
 const detailLabel = {
@@ -86,96 +59,71 @@ const detailLabel = {
   fontWeight: 600,
 } as const
 
-type FilterMap = Record<string, string>
-type DetailRow = { label: string; value: ReactNode }
-
-const KIND_META: Record<
-  Kind,
-  {
-    singular: string
-    plural: string
-    record: string
-    detailTitle: string
-    creditLabel: string
-    searchPlaceholder: string
-    emptyTitle: string
-    emptyBody: string
-  }
-> = {
-  videos: {
-    singular: 'video',
-    plural: 'videos',
-    record: 'Video Record',
-    detailTitle: 'About this recording',
-    creditLabel: 'Channel',
-    searchPlaceholder: 'Search titles, captions, events, channels, locations…',
-    emptyTitle: 'No videos match your search',
-    emptyBody:
-      'We could not find any recordings matching the selected criteria. Try removing some filters or searching with different terms.',
-  },
-  audio: {
-    singular: 'recording',
-    plural: 'recordings',
-    record: 'Audio Record',
-    detailTitle: 'About this recording',
-    creditLabel: 'Artist',
-    searchPlaceholder: 'Search titles, captions, events, artists, locations…',
-    emptyTitle: 'No recordings match your search',
-    emptyBody:
-      'We could not find any recordings matching the selected criteria. Try removing some filters or searching with different terms.',
-  },
-}
-
 const QUICK_FACETS: { key: string; label: string }[] = [
-  { key: 'category', label: 'Category' },
   { key: 'year', label: 'Year' },
+  { key: 'role', label: 'Role' },
 ]
 
 const PANEL_FACETS: { key: string; label: string }[] = [
-  { key: 'event', label: 'Event' },
-  { key: 'location', label: 'Location' },
-  { key: 'theme', label: 'Theme' },
+  { key: 'role', label: 'Role' },
   { key: 'source', label: 'Source' },
 ]
 
-const ALL_FACETS: { key: string; label: string }[] = [...QUICK_FACETS, ...PANEL_FACETS]
+const ALL_FACETS: string[] = Array.from(
+  new Set([...QUICK_FACETS, ...PANEL_FACETS].map(f => f.key)),
+)
+
+const FACET_LABELS: Record<string, string> = {
+  ...Object.fromEntries([...QUICK_FACETS, ...PANEL_FACETS].map(f => [f.key, f.label])),
+}
 
 function isPresent(v: unknown): boolean {
   return v !== null && v !== undefined && v !== ''
 }
 
-function parseTags(tags: string | null): string[] {
-  return String(tags || '')
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
+function yearKey(item: TestimonialRecord): string {
+  return item.year ? String(item.year) : 'Undated'
 }
 
-function formatDuration(value: number | string | null): string | null {
-  if (value === null || value === undefined || value === '') return null
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value) || value <= 0) return null
-    const total = Math.round(value)
-    const h = Math.floor(total / 3600)
-    const m = Math.floor((total % 3600) / 60)
-    const s = total % 60
-    return h > 0
-      ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-      : `${m}:${String(s).padStart(2, '0')}`
-  }
-  return value.trim() || null
-}
-
-function itemTitle(item: ArchiveItem, singular: string): string {
-  return item.title || item.event || `${singular === 'video' ? 'Video' : 'Recording'} #${item.id}`
-}
-
-function creditOf(item: ArchiveItem, kind: Kind): string | null {
-  return kind === 'videos' ? item.channel || null : item.artist || null
+function avatar(item: TestimonialRecord, size: number) {
+  return item.photoUrl ? (
+    <img
+      src={item.photoUrl}
+      alt={item.author}
+      width={size}
+      height={size}
+      loading="lazy"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        objectFit: 'cover',
+        border: '1px solid var(--p-border-3)',
+        flexShrink: 0,
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'var(--p-surface-2)',
+        border: '1px solid var(--p-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--p-text-4)',
+        flexShrink: 0,
+      }}
+    >
+      <User size={Math.round(size * 0.42)} />
+    </span>
+  )
 }
 
 function DetailGroup({ title, rows }: { title: string; rows: DetailRow[] }) {
-  const present = rows.filter((r) => isPresent(r.value))
+  const present = rows.filter(r => isPresent(r.value))
   if (present.length === 0) return null
   return (
     <div style={{ marginBottom: '1.25rem' }}>
@@ -201,7 +149,7 @@ function DetailGroup({ title, rows }: { title: string; rows: DetailRow[] }) {
           fontSize: '0.85rem',
         }}
       >
-        {present.map((r) => (
+        {present.map(r => (
           <Fragment key={r.label}>
             <dt style={{ ...detailLabel, alignSelf: 'baseline', paddingTop: '0.1rem' }}>{r.label}</dt>
             <dd style={{ margin: 0, color: 'var(--p-text-1)', wordBreak: 'break-word', lineHeight: 1.5 }}>{r.value}</dd>
@@ -212,123 +160,36 @@ function DetailGroup({ title, rows }: { title: string; rows: DetailRow[] }) {
   )
 }
 
-function RecordDetails({ item, kind }: { item: ArchiveItem; kind: Kind }) {
-  const meta = KIND_META[kind]
-  const tags = parseTags(item.tags)
-
+function TestimonialDetails({ item }: { item: TestimonialRecord }) {
   const about: DetailRow[] = [
     { label: 'Catalogue ID', value: `#${item.id}` },
+    { label: 'Attributed to', value: item.author },
+    { label: 'Role', value: item.role },
     { label: 'Year', value: item.year },
-    { label: 'Date recorded', value: formatArchiveDate(item.date, item.year) || null },
-    { label: 'Event', value: item.event },
-    { label: 'Location', value: item.location },
-    { label: 'Theme', value: item.theme },
-    { label: 'Category', value: item.category },
   ]
 
   const provenance: DetailRow[] = [
     { label: 'Source', value: item.source },
-    { label: meta.creditLabel, value: kind === 'videos' ? item.channel : item.artist },
-    { label: 'Platform', value: item.platform },
-    { label: 'Duration', value: formatDuration(item.duration) },
     {
-      label: 'Views',
-      value: isPresent(item.views) ? `${Number(item.views).toLocaleString()} views` : null,
-    },
-    {
-      label: 'Original',
-      value: item.url ? (
-        <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-          View on the web
+      label: 'Portrait',
+      value: item.photoUrl ? (
+        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+          View the original image
         </a>
       ) : null,
     },
+    { label: 'Quotation length', value: `${item.quote.length} characters` },
   ]
 
   const technical: DetailRow[] = [
-    {
-      label: 'Playable source',
-      value: item.src ? (
-        <a href={item.src} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-          Open media file
-        </a>
-      ) : null,
-    },
-    { label: 'Platform host', value: item.platform },
-    { label: 'Media ID', value: `#${item.id}` },
+    { label: 'Record ID', value: `#${item.id}` },
+    { label: 'Portrait held', value: item.photoUrl ? 'Yes' : 'No' },
   ]
 
   return (
     <div>
-      <DetailGroup title={meta.detailTitle} rows={about} />
+      <DetailGroup title="About this testimonial" rows={about} />
       <DetailGroup title="Provenance" rows={provenance} />
-
-      {tags.length > 0 && (
-        <div style={{ marginBottom: '1.25rem' }}>
-          <h3
-            style={{
-              ...mono,
-              fontSize: '0.6875rem',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--primary)',
-              margin: '0 0 0.5rem',
-              fontWeight: 700,
-            }}
-          >
-            Tags
-          </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-            {tags.map((t) => (
-              <span
-                key={t}
-                style={{
-                  fontSize: '0.72rem',
-                  color: 'var(--p-text-2)',
-                  border: '1px solid var(--p-border-2)',
-                  background: 'var(--p-surface-2)',
-                  borderRadius: 999,
-                  padding: '0.2rem 0.65rem',
-                }}
-              >
-                #{t}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {item.notes && item.notes !== item.caption && (
-        <div style={{ marginBottom: '1.25rem' }}>
-          <h3
-            style={{
-              ...mono,
-              fontSize: '0.6875rem',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--primary)',
-              margin: '0 0 0.4rem',
-              fontWeight: 700,
-            }}
-          >
-            Notes
-          </h3>
-          <p
-            style={{
-              fontSize: '0.85rem',
-              lineHeight: 1.6,
-              color: 'var(--p-text-2)',
-              margin: 0,
-              background: 'var(--p-surface-2)',
-              padding: '0.75rem',
-              borderRadius: 8,
-              border: '1px solid var(--p-border-2)',
-            }}
-          >
-            {item.notes}
-          </p>
-        </div>
-      )}
 
       <details style={{ borderTop: '1px solid var(--p-border)', paddingTop: '0.75rem', marginTop: '1.25rem' }}>
         <summary
@@ -351,218 +212,19 @@ function RecordDetails({ item, kind }: { item: ArchiveItem; kind: Kind }) {
   )
 }
 
-function MediaStage({ kind, src }: { kind: Kind; src: string | null }) {
-  const embed = src ? getYouTubeEmbedUrl(src) : null
-  const youtube = src ? isYouTubeUrl(src) : false
-
-  if (!src) {
-    return (
-      <div
-        style={{
-          background: '#000',
-          borderRadius: 12,
-          padding: '3rem',
-          textAlign: 'center',
-          color: 'var(--p-text-3)',
-          fontSize: '0.9rem',
-        }}
-      >
-        No playable source for this item yet.
-      </div>
-    )
-  }
-
-  if (youtube && embed) {
-    return (
-      <div
-        style={{
-          position: 'relative',
-          paddingBottom: '56.25%',
-          height: 0,
-          borderRadius: 12,
-          overflow: 'hidden',
-          background: '#000',
-        }}
-      >
-        <iframe
-          src={embed}
-          title="Media player"
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-          allowFullScreen
-          allow="autoplay"
-        />
-      </div>
-    )
-  }
-
-  if (kind === 'videos') {
-    return (
-      <video controls autoPlay style={{ width: '100%', borderRadius: 12, background: '#000', maxHeight: '70vh' }}>
-        <source src={src} />
-      </video>
-    )
-  }
-
-  return (
-    <div
-      style={{
-        background: 'linear-gradient(140deg, color-mix(in srgb, var(--primary) 30%, #000 40%), #000)',
-        borderRadius: 12,
-        padding: '2.5rem 2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '1.25rem',
-      }}
-    >
-      <AudioLines size={40} style={{ color: 'color-mix(in srgb, var(--primary) 70%, white)' }} />
-      <audio controls autoPlay style={{ width: '100%' }}>
-        <source src={src} />
-      </audio>
-    </div>
-  )
-}
-
-function MediaThumb({ kind, item }: { kind: Kind; item: ArchiveItem }) {
-  const youtubeThumb = kind === 'videos' && item.src && isYouTubeUrl(item.src) ? getYouTubeThumbUrl(item.src) : null
-
-  return (
-    <div style={{ position: 'relative', aspectRatio: '16/10', background: 'var(--p-img-bg)', overflow: 'hidden' }}>
-      {youtubeThumb ? (
-        <img
-          src={youtubeThumb}
-          alt=""
-          loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9, transition: 'transform 0.35s ease' }}
-          className="media-card-img"
-        />
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(140deg, color-mix(in srgb, var(--primary) 26%, var(--p-img-bg)) 0%, var(--p-img-bg) 100%)',
-          }}
-        >
-          {kind === 'videos' ? (
-            <Clapperboard size={34} style={{ color: 'color-mix(in srgb, var(--primary) 70%, white)' }} />
-          ) : (
-            <AudioLines size={34} style={{ color: 'color-mix(in srgb, var(--primary) 70%, white)' }} />
-          )}
-        </div>
-      )}
-
-      {item.category && (
-        <span
-          style={{
-            position: 'absolute',
-            left: '0.6rem',
-            top: '0.6rem',
-            maxWidth: '55%',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: '0.6rem',
-            ...mono,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            color: 'var(--primary-fg)',
-            background: 'var(--primary)',
-            borderRadius: 999,
-            padding: '0.18rem 0.6rem',
-          }}
-        >
-          {item.category}
-        </span>
-      )}
-
-      <span
-        style={{
-          position: 'absolute',
-          right: '0.65rem',
-          top: '0.65rem',
-          width: 30,
-          height: 30,
-          borderRadius: '50%',
-          background: 'rgba(15, 17, 23, 0.75)',
-          backdropFilter: 'blur(4px)',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: 0.85,
-        }}
-      >
-        <ZoomIn size={14} />
-      </span>
-
-      <span
-        style={{
-          position: 'absolute',
-          left: '0.8rem',
-          bottom: '0.8rem',
-          width: 34,
-          height: 34,
-          borderRadius: '50%',
-          background: 'rgba(0,0,0,0.55)',
-          border: '1px solid rgba(255,255,255,0.35)',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backdropFilter: 'blur(4px)',
-        }}
-      >
-        <Play size={14} fill="currentColor" style={{ marginLeft: 2 }} />
-      </span>
-
-      {formatDuration(item.duration) && (
-        <span
-          style={{
-            position: 'absolute',
-            right: '0.6rem',
-            bottom: '0.6rem',
-            fontSize: '0.62rem',
-            ...mono,
-            color: '#fff',
-            background: 'rgba(0,0,0,0.6)',
-            borderRadius: 999,
-            padding: '0.12rem 0.5rem',
-          }}
-        >
-          {formatDuration(item.duration)}
-        </span>
-      )}
-    </div>
-  )
-}
-
-function MediaCard({
-  kind,
-  item,
-  onOpen,
-}: {
-  kind: Kind
-  item: ArchiveItem
-  onOpen: (id: number) => void
-}) {
-  const credit = creditOf(item, kind)
-
+function TestimonialCard({ item, onOpen }: { item: TestimonialRecord; onOpen: (id: number) => void }) {
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={() => onOpen(item.id)}
-      onKeyDown={(e) => {
+      onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onOpen(item.id)
         }
       }}
-      aria-label={`Open ${itemTitle(item, KIND_META[kind].singular)}`}
+      aria-label={`Read the testimonial from ${item.author}`}
       className="p-card-lift"
       style={{
         border: '1px solid var(--p-border)',
@@ -576,22 +238,67 @@ function MediaCard({
         position: 'relative',
       }}
     >
-      <MediaThumb kind={kind} item={item} />
+      {/* Attribution band — the testimonial equivalent of the photo card's media pane */}
+      <div
+        style={{
+          position: 'relative',
+          padding: '0.85rem 1rem',
+          background: 'linear-gradient(140deg, color-mix(in srgb, var(--primary) 12%, var(--p-surface-2)) 0%, var(--p-surface-2) 100%)',
+          borderBottom: '1px solid var(--p-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+        }}
+      >
+        {avatar(item, 30)}
+        <span
+          style={{
+            fontSize: '0.65rem',
+            ...mono,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--p-text-2)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {item.author}
+        </span>
+        <span
+          style={{
+            position: 'absolute',
+            right: '0.65rem',
+            top: '0.65rem',
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            background: 'rgba(15, 17, 23, 0.75)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.85,
+          }}
+        >
+          <ZoomIn size={13} />
+        </span>
+      </div>
 
-      <div style={{ padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '0.5rem',
-            marginBottom: '0.45rem',
+            marginBottom: '0.55rem',
           }}
         >
           <span style={{ ...mono, fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)' }}>
-            {item.year || 'Undated'}
+            {yearKey(item)}
           </span>
-          {credit && (
+          {item.source && (
             <span
               style={{
                 fontSize: '0.65rem',
@@ -604,79 +311,62 @@ function MediaCard({
                 maxWidth: '60%',
               }}
             >
-              {credit}
+              {item.source}
             </span>
           )}
         </div>
 
-        <h3
+        <Quote size={18} style={{ color: 'var(--primary)', marginBottom: '0.5rem' }} />
+        <blockquote
           style={{
+            margin: 0,
             fontSize: '0.875rem',
-            fontWeight: 600,
+            lineHeight: 1.6,
+            fontStyle: 'italic',
             color: 'var(--p-text-1)',
-            lineHeight: 1.4,
-            margin: '0 0 0.4rem',
             display: '-webkit-box',
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 5,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
           }}
         >
-          {itemTitle(item, KIND_META[kind].singular)}
-        </h3>
+          &ldquo;{item.quote}&rdquo;
+        </blockquote>
 
-        {item.caption && (
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.75rem',
-              color: 'var(--p-text-3)',
-              lineHeight: 1.5,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
-            {item.caption}
-          </p>
-        )}
-
-        <div style={{ marginTop: 'auto', paddingTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          {item.location && (
-            <span
-              style={{
-                fontSize: '0.65rem',
-                color: 'var(--p-text-3)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.2rem',
-              }}
-            >
-              <MapPin size={11} /> {item.location}
-            </span>
-          )}
-          {item.theme && (
-            <span
-              style={{
-                fontSize: '0.65rem',
-                color: 'var(--p-text-4)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.2rem',
-              }}
-            >
-              <Tag size={10} /> {item.theme}
-            </span>
-          )}
+        <div
+          style={{
+            marginTop: 'auto',
+            paddingTop: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+          }}
+        >
+          {avatar(item, 26)}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--p-text-1)' }}>{item.author}</div>
+            {item.role && (
+              <div
+                style={{
+                  fontSize: '0.68rem',
+                  color: 'var(--p-text-3)',
+                  lineHeight: 1.35,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {item.role}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function MediaLightbox({
-  kind,
+function TestimonialLightbox({
   item,
   index,
   total,
@@ -684,8 +374,7 @@ function MediaLightbox({
   onPrev,
   onNext,
 }: {
-  kind: Kind
-  item: ArchiveItem
+  item: TestimonialRecord
   index: number
   total: number
   onClose: () => void
@@ -694,8 +383,6 @@ function MediaLightbox({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
-  const meta = KIND_META[kind]
-  const title = itemTitle(item, meta.singular)
 
   useEffect(() => {
     const previous = document.body.style.overflow
@@ -755,7 +442,7 @@ function MediaLightbox({
 
   const handleCopyLink = () => {
     if (typeof window === 'undefined') return
-    const url = `${window.location.origin}/${kind}?item=${item.id}`
+    const url = `${window.location.origin}/archives/testimonials?item=${item.id}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2200)
@@ -781,7 +468,6 @@ function MediaLightbox({
     cursor: 'pointer',
     transition: 'background 0.2s, color 0.2s',
   }
-
   const hoverIn = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.background = 'var(--primary)'
     e.currentTarget.style.color = 'var(--primary-fg)'
@@ -793,7 +479,7 @@ function MediaLightbox({
 
   return (
     <div
-      onClick={(e) => {
+      onClick={e => {
         if (e.target === e.currentTarget) onClose()
       }}
       style={{
@@ -813,7 +499,7 @@ function MediaLightbox({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={`Testimonial from ${item.author}`}
         tabIndex={-1}
         className="media-lightbox-modal"
         style={{
@@ -832,7 +518,7 @@ function MediaLightbox({
           position: 'relative',
         }}
       >
-        {/* ── Left pane: dark playback stage ── */}
+        {/* ── Left pane: the quotation, set as a reading surface ── */}
         <div
           style={{
             position: 'relative',
@@ -841,40 +527,47 @@ function MediaLightbox({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            overflow: 'hidden',
-            padding: 'clamp(1rem, 3vw, 2.5rem)',
+            overflowY: 'auto',
+            padding: 'clamp(1.5rem, 4vw, 3.5rem)',
             borderRight: '1px solid var(--p-border)',
           }}
         >
           {index > 0 && onPrev && (
-            <button
-              onClick={onPrev}
-              aria-label={`Previous ${meta.singular}`}
-              style={{ ...navButtonStyle, left: '1.25rem' }}
-              onMouseEnter={hoverIn}
-              onMouseLeave={hoverOut}
-            >
+            <button onClick={onPrev} aria-label="Previous testimonial" style={{ ...navButtonStyle, left: '1.25rem' }} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
               <ChevronLeft size={22} />
             </button>
           )}
           {index < total - 1 && onNext && (
-            <button
-              onClick={onNext}
-              aria-label={`Next ${meta.singular}`}
-              style={{ ...navButtonStyle, right: '1.25rem' }}
-              onMouseEnter={hoverIn}
-              onMouseLeave={hoverOut}
-            >
+            <button onClick={onNext} aria-label="Next testimonial" style={{ ...navButtonStyle, right: '1.25rem' }} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
               <ChevronRight size={22} />
             </button>
           )}
 
-          <div style={{ width: '100%', maxWidth: 860, position: 'relative', zIndex: 1 }}>
-            <MediaStage kind={kind} src={item.src} />
+          <div style={{ width: '100%', maxWidth: 700, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <Quote size={30} style={{ color: 'color-mix(in srgb, var(--primary) 70%, white)' }} />
+            <blockquote
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-serif), Georgia, serif',
+                fontSize: 'clamp(1.1rem, 2.3vw, 1.6rem)',
+                lineHeight: 1.6,
+                fontStyle: 'italic',
+                color: '#f2f2ef',
+              }}
+            >
+              &ldquo;{item.quote}&rdquo;
+            </blockquote>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>
+              {avatar(item, 40)}
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff' }}>{item.author}</div>
+                {item.role && <div style={{ fontSize: '0.78rem', marginTop: '0.1rem' }}>{item.role}</div>}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* ── Right pane: archival context ── */}
+        {/* ── Right pane: archival record ── */}
         <div style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--p-surface)' }}>
           <div
             style={{
@@ -886,12 +579,12 @@ function MediaLightbox({
             }}
           >
             <span style={{ ...mono, fontSize: '0.6875rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)' }}>
-              {meta.record}
+              Testimonial Record
             </span>
             <button
               onClick={onClose}
               data-autofocus
-              aria-label={`Close ${meta.singular} viewer`}
+              aria-label="Close testimonial viewer"
               style={{
                 background: 'var(--p-surface-2)',
                 border: '1px solid var(--p-border-3)',
@@ -920,11 +613,11 @@ function MediaLightbox({
                 color: 'var(--p-text-1)',
               }}
             >
-              {title}
+              {item.author}
             </h2>
 
             <div style={{ fontSize: '0.75rem', color: 'var(--p-text-3)', marginBottom: '0.85rem' }}>
-              {item.source ? `Source: ${item.source}` : 'Source not recorded'}
+              {item.role ? `Attributed to ${item.role}` : 'Attribution not recorded'}
               {item.year ? ` · ${item.year}` : ''}
               {` · ${index + 1} of ${total}`}
             </div>
@@ -946,7 +639,7 @@ function MediaLightbox({
                   {item.year}
                 </span>
               )}
-              {item.category && (
+              {item.role && (
                 <span
                   style={{
                     fontSize: '0.75rem',
@@ -957,24 +650,21 @@ function MediaLightbox({
                     padding: '0.2rem 0.65rem',
                   }}
                 >
-                  {item.category}
+                  {item.role}
                 </span>
               )}
-              {item.location && (
+              {item.source && (
                 <span
                   style={{
                     fontSize: '0.75rem',
                     color: 'var(--p-text-3)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
                     background: 'var(--p-surface-2)',
                     border: '1px solid var(--p-border-2)',
                     borderRadius: 999,
                     padding: '0.2rem 0.65rem',
                   }}
                 >
-                  <MapPin size={12} /> {item.location}
+                  {item.source}
                 </span>
               )}
             </div>
@@ -989,68 +679,28 @@ function MediaLightbox({
                 borderBottom: '1px solid var(--p-border)',
               }}
             >
-              <Link
-                href={`/${kind}/${item.id}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  background: 'var(--primary)',
-                  color: 'var(--primary-fg)',
-                  borderRadius: 999,
-                  padding: '0.45rem 1rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                <ArrowRight size={14} /> Full record
-              </Link>
-
               <button
                 onClick={handleCopyLink}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.4rem',
-                  background: 'var(--p-surface-2)',
-                  border: '1px solid var(--p-border-3)',
-                  color: 'var(--p-text-1)',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
+                  border: 'none',
                   borderRadius: 999,
-                  padding: '0.45rem 0.95rem',
+                  padding: '0.45rem 1rem',
                   fontSize: '0.8rem',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
-                {copied ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Share2 size={14} />}
+                {copied ? <Check size={14} style={{ color: 'var(--primary-fg)' }} /> : <Share2 size={14} />}
                 {copied ? 'Link copied!' : 'Share link'}
               </button>
-
-              {item.url && (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    background: 'transparent',
-                    border: '1px solid var(--p-border-2)',
-                    color: 'var(--p-text-2)',
-                    borderRadius: 999,
-                    padding: '0.45rem 0.85rem',
-                    fontSize: '0.8rem',
-                    textDecoration: 'none',
-                  }}
-                >
-                  Source <ExternalLink size={13} />
-                </a>
-              )}
             </div>
 
-            <RecordDetails item={item} kind={kind} />
+            <TestimonialDetails item={item} />
           </div>
         </div>
       </div>
@@ -1058,21 +708,10 @@ function MediaLightbox({
   )
 }
 
-function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultCategory }: {
-  kind: Kind
-  eyebrow: string
-  heading: ReactNode
-  sub: string
-  categories: readonly string[]
-  defaultCategory?: string
-}) {
+function TestimonialLibraryContent({ records }: { records: TestimonialRecord[] }) {
   const searchParams = useSearchParams()
-  const meta = KIND_META[kind]
-  const api = kind === 'videos' ? '/api/videos' : '/api/audio'
-  const route = `/${kind}`
 
   const [q, setQ] = useState(searchParams.get('q') || '')
-  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10) || 1)
   const [viewMode, setViewMode] = useState<ViewMode>(
     (searchParams.get('view') as ViewMode) === 'chronological' ? 'chronological' : 'grid',
   )
@@ -1080,71 +719,67 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
     searchParams.get('item') ? parseInt(searchParams.get('item')!, 10) || null : null,
   )
   const [showFilters, setShowFilters] = useState(false)
-  const [filters, setFilters] = useState<FilterMap>(() => {
-    const map: FilterMap = {}
-    for (const f of ALL_FACETS) {
-      const v = searchParams.get(f.key) || (f.key === 'category' ? defaultCategory : null)
-      if (v) map[f.key] = v
+  const [filters, setFilters] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
+    for (const key of ALL_FACETS) {
+      const v = searchParams.get(key)
+      if (v) map[key] = v
     }
     return map
   })
 
-  const [data, setData] = useState<ListData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [standaloneItem, setStandaloneItem] = useState<ArchiveItem | null>(null)
+  const facetOptions = useCallback(
+    (key: string): FacetOption[] => {
+      const counts = new Map<string, number>()
+      for (const r of records) {
+        const raw = (r as unknown as Record<string, unknown>)[key]
+        const value = raw === null || raw === undefined || raw === '' ? null : String(raw)
+        if (!value) continue
+        counts.set(value, (counts.get(value) || 0) + 1)
+      }
+      return Array.from(counts.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => (key === 'year' ? b.value.localeCompare(a.value) : b.count - a.count || a.value.localeCompare(b.value)))
+    },
+    [records],
+  )
+
+  const matches = useCallback(
+    (r: TestimonialRecord, filtersMap: Record<string, string>, query: string) => {
+      for (const [k, v] of Object.entries(filtersMap)) {
+        if (!v) continue
+        const raw = (r as unknown as Record<string, unknown>)[k]
+        const value = raw === null || raw === undefined ? '' : String(raw)
+        if (value !== v) return false
+      }
+      const needle = query.trim().toLowerCase()
+      if (!needle) return true
+      return [r.author, r.role, r.quote, r.source, r.year ? String(r.year) : '']
+        .filter(Boolean)
+        .some(field => String(field).toLowerCase().includes(needle))
+    },
+    [],
+  )
 
   const syncUrl = useCallback(
-    (newQ: string, newFilters: FilterMap, newPage: number, newView: ViewMode, newItemId: number | null) => {
+    (newQ: string, newFilters: Record<string, string>, newView: ViewMode, newItemId: number | null) => {
       if (typeof window === 'undefined') return
       const sp = new URLSearchParams()
       if (newQ.trim()) sp.set('q', newQ.trim())
       for (const [k, v] of Object.entries(newFilters)) if (v) sp.set(k, v)
-      if (newPage > 1) sp.set('page', String(newPage))
       if (newView !== 'grid') sp.set('view', newView)
       if (newItemId !== null) sp.set('item', String(newItemId))
       const qs = sp.toString()
-      window.history.replaceState(null, '', qs ? `${route}?${qs}` : route)
+      window.history.replaceState(null, '', qs ? `${ROUTE}?${qs}` : ROUTE)
     },
-    [route],
-  )
-
-  const load = useCallback(
-    (f: FilterMap, query: string, p: number) => {
-      setLoading(true)
-      const params = new URLSearchParams({ page: String(p), perPage: String(PER_PAGE) })
-      for (const [k, v] of Object.entries(f)) if (v) params.set(k, v)
-      if (query) params.set('q', query)
-      jsonFetch<ListData>(`${api}?${params.toString()}`)
-        .then(d => {
-          if (d) setData(d)
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false))
-    },
-    [api],
+    [],
   )
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      load(filters, q, page)
-      syncUrl(q, filters, page, viewMode, activeItemId)
-    }, q ? 250 : 0)
-    return () => clearTimeout(t)
-  }, [filters, q, page, viewMode, activeItemId, load, syncUrl])
-
-  // Deep-link loader for an item that is not on the current page of results
-  useEffect(() => {
-    if (!activeItemId || !data?.items) return
-    if (data.items.some((i) => i.id === activeItemId)) return
-    jsonFetch<ArchiveItem>(`${api}/${activeItemId}`)
-      .then(res => {
-        if (res) setStandaloneItem(res)
-      })
-      .catch(() => {})
-  }, [activeItemId, data, api])
+    syncUrl(q, filters, viewMode, activeItemId)
+  }, [q, filters, viewMode, activeItemId, syncUrl])
 
   const setFilter = (key: string, value: string) => {
-    setPage(1)
     setFilters(prev => {
       const next = { ...prev }
       if (value) next[key] = value
@@ -1156,99 +791,69 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
   const clearAllFilters = () => {
     setQ('')
     setFilters({})
-    setPage(1)
   }
 
-  const removeSingleFilter = (key: string) => {
-    if (key === 'q') setQ('')
-    else setFilter(key, '')
-  }
+  const items = useMemo(() => records.filter(r => matches(r, filters, q)), [records, filters, q, matches])
 
-  const changePage = (p: number) => {
-    setPage(p)
-    setActiveItemId(null)
-    setStandaloneItem(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const openItem = (id: number) => {
-    setActiveItemId(id)
-    syncUrl(q, filters, page, viewMode, id)
-  }
-
-  const closeItem = () => {
-    setActiveItemId(null)
-    setStandaloneItem(null)
-    syncUrl(q, filters, page, viewMode, null)
-  }
-
-  const items = useMemo(() => data?.items ?? [], [data])
   const activeIndex = useMemo(
-    () => (activeItemId === null ? -1 : items.findIndex((i) => i.id === activeItemId)),
+    () => (activeItemId === null ? -1 : items.findIndex(i => i.id === activeItemId)),
     [activeItemId, items],
   )
-  const activeItem = useMemo(() => {
-    if (activeIndex >= 0) return items[activeIndex]
-    return standaloneItem
-  }, [activeIndex, items, standaloneItem])
+  const activeItem = useMemo(
+    () => (activeIndex >= 0 ? items[activeIndex] : records.find(r => r.id === activeItemId) ?? null),
+    [activeIndex, items, records, activeItemId],
+  )
 
   const activeFilterEntries = useMemo(() => {
     const list: { key: string; label: string; value: string }[] = []
     if (q) list.push({ key: 'q', label: 'Search', value: `“${q}”` })
     for (const [k, v] of Object.entries(filters)) {
       if (!v) continue
-      const f = ALL_FACETS.find(x => x.key === k)
-      list.push({ key: k, label: f?.label || k, value: v })
+      list.push({ key: k, label: FACET_LABELS[k] || k, value: v })
     }
     return list
   }, [q, filters])
   const activeFilterCount = activeFilterEntries.length
 
   const yearGroups = useMemo(() => {
-    const map = new Map<string, ArchiveItem[]>()
+    const map = new Map<string, TestimonialRecord[]>()
     for (const item of items) {
-      const key = item.year ? String(item.year) : 'Undated'
+      const key = yearKey(item)
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(item)
     }
     return Array.from(map.entries()).map(([year, groupItems]) => ({ year, items: groupItems }))
   }, [items])
 
-  const totalPages = Math.ceil((data?.total ?? 0) / PER_PAGE)
-
-  const categoryOptions = useMemo(() => {
-    const fromApi = data?.categories ?? []
-    if (fromApi.length) return fromApi
-    return categories.map(c => ({ value: c, count: 0 }))
-  }, [data, categories])
-
-  const quickFacetOptions = (key: string) => {
-    if (key === 'category') return categoryOptions
-    return data?.facets?.[key] ?? []
+  const openItem = (id: number) => {
+    setActiveItemId(id)
+    syncUrl(q, filters, viewMode, id)
   }
 
-  const panelFacetOptions = (key: string) => {
-    if (key === 'source') return (data?.sources ?? []).map(s => ({ value: s, count: 0 }))
-    return data?.facets?.[key] ?? []
+  const closeItem = () => {
+    setActiveItemId(null)
+    syncUrl(q, filters, viewMode, null)
   }
 
   return (
     <div>
-      {/* ── Hero & media cross-navigation ── */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)', margin: '-2rem -1.5rem 0' }}>
+      {/* ── Hero & archive cross-navigation ── */}
+      <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <span style={{ ...mono, fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>
-            {eyebrow}
+            Archive · Testimonials
           </span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0', color: 'var(--p-text-1)' }}>
-            {heading}
+            What <span className="p-serif">others have said</span>
           </h1>
-          <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '42rem', margin: 0 }}>{sub}</p>
+          <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '42rem', margin: 0 }}>
+            Tributes and assessments from prominent figures and institutions in Ghana and the world.
+          </p>
 
-          <nav aria-label="Media collections" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1.75rem' }}>
-            {MEDIA_COLLECTION_NAV.map(l => {
-              const current = l.href === route
+          <nav aria-label="Archive collections" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1.75rem' }}>
+            {ARCHIVE_COLLECTION_NAV.map(l => {
+              const current = l.href === ROUTE
               return (
                 <Link
                   key={l.href}
@@ -1277,23 +882,16 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
       </section>
 
       {/* ── Main exploration section ── */}
-      <section
-        className="p-section"
-        data-motion-entry
-        style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2rem, 4vw, 3.5rem) 0' }}
-      >
+      <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2rem, 4vw, 3.5rem) 1.5rem' }}>
         {/* Search & view controls */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
           <div style={{ flex: '1 1 300px', position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Search size={16} style={{ position: 'absolute', left: '1rem', color: 'var(--p-text-4)', pointerEvents: 'none' }} />
             <input
               value={q}
-              onChange={e => {
-                setQ(e.target.value)
-                setPage(1)
-              }}
-              placeholder={meta.searchPlaceholder}
-              aria-label={`Search ${meta.plural}`}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search attributions, roles, quotations…"
+              aria-label="Search testimonials"
               style={{
                 width: '100%',
                 background: 'var(--p-surface)',
@@ -1308,10 +906,7 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
             />
             {q && (
               <button
-                onClick={() => {
-                  setQ('')
-                  setPage(1)
-                }}
+                onClick={() => setQ('')}
                 aria-label="Clear search text"
                 style={{ position: 'absolute', right: '0.85rem', background: 'none', border: 'none', color: 'var(--p-text-4)', cursor: 'pointer', padding: '0.2rem' }}
               >
@@ -1386,7 +981,7 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
         {/* Quick facet pill strips */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1.25rem' }}>
           {QUICK_FACETS.map(f => {
-            const options = quickFacetOptions(f.key)
+            const options = facetOptions(f.key)
             if (options.length === 0) return null
             return (
               <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
@@ -1452,39 +1047,32 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
               gap: '0.85rem',
             }}
           >
-            {PANEL_FACETS.map(f => (
-              <div key={f.key}>
-                <label
-                  htmlFor={`media-filter-${f.key}`}
-                  style={{ display: 'block', ...mono, fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--p-text-3)', marginBottom: '0.35rem' }}
-                >
-                  {f.label}
-                </label>
-                <select
-                  id={`media-filter-${f.key}`}
-                  value={filters[f.key] || ''}
-                  onChange={e => setFilter(f.key, e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: 'var(--p-surface-2)',
-                    border: '1px solid var(--p-border-3)',
-                    borderRadius: 8,
-                    padding: '0.5rem 0.75rem',
-                    color: 'var(--p-text-1)',
-                    fontSize: '0.82rem',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="">All {f.label.toLowerCase()}</option>
-                  {panelFacetOptions(f.key).map(o => (
-                    <option key={o.value} value={o.value}>
-                      {o.value}
-                      {o.count ? ` (${o.count})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            {PANEL_FACETS.map(f => {
+              const options = facetOptions(f.key)
+              return (
+                <div key={f.key}>
+                  <label
+                    htmlFor={`testimonial-filter-${f.key}`}
+                    style={{ display: 'block', ...mono, fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--p-text-3)', marginBottom: '0.35rem' }}
+                  >
+                    {f.label}
+                  </label>
+                  <select
+                    id={`testimonial-filter-${f.key}`}
+                    value={filters[f.key] || ''}
+                    onChange={e => setFilter(f.key, e.target.value)}
+                    style={{ width: '100%', background: 'var(--p-surface-2)', border: '1px solid var(--p-border-3)', borderRadius: 8, padding: '0.5rem 0.75rem', color: 'var(--p-text-1)', fontSize: '0.82rem', outline: 'none' }}
+                  >
+                    <option value="">All {f.label.toLowerCase()}</option>
+                    {options.map(o => (
+                      <option key={o.value} value={o.value}>
+                        {o.value} ({o.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -1501,9 +1089,7 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
         >
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.45rem' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--p-text-3)', marginRight: '0.35rem' }}>
-              {loading
-                ? `Searching ${meta.plural}…`
-                : `${(data?.total ?? 0).toLocaleString()} ${data?.total === 1 ? meta.singular : meta.plural} found`}
+              {items.length} testimonial{items.length === 1 ? '' : 's'} found
             </span>
 
             {activeFilterEntries.map(e => (
@@ -1524,7 +1110,10 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
                 <span style={{ color: 'var(--p-text-4)' }}>{e.label}:</span>
                 <strong style={{ color: 'var(--primary)' }}>{e.value}</strong>
                 <button
-                  onClick={() => removeSingleFilter(e.key)}
+                  onClick={() => {
+                    if (e.key === 'q') setQ('')
+                    else setFilter(e.key, '')
+                  }}
                   aria-label={`Remove filter for ${e.label}`}
                   style={{ background: 'none', border: 'none', color: 'var(--p-text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
                 >
@@ -1556,34 +1145,28 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
         </div>
 
         {/* Content */}
-        {loading && items.length === 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '1.25rem' }}>
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} style={{ borderRadius: 14, border: '1px solid var(--p-border)', background: 'var(--p-surface)', overflow: 'hidden', height: 300, opacity: 0.7 }}>
-                <div style={{ aspectRatio: '16/10', background: 'var(--p-surface-2)' }} />
-                <div style={{ padding: '0.85rem' }}>
-                  <div style={{ width: '40%', height: 14, background: 'var(--p-surface-2)', borderRadius: 4, marginBottom: '0.6rem' }} />
-                  <div style={{ width: '90%', height: 12, background: 'var(--p-surface-2)', borderRadius: 4 }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '5rem 1.5rem', border: '1px dashed var(--p-border)', borderRadius: 20 }}>
             <Search size={36} style={{ color: 'var(--p-text-4)', marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.15rem', color: 'var(--p-text-1)', margin: '0 0 0.5rem' }}>{meta.emptyTitle}</h3>
-            <p style={{ color: 'var(--p-text-3)', fontSize: '0.9rem', maxWidth: '28rem', margin: '0 auto 1.5rem' }}>{meta.emptyBody}</p>
-            <button
-              onClick={clearAllFilters}
-              style={{ background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 999, padding: '0.6rem 1.4rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Clear all filters
-            </button>
+            <h3 style={{ fontSize: '1.15rem', color: 'var(--p-text-1)', margin: '0 0 0.5rem' }}>No testimonials match your search</h3>
+            <p style={{ color: 'var(--p-text-3)', fontSize: '0.9rem', maxWidth: '28rem', margin: '0 auto 1.5rem' }}>
+              {records.length === 0
+                ? 'Testimonials are still being compiled. Check back soon.'
+                : 'We could not find any testimonials matching the selected criteria. Try removing some filters or searching with different terms.'}
+            </p>
+            {records.length > 0 && (
+              <button
+                onClick={clearAllFilters}
+                style={{ background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 999, padding: '0.6rem 1.4rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
             {items.map(item => (
-              <MediaCard key={item.id} kind={kind} item={item} onOpen={openItem} />
+              <TestimonialCard key={item.id} item={item} onOpen={openItem} />
             ))}
           </div>
         ) : (
@@ -1607,11 +1190,11 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
                   </h3>
                   <span aria-hidden style={{ flex: 1, height: 1, background: 'var(--p-border)' }} />
                   <span style={{ ...mono, fontSize: '0.75rem', letterSpacing: '0.08em', color: 'var(--p-text-4)' }}>
-                    {group.items.length} {group.items.length === 1 ? meta.singular : meta.plural}
+                    {group.items.length} testimonial{group.items.length === 1 ? '' : 's'}
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '1rem' }}>
                   {group.items.map(item => (
                     <div
                       key={item.id}
@@ -1624,7 +1207,7 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
                           openItem(item.id)
                         }
                       }}
-                      aria-label={`Open ${itemTitle(item, meta.singular)}`}
+                      aria-label={`Read the testimonial from ${item.author}`}
                       className="p-card-lift"
                       style={{
                         border: '1px solid var(--p-border)',
@@ -1634,28 +1217,32 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: 'column',
+                        textAlign: 'left',
                       }}
                     >
-                      <MediaThumb kind={kind} item={item} />
-                      <div style={{ padding: '0.75rem 0.85rem' }}>
-                        <div
+                      <div style={{ padding: '0.85rem 0.9rem 0' }}>
+                        <span style={{ ...mono, fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary)' }}>
+                          {item.role || 'Testimonial'}
+                        </span>
+                      </div>
+                      <div style={{ padding: '0.6rem 0.9rem 0.9rem' }}>
+                        <blockquote
                           style={{
+                            margin: 0,
                             fontSize: '0.82rem',
-                            fontWeight: 600,
+                            lineHeight: 1.6,
+                            fontStyle: 'italic',
                             color: 'var(--p-text-1)',
-                            lineHeight: 1.35,
                             display: '-webkit-box',
-                            WebkitLineClamp: 2,
+                            WebkitLineClamp: 4,
                             WebkitBoxOrient: 'vertical',
                             overflow: 'hidden',
-                            marginBottom: '0.35rem',
+                            marginBottom: '0.5rem',
                           }}
                         >
-                          {itemTitle(item, meta.singular)}
-                        </div>
-                        {item.event && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--p-text-3)', ...mono }}>{item.event}</div>
-                        )}
+                          &ldquo;{item.quote}&rdquo;
+                        </blockquote>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--p-text-3)', ...mono }}>{item.author}</div>
                       </div>
                     </div>
                   ))}
@@ -1664,66 +1251,10 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
             ))}
           </div>
         )}
-
-        {/* Numbered pagination */}
-        {totalPages > 1 && (
-          <nav aria-label="Pagination navigation" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '3rem', flexWrap: 'wrap' }}>
-            {(() => {
-              const start = Math.max(1, Math.min(page - 4, totalPages - 9))
-              const nums = Array.from({ length: Math.min(10, totalPages) }, (_, i) => start + i)
-              const pageBtn = (
-                label: ReactNode,
-                target: number,
-                opts?: { active?: boolean; disabled?: boolean; key?: number | string },
-              ) => (
-                <button
-                  key={opts?.key}
-                  disabled={opts?.disabled}
-                  onClick={() => changePage(target)}
-                  style={{
-                    minWidth: 38,
-                    height: 38,
-                    borderRadius: 999,
-                    cursor: opts?.disabled ? 'not-allowed' : 'pointer',
-                    fontSize: '0.8rem',
-                    ...mono,
-                    border: '1px solid var(--p-border-3)',
-                    background: opts?.active ? 'var(--primary)' : 'var(--p-surface)',
-                    color: opts?.active ? 'var(--primary-fg)' : opts?.disabled ? 'var(--p-text-4)' : 'var(--p-text-1)',
-                    padding: '0 0.9rem',
-                    transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-              return (
-                <>
-                  {pageBtn(
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <ChevronLeft size={14} /> Prev
-                    </span>,
-                    page - 1,
-                    { disabled: page <= 1, key: 'prev' },
-                  )}
-                  {nums.map(p => pageBtn(p, p, { active: p === page, key: p }))}
-                  {pageBtn(
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                      Next <ChevronRight size={14} />
-                    </span>,
-                    page + 1,
-                    { disabled: page >= totalPages, key: 'next' },
-                  )}
-                </>
-              )
-            })()}
-          </nav>
-        )}
       </section>
 
       {activeItem && (
-        <MediaLightbox
-          kind={kind}
+        <TestimonialLightbox
           item={activeItem}
           index={activeIndex >= 0 ? activeIndex : 0}
           total={items.length > 0 ? items.length : 1}
@@ -1736,35 +1267,16 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
   )
 }
 
-export interface MediaArchiveProps {
-  kind: Kind
-  eyebrow: string
-  heading: ReactNode
-  sub: string
-  categories: readonly string[]
-  defaultCategory?: string
-}
-
-export default function MediaArchive({ kind, eyebrow, heading, sub, categories, defaultCategory }: MediaArchiveProps) {
+export default function TestimonialArchive({ records }: { records: TestimonialRecord[] }) {
   return (
     <Suspense
       fallback={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
-          <span style={{ ...mono, fontSize: '0.85rem', color: 'var(--p-text-3)' }}>
-            Loading {KIND_META[kind].record}…
-          </span>
+          <span style={{ ...mono, fontSize: '0.85rem', color: 'var(--p-text-3)' }}>Loading Testimonial Record…</span>
         </div>
       }
     >
-      <MediaLibraryContent
-        key={`${kind}:${defaultCategory || ''}`}
-        kind={kind}
-        eyebrow={eyebrow}
-        heading={heading}
-        sub={sub}
-        categories={categories}
-        defaultCategory={defaultCategory}
-      />
+      <TestimonialLibraryContent records={records} />
     </Suspense>
   )
 }

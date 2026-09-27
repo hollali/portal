@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { DEFAULT_HERO, parseData, type HeroData } from '@/lib/content'
 
 const CACHE_TTL_MS = 60_000
 
@@ -118,3 +119,17 @@ const getLatestArchiveItemsCached = memCache(async (limit: number) => {
     return []
   }
 })
+
+const getHeroContentCached = memCache(async (): Promise<HeroData> => {
+  try {
+    const row = await prisma.contentSection.findUnique({ where: { key: 'home_hero' } })
+    if (!row || row.status !== 'published') return DEFAULT_HERO
+    return parseData<HeroData>(row.data, DEFAULT_HERO)
+  } catch {
+    return DEFAULT_HERO
+  }
+})
+
+export async function getHeroContent(): Promise<HeroData> {
+  return getHeroContentCached()
+}

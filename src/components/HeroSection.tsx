@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Landmark, ArrowUpRight, Quote } from 'lucide-react'
+import type { HeroData } from '@/lib/content'
 
 export interface HeroStats {
   value: number
@@ -12,6 +13,7 @@ export interface HeroStats {
 
 interface HeroSectionProps {
   stats: HeroStats[]
+  content: HeroData
 }
 
 function prefersReducedMotion(): boolean {
@@ -44,10 +46,26 @@ function CountUp({ value }: { value: number }) {
   return <span ref={ref} style={{ fontVariantNumeric: 'tabular-nums' }}>{value.toLocaleString()}</span>
 }
 
-export default function HeroSection({ stats }: HeroSectionProps) {
+export default function HeroSection({ stats, content }: HeroSectionProps) {
   const heroRef = useRef<HTMLElement>(null)
   const parallaxRef = useRef<HTMLDivElement>(null)
+  const spotRaf = useRef(0)
   const [lit, setLit] = useState(false)
+
+  useEffect(() => {
+    const heroEl = heroRef.current
+    if (!heroEl) return
+    const io = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          heroEl.dataset.heroVisible = entry.isIntersecting ? 'true' : 'false'
+        }
+      },
+      { threshold: 0 },
+    )
+    io.observe(heroEl)
+    return () => io.disconnect()
+  }, [])
 
   useEffect(() => {
     if (prefersReducedMotion()) return
@@ -69,6 +87,7 @@ export default function HeroSection({ stats }: HeroSectionProps) {
     return () => {
       window.removeEventListener('scroll', onScroll)
       cancelAnimationFrame(raf)
+      cancelAnimationFrame(spotRaf.current)
     }
   }, [])
 
@@ -76,9 +95,13 @@ export default function HeroSection({ stats }: HeroSectionProps) {
     if (e.pointerType === 'touch' || prefersReducedMotion()) return
     const el = heroRef.current
     if (!el) return
-    const r = el.getBoundingClientRect()
-    el.style.setProperty('--spot-x', `${e.clientX - r.left}px`)
-    el.style.setProperty('--spot-y', `${e.clientY - r.top}px`)
+    const { clientX, clientY } = e
+    cancelAnimationFrame(spotRaf.current)
+    spotRaf.current = requestAnimationFrame(() => {
+      const r = el.getBoundingClientRect()
+      el.style.setProperty('--spot-x', `${clientX - r.left}px`)
+      el.style.setProperty('--spot-y', `${clientY - r.top}px`)
+    })
     setLit(true)
   }
 
@@ -144,7 +167,7 @@ export default function HeroSection({ stats }: HeroSectionProps) {
             padding: '0.35rem 0.85rem', borderRadius: 999, animationDelay: '60ms',
           }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--primary)' }} />
-            Speaker · Eighth Parliament of Ghana
+            {content.eyebrow}
           </span>
 
           <h1 className="p-hero-title hero-rise" style={{
@@ -163,7 +186,7 @@ export default function HeroSection({ stats }: HeroSectionProps) {
               WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
               backgroundSize: '200% 100%',
             }}>
-              Rt. Hon. Alban Bagbin
+              {content.displayName}
             </span>
           </h1>
 
@@ -171,8 +194,7 @@ export default function HeroSection({ stats }: HeroSectionProps) {
             animationDelay: '220ms', fontSize: '1.0625rem', lineHeight: 1.65, color: 'var(--p-text-2)',
             maxWidth: '34rem', margin: '0 0 2rem',
           }}>
-            Speeches, public papers, interviews, letters, photographs and milestones from a thirty-year career —
-            indexed, dated and preserved as the living record of Ghana&apos;s eighth Speaker.
+            {content.description}
           </p>
 
           <div className="p-cta-buttons hero-rise" style={{ animationDelay: '300ms', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
@@ -212,8 +234,8 @@ export default function HeroSection({ stats }: HeroSectionProps) {
             <div style={{ position: 'relative', width: '100%', maxWidth: 400 }}>
               <div style={{ padding: 10, borderRadius: '210px 210px 20px 20px', background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', boxShadow: 'var(--p-shadow), 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent)' }}>
                 <Image
-                  src="/images/bagbin-speaker.jpg"
-                  alt="Alban Bagbin, Speaker of the Parliament of Ghana"
+                  src={content.portraitUrl}
+                  alt={content.portraitAlt}
                   width={779}
                   height={917}
                   priority
@@ -223,7 +245,7 @@ export default function HeroSection({ stats }: HeroSectionProps) {
               </div>
 
               <div style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.625rem', letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--p-text-4)', marginTop: '0.85rem', textAlign: 'center' }}>
-                Alban Sumana Kingsford Bagbin · MP since 1993
+                {content.name} · MP since 1993
               </div>
 
               <div aria-hidden className="hero-stamp" style={{ position: 'absolute', left: -26, bottom: 44, zIndex: 3 }}>
@@ -242,8 +264,8 @@ export default function HeroSection({ stats }: HeroSectionProps) {
 
               <div style={{ position: 'absolute', bottom: 78, left: '50%', transform: 'translateX(-50%)', width: '82%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'color-mix(in srgb, var(--p-surface-2) 84%, transparent)', backdropFilter: 'blur(12px)', border: '1px solid var(--p-border-3)', borderRadius: 12, padding: '0.7rem 1rem', boxShadow: 'var(--p-shadow)' }}>
                 <div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Speaker since</div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--p-text-1)' }}>7 January 2021</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{content.profileLabel}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--p-text-1)' }}>{content.profileValue}</div>
                 </div>
                 <Quote size={20} style={{ color: 'var(--primary)' }} />
               </div>

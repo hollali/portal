@@ -53,13 +53,12 @@ export type SectionData = HeroData | BiographyData | TimelineData | Institutions
 
 export const DEFAULT_HERO: HeroData = {
   eyebrow: 'Rt. Hon. · Speaker of the Parliament of Ghana',
-  name: 'Alban Sumana',
-  displayName: 'Kingsford Bagbin',
+  name: 'Alban Sumana Kingsford Bagbin',
+  displayName: 'Rt. Hon. Alban Bagbin',
   description:
     'Ghanaian lawyer, statesman and legislator — elected Speaker of the 8th Parliament in 2021 as the first Speaker chosen from the opposition in Ghana’s history, and re-elected to preside over the 9th Parliament in 2025.',
-  portraitUrl:
-    'https://upload.wikimedia.org/wikipedia/commons/8/8b/Speaker_Alban_Bagbin-2_%28cropped%29.jpg',
-  portraitAlt: 'Alban Bagbin in 2021',
+  portraitUrl: '/images/bagbin-speaker.jpg',
+  portraitAlt: 'Alban Bagbin, Speaker of the Parliament of Ghana',
   profileLabel: 'Incumbent since',
   profileValue: '7 January 2021',
   facts: [
@@ -137,18 +136,21 @@ export interface PubSection {
 
 export type SectionsMap = Partial<Record<SectionKey, PubSection>>
 
-export function parseData<T>(raw: string | null | undefined, fallback: T): T {
-  if (!raw) return fallback
+export function parseData<T>(raw: unknown, fallback: T): T {
+  if (raw == null) return fallback
+  if (typeof raw === 'object') return { ...fallback, ...(raw as Partial<T>) } as T
+  if (typeof raw !== 'string') return fallback
   try {
-    return { ...fallback, ...JSON.parse(raw) } as T
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object') return { ...fallback, ...(parsed as Partial<T>) } as T
   } catch {
     return fallback
   }
+  return fallback
 }
 
 export function sectionData<T>(key: SectionKey, sections: SectionsMap | null | undefined, fallback: T): T {
-  const section = sections?.[key]
-  return parseData<T>(section?.data ? JSON.stringify(section.data) : null, fallback)
+  return parseData<T>(sections?.[key]?.data ?? null, fallback)
 }
 
 export function normalizeSlug(value: string): string {

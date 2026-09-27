@@ -48,24 +48,92 @@ const FIELD_MAP: Record<string, string> = {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
 
+  const singleId = searchParams.get('id')
+  if (singleId) {
+    const idNum = parseInt(singleId, 10)
+    if (!isNaN(idNum)) {
+      const img = await prisma.image.findUnique({ where: { id: idNum } })
+      if (!img) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      const item: PhotoItem = {
+        id: img.id,
+        src: resolveMediaSrc(img),
+        year: img.year,
+        event: img.event,
+        location: img.location,
+        person: img.person,
+        institution: img.institution,
+        parliament: img.parliament,
+        theme: img.theme,
+        caption: img.caption || img.notes || null,
+        source: img.source,
+        sourceUrl: img.url,
+        query: img.query,
+        collectedAt: img.collectedAt,
+        dateTaken: img.dateTaken,
+        notes: img.notes,
+        tags: img.tags,
+        curated: img.curated,
+        storedLocally: localMediaExists(img.localPath),
+        imageHash: img.imageHash,
+        faceDetected: img.faceDetected,
+        faceCount: img.faceCount,
+        faceMatch: img.faceMatch,
+        faceMatchScore: img.faceMatchScore,
+        faceMatchDistance: img.faceMatchDistance,
+        bestReferencePath: img.bestReferencePath ? img.bestReferencePath.split(/[\\/]/).pop() || null : null,
+      }
+      return NextResponse.json({ item })
+    }
+  }
+
+  const q = searchParams.get('q')?.trim() || ''
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
   const perPage = Math.min(200, Math.max(1, parseInt(searchParams.get('perPage') || '48')))
   const skip = (page - 1) * perPage
 
-  const facetWhere: Record<string, unknown>[] = []
-  let hasFacetFilter = false
+  const andFilters: Record<string, unknown>[] = []
+
+  // Ensure image has an available source
+  andFilters.push({
+    OR: [
+      { localPath: { not: null } },
+      { url: { not: null } },
+    ],
+  })
+
+  // Facet filters
   for (const f of PHOTO_FACET_FIELDS) {
     const val = searchParams.get(f.key) || ''
     if (val) {
-      hasFacetFilter = true
-      facetWhere.push({ [FIELD_MAP[f.key]]: val })
+      if (f.key === 'year') {
+        const y = parseInt(val, 10)
+        if (!isNaN(y)) andFilters.push({ year: y })
+      } else {
+        andFilters.push({ [FIELD_MAP[f.key]]: val })
+      }
     }
   }
 
-  const where: Record<string, unknown> = {}
-  if (hasFacetFilter) {
-    where.AND = facetWhere
+  // Full-text query across textual fields
+  if (q) {
+    const orQueries: Record<string, unknown>[] = [
+      { caption: { contains: q, mode: 'insensitive' } },
+      { notes: { contains: q, mode: 'insensitive' } },
+      { event: { contains: q, mode: 'insensitive' } },
+      { location: { contains: q, mode: 'insensitive' } },
+      { person: { contains: q, mode: 'insensitive' } },
+      { institution: { contains: q, mode: 'insensitive' } },
+      { theme: { contains: q, mode: 'insensitive' } },
+      { tags: { contains: q, mode: 'insensitive' } },
+    ]
+    const numericYear = parseInt(q, 10)
+    if (!isNaN(numericYear) && numericYear >= 1900 && numericYear <= 2100) {
+      orQueries.push({ year: numericYear })
+    }
+    andFilters.push({ OR: orQueries })
   }
+
+  const where: Record<string, unknown> = andFilters.length > 0 ? { AND: andFilters } : {}
 
   const [rows, count, allRows] = await Promise.all([
     prisma.image.findMany({ where, orderBy: [{ year: 'desc' }, { id: 'desc' }], skip, take: perPage }),

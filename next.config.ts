@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.youtube.com' },
       { protocol: 'https', hostname: '**.ytimg.com' },
       { protocol: 'https', hostname: '**.githubusercontent.com' },
+      { protocol: 'https', hostname: 'upload.wikimedia.org' },
     ],
   },
 };

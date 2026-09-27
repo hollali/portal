@@ -48,6 +48,32 @@ const FACET_QUERIES: Record<FacetKey, (kinds: ArchiveKind[]) => Promise<(string 
 
 const nonEmpty = (values: (string | null)[]): string[] => values.filter((v): v is string => Boolean(v))
 
+const CHIP_MAX = 8
+
+const FACET_META = [
+  { key: 'year', all: 'All years' },
+  { key: 'theme', all: 'All themes' },
+  { key: 'occasion', all: 'All occasions' },
+  { key: 'parliament', all: 'All parliaments' },
+] as const
+
+type FacetName = (typeof FACET_META)[number]['key']
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatDate(value: string | null): string {
+  if (!value) return ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!m) return value
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`
+}
+
+function yearOf(item: { year: number | null; date: string | null }): string {
+  if (item.year) return String(item.year)
+  const parsed = item.date ? parseInt(item.date.slice(0, 4), 10) : NaN
+  return Number.isFinite(parsed) ? String(parsed) : 'undated'
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { kind } = await params
   const listKind = kind as ListRouteKind
@@ -111,6 +137,33 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
     ? `${items.length} result${items.length === 1 ? '' : 's'}${q ? ` for “${q}”` : ''}`
     : `${items.length} ${items.length === 1 ? copy.noun : copy.plural}`
 
+  const basePath = `/archives/${kind}`
+  const activeFacets: Record<FacetName, string> = { year, theme, occasion, parliament }
+  const facetValues: Record<FacetName, string[]> = {
+    year: years.map(y => y.year).filter((y): y is number => y !== null).map(String),
+    theme: themes,
+    occasion: occasions,
+    parliament: parliaments,
+  }
+
+  const facetHref = (patch: Partial<Record<FacetName, string>>) => {
+    const sp = new URLSearchParams()
+    const merged = { q, ...activeFacets, ...patch }
+    for (const [k, v] of Object.entries(merged)) if (v) sp.set(k, v)
+    const qs = sp.toString()
+    return qs ? `${basePath}?${qs}` : basePath
+  }
+
+  const groups: { year: string; rows: typeof items }[] = []
+  for (const item of items) {
+    const key = yearOf(item)
+    const last = groups[groups.length - 1]
+    if (last && last.year === key) last.rows.push(item)
+    else groups.push({ year: key, rows: [item] })
+  }
+
+  const showKind = kinds.length > 1
+
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
@@ -121,52 +174,53 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{copy.eyebrow}</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 0.75rem', color: 'var(--p-text-1)' }}>{copy.heading}</h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '36rem', margin: 0 }}>{copy.sub}</p>
+
+          <nav aria-label="Archive collections" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1.75rem' }}>
+            {(Object.keys(LIST_ROUTE_KINDS) as ListRouteKind[]).map(k => {
+              const active = k === kind
+              return (
+                <Link key={k} href={`/archives/${k}`} aria-current={active ? 'page' : undefined} style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: active ? 'var(--primary-fg)' : 'var(--p-text-3)', textDecoration: 'none', background: active ? 'var(--primary)' : 'var(--p-surface)', border: '1px solid var(--p-border)', borderRadius: 999, padding: '0.35rem 0.85rem' }}>
+                  {LIST_COPY[k].heading}
+                </Link>
+              )
+            })}
+            <Link href="/archives/milestones" style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--p-text-3)', textDecoration: 'none', background: 'var(--p-surface)', border: '1px solid var(--p-border)', borderRadius: 999, padding: '0.35rem 0.85rem' }}>Milestones</Link>
+          </nav>
         </div>
       </section>
 
       <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
-        {/* Filters */}
-        <form method="get" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '2rem' }}>
+        {/* Search, plus any facet too large to chip */}
+        <form method="get" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          {FACET_META.filter(f => facetValues[f.key].length > CHIP_MAX).map(f => (
+            <select key={f.key} name={f.key} defaultValue={activeFacets[f.key]} aria-label={`Filter by ${f.key}`} style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
+              <option value="">{f.all}</option>
+              {facetValues[f.key].map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          ))}
           <input name="q" defaultValue={q} placeholder="Search in this collection…" aria-label="Search this collection"
             style={{ flex: 1, minWidth: 220, background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.9rem', outline: 'none' }} />
-          <select name="year" defaultValue={year} aria-label="Filter by year" style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
-            <option value="">All years</option>
-            {years.filter(y => y.year !== null).map(y => <option key={y.year} value={y.year!}>{y.year}</option>)}
-          </select>
-          {themes.length > 0 && (
-            <select name="theme" defaultValue={theme} aria-label="Filter by theme" style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
-              <option value="">All themes</option>
-              {themes.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          )}
-          {occasions.length > 0 && (
-            <select name="occasion" defaultValue={occasion} aria-label="Filter by occasion" style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
-              <option value="">All occasions</option>
-              {occasions.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          )}
-          {parliaments.length > 0 && (
-            <select name="parliament" defaultValue={parliament} aria-label="Filter by parliament" style={{ background: 'var(--p-surface)', border: '1px solid var(--p-border-3)', borderRadius: 999, padding: '0.6rem 1.1rem', color: 'var(--p-text-1)', fontSize: '0.875rem', outline: 'none' }}>
-              <option value="">All parliaments</option>
-              {parliaments.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          )}
-          <button type="submit" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 999, padding: '0.6rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Filter</button>
-          {(q || year || theme || occasion || parliament) && <Link href={`/archives/${kind}`} style={{ alignSelf: 'center', fontSize: '0.8125rem', color: 'var(--p-text-3)' }}>Clear</Link>}
+          <button type="submit" style={{ background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 999, padding: '0.6rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Search</button>
+          {isFiltered && <Link href={basePath} style={{ alignSelf: 'center', fontSize: '0.8125rem', color: 'var(--p-text-3)' }}>Clear all</Link>}
         </form>
 
-        {/* Other collections quick-links */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '2rem' }}>
-          {(Object.keys(LIST_ROUTE_KINDS) as ListRouteKind[]).map(k => {
-            const active = k === kind
-            return (
-              <Link key={k} href={`/archives/${k}`} style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: active ? 'var(--primary-fg)' : 'var(--p-text-3)', textDecoration: 'none', background: active ? 'var(--primary)' : 'var(--p-surface)', border: '1px solid var(--p-border)', borderRadius: 999, padding: '0.35rem 0.85rem' }}>
-                {LIST_COPY[k].heading}
-              </Link>
-            )
-          })}
-          <Link href="/archives/milestones" style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--p-text-3)', textDecoration: 'none', background: 'var(--p-surface)', border: '1px solid var(--p-border)', borderRadius: 999, padding: '0.35rem 0.85rem' }}>Milestones</Link>
-        </div>
+        {/* Facet chips — small facets only, so the values are visible without opening a menu */}
+        {FACET_META.filter(f => facetValues[f.key].length > 0 && facetValues[f.key].length <= CHIP_MAX).map(f => (
+          <div key={f.key} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.625rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--p-text-4)', minWidth: '5.5rem' }}>{f.key}</span>
+            <Link href={facetHref({ [f.key]: '' })} className="p-chip" aria-current={!activeFacets[f.key] ? "true" : undefined} style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.05em', textDecoration: 'none', color: !activeFacets[f.key] ? 'var(--primary-fg)' : 'var(--p-text-3)', background: !activeFacets[f.key] ? 'var(--primary)' : 'transparent', border: '1px solid var(--p-border)', borderRadius: 999, padding: '0.3rem 0.7rem' }}>
+              {f.all}
+            </Link>
+            {facetValues[f.key].map(v => {
+              const on = activeFacets[f.key] === v
+              return (
+                <Link key={v} href={facetHref({ [f.key]: v })} className="p-chip" aria-current={on ? "true" : undefined} style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.05em', textDecoration: 'none', color: on ? 'var(--primary-fg)' : 'var(--p-text-3)', background: on ? 'var(--primary)' : 'transparent', border: `1px solid ${on ? 'var(--primary)' : 'var(--p-border)'}`, borderRadius: 999, padding: '0.3rem 0.7rem' }}>
+                  {v}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
 
         {items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '4rem 1rem', border: '1px dashed var(--p-border)', borderRadius: 16 }}>
@@ -175,46 +229,58 @@ export default async function ArchiveListPage({ params, searchParams }: Props) {
           </div>
         ) : (
           <>
-            <h2 style={{ fontSize: '0.8125rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--p-text-3)', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: '0.8125rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--p-text-3)', margin: '2rem 0 1.25rem' }}>
               {resultSummary}
             </h2>
-            <ul style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1rem', listStyle: 'none', margin: 0, padding: 0 }}>
-              {items.map(item => {
-                const Icon = KIND_ICON[item.kind] ?? FileText
-                const cfg = KIND_CONFIG[item.kind as ArchiveKind]
-                return (
-                  <li key={item.id}>
-                    <Link href={`/archives/${kind}/${item.slug}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', height: '100%' }}>
-                      <div className="p-card-lift" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.4rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.6875rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary)' }}>
-                            <Icon size={13} /> {cfg?.label || item.kind}
-                          </span>
-                          <span style={{ fontSize: '0.6875rem', color: 'var(--p-text-4)', fontFamily: 'var(--font-mono), monospace' }}>{item.date || item.year || ''}</span>
-                        </div>
-                        <div style={{ fontWeight: 700, fontSize: '1.02rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif', lineHeight: 1.35, marginBottom: '0.5rem' }}>{item.title}</div>
-                        {item.excerpt && (
-                          <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--p-text-3)', lineHeight: 1.6, flex: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.excerpt}</p>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.9rem' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                            {[item.event, item.location, item.theme].filter(Boolean).slice(0, 2).map(f => (
-                              <span key={f} style={{ fontSize: '0.66rem', color: 'var(--p-text-3)', border: '1px solid var(--p-border-2)', background: 'var(--p-surface-2)', borderRadius: 999, padding: '0.15rem 0.55rem' }}>{f}</span>
-                            ))}
-                          </div>
-                          {item.filePath && <Download size={14} style={{ color: 'var(--p-text-4)' }} aria-label="Downloadable document" />}
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+              {groups.map(group => (
+                <section key={group.year} aria-label={group.year === 'undated' ? 'Undated' : `Year ${group.year}`}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, fontFamily: 'var(--font-serif), Georgia, serif', fontStyle: 'italic', fontWeight: 500, fontSize: '1.75rem', lineHeight: 1, letterSpacing: '-0.01em', color: 'var(--p-text-1)' }}>{group.year}</h3>
+                    <span aria-hidden style={{ flex: 1, height: 1, background: 'var(--p-border)' }} />
+                    <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.625rem', letterSpacing: '0.1em', color: 'var(--p-text-4)' }}>{group.rows.length}</span>
+                  </div>
+
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, borderTop: '1px solid var(--p-border-2)' }}>
+                    {group.rows.map(item => {
+                      const Icon = KIND_ICON[item.kind] ?? FileText
+                      const cfg = KIND_CONFIG[item.kind as ArchiveKind]
+                      const meta = [item.occasion ?? item.event, item.parliament].filter(Boolean).join(' · ')
+                      return (
+                        <li key={item.id} style={{ borderBottom: '1px solid var(--p-border-2)' }}>
+                          <Link href={`/archives/${kind}/${item.slug}`} className="p-link-strong" style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: '7.5rem 1fr auto', gap: '1.25rem', alignItems: 'baseline', padding: '1.1rem 0.5rem 1.1rem 0' }}>
+                            <time dateTime={item.date ?? undefined} style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.75rem', letterSpacing: '0.04em', color: 'var(--primary)' }}>{formatDate(item.date) || item.year || '—'}</time>
+
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                {showKind && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.625rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--p-text-4)' }}>
+                                    <Icon size={12} /> {cfg?.label || item.kind}
+                                  </span>
+                                )}
+                                <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif', lineHeight: 1.3 }}>{item.title}</span>
+                              </div>
+                              {meta && <div style={{ fontSize: '0.75rem', color: 'var(--p-text-3)', fontFamily: 'var(--font-mono), monospace', marginTop: '0.3rem' }}>{meta}</div>}
+                              {item.excerpt && (
+                                <p style={{ margin: '0.45rem 0 0', fontSize: '0.875rem', color: 'var(--p-text-2)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.excerpt}</p>
+                              )}
+                            </div>
+
+                            {item.filePath ? <Download size={15} style={{ color: 'var(--p-text-4)' }} aria-label="Downloadable document" /> : <span />}
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
           </>
         )}
 
         <p style={{ marginTop: '2.5rem', fontSize: '0.8rem', color: 'var(--p-text-4)' }}>
-          Showing {items.length} of the {marginCount} published records held across speeches, papers, interviews and notes.
+          {marginCount} published records held across speeches, papers, interviews and notes.
         </p>
       </section>
 
