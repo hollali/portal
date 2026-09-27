@@ -91,6 +91,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, unreadCount: await unreadCount() })
   }
 
+  // The client used to implement "clear all" by looping one DELETE per row,
+  // which meant up to 200 sequential round trips. One deleteMany instead.
+  if (action === 'clear_all') {
+    const res = await prisma.notification.deleteMany({ where: { userId: session.userId } })
+    return NextResponse.json({ success: true, deleted: res.count, unreadCount: await unreadCount() })
+  }
+
   if (action === 'create') {
     const type = String(body.type || 'info')
     const message = String(body.message || '').trim()

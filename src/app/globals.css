@@ -2,7 +2,32 @@
 
 /* ─── Parliament of Ghana theme ────────────────────────
    Palette from the Parliament of Ghana identity:
-   deep navy blue · rich gold · institutional neutrals   */
+   deep navy blue · rich gold · institutional neutrals
+
+   ── MAINTENANCE INVARIANT ─────────────────────────────
+   Dark is the default and lives in `:root`. The ONLY other
+   place a colour token may be declared is the `.light` block
+   below. There is deliberately no `prefers-color-scheme`
+   copy — `theme-init` in src/app/layout.tsx always sets
+   exactly one of `.dark` / `.light` before first paint.
+
+   So there are two places to keep in sync, not three. That
+   third copy is what previously let tokens go missing
+   silently; `src/__tests__/tokens.test.ts` now fails the
+   build if a token is declared in one and not the other, or
+   if a var() reference resolves to nothing.
+
+   Theme-independent metrics (e.g. --sidebar-width) belong in
+   `:root` only — do not duplicate them into `.light`.
+
+   Elevation is a deliberate three-step ladder:
+     --background   page canvas
+     --card         panel, modal, table
+     --surface      quiet control (button, tab rail, input)
+                    one step above --card so controls stay
+                    visible when they sit ON a card
+   */
+
 
 :root {
   --background: #0f1117;
@@ -13,6 +38,8 @@
   --border-strong: #353535;
   --card: #16181f;
   --card-hover: #1d2028;
+  --surface: #1f232c;
+  --surface-hover: #262b36;
   --sidebar-bg: #0e1013;
   --primary: #f2a900;
   --primary-dark: #f7b629;
@@ -25,6 +52,11 @@
   --row-hover: rgba(238, 238, 238, 0.04);
   --sidebar-width: 260px;
   color-scheme: dark;
+
+  /* Default minimum width for a data table before it stacks into cards.
+     Individual tables override this per-instance with an inline
+     `--table-min` value, so it must be a real token. */
+  --table-min: 560px;
 
   /* ─── Public landing surface tokens ─── */
   --p-bg: #0f1117;
@@ -65,6 +97,8 @@
   --border-strong: #c4c8d0;
   --card: #ffffff;
   --card-hover: #fafbfc;
+  --surface: #f4f6f8;
+  --surface-hover: #e9edf2;
   --sidebar-bg: #f7f8fa;
   --primary: #a16207;
   --primary-dark: #b8790a;
@@ -103,51 +137,11 @@
   --shimmer-d: #6d4f00;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not(.dark):not(.light) {
-    --background: #ffffff;
-    --foreground: #1a1d26;
-    --muted: #626262;
-    --muted-foreground: #454a54;
-    --border: #dbdde2;
-    --border-strong: #c4c8d0;
-    --card: #ffffff;
-    --card-hover: #fafbfc;
-    --sidebar-bg: #f7f8fa;
-    --primary: #a16207;
-    --primary-dark: #b8790a;
-    --primary-fg: #ffffff;
-    --primary-glow: rgba(161, 98, 7, 0.12);
-    --focus: #1d4289;
-    --danger: #b3261e;
-    --success: #1a7f37;
-    --warning: #a14c00;
-    --row-hover: rgba(15, 17, 23, 0.05);
-    --p-bg: #ffffff;
-    --p-surface: #f7f7f6;
-    --p-surface-2: #f0f0ee;
-    --p-surface-3: #fbfbfa;
-    --p-text-1: #0f1117;
-    --p-text-2: #3d4250;
-    --p-text-3: #565d6b;
-    --p-text-4: #5f6675;
-    --p-border: rgba(0, 0, 0, 0.10);
-    --p-border-2: rgba(0, 0, 0, 0.08);
-    --p-border-3: rgba(15, 17, 23, 0.46);
-    --p-img-bg: #e9e9e6;
-    --p-cta-bg: linear-gradient(120deg, #eef3fb 0%, #e3ebf7 45%, #f7f0dd 100%);
-    --p-cta-text: #1d4289;
-    --p-shadow: 0 24px 80px -20px rgba(15, 17, 23, 0.16);
-    --p-navy: #1d4289;
-    --p-navy-deep: #10295c;
-    --p-gold: #a16207;
-    --shimmer-a: #b8790a;
-    --shimmer-b: #966a00;
-    --shimmer-c: #a56f00;
-    --shimmer-d: #6d4f00;
-    color-scheme: light;
-  }
-}
+/* No `prefers-color-scheme` block here on purpose — see the maintenance
+   invariant above. `theme-init` (src/app/layout.tsx) resolves the stored
+   preference or falls back to the OS setting and sets `.dark` / `.light`
+   before first paint, so there is no flash and no third copy to keep in
+   sync. See also `.light` above, which is the only light-mode source. */
 
 * {
   box-sizing: border-box;
@@ -197,6 +191,91 @@ h1, h2, h3 {
   background: var(--border-strong);
   border-radius: 8px;
   border: 2px solid var(--background);
+}
+
+/* ─── UI kit primitives ───
+   Shared behaviour for the components in src/components/ui.
+   Colour comes from the token ladder above, so these stay correct
+   in both themes without per-variant colour declarations. */
+
+/* Interaction is a surface/border shift, never a transform: scaling a
+   control moves the hit target out from under the pointer. */
+.ui-btn {
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.ui-btn[data-variant="primary"]:hover:not(:disabled) { background: var(--primary-dark); }
+.ui-btn[data-variant="danger"]:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 86%, #000); }
+.ui-btn[data-variant="secondary"]:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
+.ui-btn[data-variant="outline"]:hover:not(:disabled),
+.ui-btn[data-variant="ghost"]:hover:not(:disabled) { background: var(--row-hover); color: var(--foreground); }
+.ui-btn:active:not(:disabled) { filter: brightness(0.94); }
+.ui-btn:disabled { opacity: 0.55; }
+
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+.ui-btn-spin { animation: ui-spin 0.7s linear infinite; }
+
+.ui-input {
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.ui-input:hover:not(:disabled) { border-color: var(--border-strong); }
+.ui-input:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent);
+}
+.ui-input:disabled { opacity: 0.55; cursor: not-allowed; }
+.ui-input[data-invalid] {
+  border-color: var(--danger);
+}
+.ui-input[data-invalid]:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+.ui-input::placeholder { color: var(--muted); }
+
+/* Grouped form sections. Tailwind's preflight resets fieldset borders to
+   `0 solid`, so a `fieldset.card` gets its border from the class — but a bare
+   `legend` then renders half-inside that border. Floating it takes the legend
+   out of the border box.
+   Only layout is set here: this rule is unlayered, so it outranks Tailwind's
+   `utilities` layer and any font/weight/margin utility on the legend itself.
+   Typography stays with the caller. */
+fieldset > legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+/* A floated legend must be cleared or it overlaps the first row. */
+fieldset > legend + * { clear: both; }
+
+/* Dropdown menu items: a surface shift, matching .ui-btn's "no transform" rule.
+   A scale on hover would make the item move out from under the pointer mid-click. */
+.ui-menu {
+  animation: ui-menu-in 0.12s ease-out;
+}
+@keyframes ui-menu-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.ui-menu-item:not(:disabled):hover,
+.ui-menu-item:focus-visible {
+  background: var(--surface-hover);
+  outline: none;
+}
+
+/* Chevron drawn with a rotated border so the control needs no extra markup
+   and no icon font. */
+.ui-select {  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 15px) calc(50% + 1px), calc(100% - 10px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.ui-select option { background: var(--card); color: var(--foreground); }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ─── Smooth anchor scrolling ─── */
@@ -494,9 +573,9 @@ html[data-motion="js"] .hero-cta:hover {
   to   { transform: translateX(-100%); }
 }
 
-/* ─── Staggered nav items ─── */
+/* ─── Nav item ─── */
 .nav-item {
-  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s;
 }
 .nav-item:hover {
   background: var(--row-hover);
@@ -512,71 +591,81 @@ html[data-motion="js"] .hero-cta:hover {
   color: var(--primary-fg);
 }
 
-/* ─── Icon animation ─── */
+/* Icons only tint — the previous scale+rotate nudge fired on every
+   pointer pass and read as decoration rather than feedback. */
 .nav-icon {
-  transition: transform 0.3s ease;
+  transition: color 0.15s;
   display: inline-flex;
 }
 .nav-item:hover .nav-icon {
-  transform: scale(1.15) rotate(-3deg);
-}
-.nav-item.active .nav-icon {
-  animation: iconPop 0.4s ease-out;
-}
-@keyframes iconPop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.3) rotate(-5deg); }
-  100% { transform: scale(1) rotate(0); }
+  color: var(--primary);
 }
 
-/* ─── Card hover lift ─── */
+/* ─── Card ───
+   `.card` is a container and is often not interactive, so it gets a
+   border/shadow response only. Use `.card-interactive` when the whole
+   card is a control — that variant is the one allowed to lift. */
 .card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .card:hover {
-  transform: translateY(-2px);
   border-color: var(--border-strong);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
-.light .card:hover {
-  box-shadow: 0 4px 16px rgba(11, 11, 11, 0.08);
+.card-interactive {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
+.card-interactive:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: var(--card-hover);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.light .card-interactive:hover {
+  box-shadow: 0 2px 10px rgba(11, 11, 11, 0.06);
+}
+.card-interactive:active { background: var(--surface); }
 
-/* ─── Stat card ─── */
+/* ─── Stat card ───
+   Colour shift on hover, no scale. `brightness()` on the number was
+   unpredictable against the dark background. */
 .stat-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1.5rem;
   text-align: center;
-  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   cursor: pointer;
 }
 .stat-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  border-color: var(--border-strong);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: var(--card-hover);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 .light .stat-card:hover {
-  box-shadow: 0 8px 24px rgba(11, 11, 11, 0.1);
+  box-shadow: 0 2px 12px rgba(11, 11, 11, 0.07);
 }
 .stat-card .stat-count {
-  transition: color 0.3s;
+  transition: color 0.15s;
 }
 .stat-card:hover .stat-count {
-  filter: brightness(1.2);
+  color: var(--primary);
 }
 @keyframes countPulse {
   0%   { transform: scale(1); }
-  50%  { transform: scale(1.05); }
+  50%  { transform: scale(1.03); }
   100% { transform: scale(1); }
 }
 .stat-count.animate {
-  animation: countPulse 0.6s ease-out;
+  animation: countPulse 0.4s ease-out;
 }
 
 /* ─── Table rows ─── */
@@ -633,16 +722,17 @@ tbody tr:hover {
   color: var(--primary-fg);
 }
 
-/* ─── Button pulse ─── */
+/* ─── Emphasis on hover ───
+   A 3% scale is small but still moves the target; a colour shift is not. */
 .btn-pulse {
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .btn-pulse:hover {
-  transform: scale(1.03);
-  box-shadow: 0 2px 12px var(--primary-glow);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 .btn-pulse:active {
-  transform: scale(0.97);
+  background: var(--row-hover);
 }
 
 /* ─── Fade-in staggered items ─── */
@@ -668,13 +758,56 @@ a:hover {
   color: var(--primary-dark);
 }
 
+/* ─── App shell ───
+   The sidebar is `position: fixed`, so the body column is offset by the same
+   token. Owned by CSS rather than an inline `marginLeft` in the layout so the
+   two can never disagree. */
+.portal-shell__body {
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-shell__main {
+  flex: 1;
+  width: 100%;
+  max-width: 1280px;
+  padding: 1.5rem 2rem 3rem;
+}
+
+/* `main` is no longer the layout hook, so the old mobile override would leak
+   onto the public-facing layouts that still use a bare <main>. */
+@media (max-width: 767px) {
+  .portal-shell__body {
+    margin-left: 0;
+  }
+  .portal-shell__main {
+    padding: 1rem 1rem 2.5rem;
+  }
+}
+
+/* Visible only when focused — the first tab stop on every portal page. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0 0 8px 8px;
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus-visible {
+  top: 0;
+}
+
 /* ─── Responsive utilities ─── */
 @media (max-width: 767px) {
-  main {
-    margin-left: 0 !important;
-    padding: 1rem !important;
-  }
-
   .stack-sm {
     grid-template-columns: 1fr !important;
   }
@@ -696,8 +829,74 @@ a:hover {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .table-wrap table {
-    min-width: 560px;
+  .table-wrap table,
+  .media-table {
+    min-width: var(--table-min, 560px);
+  }
+
+  /* Below 768px a 560px-minimum table is unusable, so each row becomes a
+     stacked card. The label comes from each cell's `data-label`, which mirrors
+     its column header, so the visual pairing stays in sync with the real
+     table. The header row is visually hidden rather than `display: none` so
+     screen readers still announce the column associations. */
+  .table-wrap.table-cards {
+    overflow-x: visible;
+  }
+  .table-wrap.table-cards table,
+  .table-wrap.table-cards .media-table {
+    min-width: 0;
+  }
+  .table-wrap.table-cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .table-wrap.table-cards tbody tr {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
+    padding: 0.25rem 0;
+  }
+  .table-wrap.table-cards tbody tr:last-child {
+    margin-bottom: 0;
+  }
+  .table-wrap.table-cards td {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 38%) 1fr;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.5rem 0.875rem;
+    border: none;
+    text-align: left;
+  }
+  .table-wrap.table-cards td::before {
+    content: attr(data-label);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+  }
+  /* Cells that are really a full-width action strip or a bare checkbox get
+     the whole row to themselves. */
+  .table-wrap.table-cards td[data-wide],
+  .table-wrap.table-cards td.select-cell {
+    grid-template-columns: 1fr;
+  }
+  .table-wrap.table-cards td[data-wide]::before,
+  .table-wrap.table-cards td.select-cell::before {
+    content: none;
+  }
+  .table-wrap.table-cards td.select-cell {
+    padding-block: 0.25rem;
   }
 
   .grid-2-sm {

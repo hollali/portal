@@ -306,11 +306,11 @@ function MatchNotice({ result }: { result: AskResult }) {
         lineHeight: 1.5,
         color: "var(--p-text-2)",
         background: gap
-          ? "color-mix(in srgb, #b45309 10%, transparent)"
+          ? "color-mix(in srgb, var(--warning) 12%, transparent)"
           : "color-mix(in srgb, var(--primary) 8%, transparent)",
         border: `1px solid ${
           gap
-            ? "color-mix(in srgb, #b45309 30%, transparent)"
+            ? "color-mix(in srgb, var(--warning) 38%, transparent)"
             : "color-mix(in srgb, var(--primary) 28%, transparent)"
         }`,
       }}

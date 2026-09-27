@@ -101,15 +101,34 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
         </select>
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
+      <div className="card table-wrap table-cards">
         <table>
           <thead>
             <tr>
               {columns.map(col => (
-                <th key={col.key}>
+                <th
+                  key={col.key}
+                  scope="col"
+                  // Announce the current sort on the header, not just with a glyph.
+                  aria-sort={
+                    col.sortable && sort === col.key ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'
+                  }
+                >
                   {col.sortable ? (
-                    <button onClick={() => handleSort(col.key)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: sort === col.key ? 'var(--primary)' : 'var(--muted)', padding: 0 }}>
-                      {col.label} {sort === col.key ? (dir === 'asc' ? '▲' : '▼') : ''}
+                    <button
+                      onClick={() => handleSort(col.key)}
+                      aria-label={`Sort by ${col.label}`}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: sort === col.key ? 'var(--primary)' : 'var(--muted)', padding: 0 }}
+                    >
+                      {col.label}{' '}
+                      {sort === col.key && (
+                        <>
+                          <span aria-hidden>{dir === 'asc' ? '▲' : '▼'}</span>
+                          <span className="sr-only">
+                            {dir === 'asc' ? 'sorted ascending' : 'sorted descending'}
+                          </span>
+                        </>
+                      )}
                     </button>
                   ) : col.label}
                 </th>
@@ -120,7 +139,9 @@ export default function ListPage({ type, apiPath, title, columns, searchPlacehol
             {data.items.map((item: MediaRow, idx: number) => (
               <tr key={item.id} className="stagger-item" style={{ animationDelay: `${(idx % 10) * 0.03}s` }}>
                 {columns.map(col => (
-                  <td key={col.key}>
+                  // `data-label` mirrors the column header so the stacked
+                  // mobile card layout can show the field name.
+                  <td key={col.key} data-label={col.label}>
                     {col.key === 'id' ? (
                       <Link href={`${detailPrefix}${item.id}`} style={{ fontWeight: 600 }}>{item.id}</Link>
                     ) : col.render ? (

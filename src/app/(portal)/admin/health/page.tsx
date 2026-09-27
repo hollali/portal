@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Activity, RefreshCw, HardDrive, Database, AlertTriangle, CheckCircle2, FileWarning, EyeOff } from 'lucide-react'
-import { AnimBtn, SkeletonTable, EmptyState } from '@/components/ui'
+import { SkeletonTable, EmptyState } from '@/components/ui'
+import { PageHeader, Button, Badge } from '@/components/ui/kit'
 import { jsonFetch } from '@/lib/jsonFetch'
 
 interface TypeHealth {
@@ -29,7 +30,9 @@ export default function HealthPage() {
   const router = useRouter()
   const [data, setData] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  // This gate admits admin OR editor, so the old `isAdmin` name was a lie.
+  const [authorized, setAuthorized] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export default function HealthPage() {
         router.push('/admin')
         return
       }
-      setIsAdmin(true)
+      setAuthorized(true)
     })
   }, [router])
 
@@ -47,32 +50,26 @@ export default function HealthPage() {
     const res = await fetch('/api/admin/health')
     if (res.ok) {
       const d = await res.json().catch(() => null)
-      if (d) setData(d)
+      if (d) {
+        setData(d)
+        setLoadFailed(false)
+      } else {
+        setLoadFailed(true)
+      }
+    } else {
+      setLoadFailed(true)
     }
     setLoading(false)
     setRefreshing(false)
   }, [])
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!authorized) return
     const id = requestAnimationFrame(() => fetchHealth())
     return () => cancelAnimationFrame(id)
-  }, [isAdmin, fetchHealth])
+  }, [authorized, fetchHealth])
 
-  const refresh = () => {
-    setRefreshing(true)
-    fetchHealth()
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <SkeletonTable rows={5} cols={4} />
-      </div>
-    )
-  }
-
-  if (loading && !data) {
+  if (!authorized || (loading && !data)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <SkeletonTable rows={5} cols={4} />
@@ -84,10 +81,9 @@ export default function HealthPage() {
     return (
       <div className="text-center py-16">
         <EmptyState message="Could not load health data." icon={<Activity size={48} />} />
-        <button onClick={() => fetchHealth(true)}
-          style={{ marginTop: '1rem', background: 'var(--primary)', border: 'none', color: 'var(--primary-fg)', borderRadius: 8, padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+        <Button variant="primary" onClick={() => fetchHealth(true)} style={{ marginTop: '1rem' }}>
           Retry
-        </button>
+        </Button>
       </div>
     )
   }
@@ -96,38 +92,47 @@ export default function HealthPage() {
 
   return (
     <div className="page-enter">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold mb-1 flex items-center gap-2">
-            <Activity size={20} style={{ color: overallHealthy ? 'var(--success)' : 'var(--warning)' }} /> System Health
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-            Media integrity, storage, and database overview. Generated {new Date(data.generatedAt).toLocaleString()}
-          </p>
+      <PageHeader
+        title="System Health"
+        icon={<Activity size={22} style={{ color: overallHealthy ? 'var(--success)' : 'var(--warning)' }} />}
+        crumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Health' }]}
+        description={`Media integrity, storage, and database overview. Generated ${new Date(data.generatedAt).toLocaleString()}`}
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => fetchHealth(true)}
+            loading={refreshing}
+            iconLeft={<RefreshCw size={14} aria-hidden />}
+          >
+            Refresh
+          </Button>
+        }
+      />
+
+      {loadFailed && (
+        <div role="alert" className="card mb-4" style={{ padding: '0.75rem 1rem', borderColor: 'var(--warning)', color: 'var(--warning)' }}>
+          Showing the last successful reading — the latest refresh failed.
         </div>
-        <AnimBtn onClick={refresh} disabled={refreshing} style={{ padding: '0.5rem 1rem', background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--primary)', fontWeight: 600, fontSize: '0.875rem', gap: '0.375rem' }}>
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh
-        </AnimBtn>
-      </div>
+      )}
 
       {/* Overall status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         <div className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {overallHealthy ? <CheckCircle2 size={32} style={{ color: 'var(--success)' }} /> : <AlertTriangle size={32} style={{ color: 'var(--warning)' }} />}
+          {overallHealthy ? <CheckCircle2 size={32} style={{ color: 'var(--success)' }} aria-hidden /> : <AlertTriangle size={32} style={{ color: 'var(--warning)' }} aria-hidden />}
           <div>
             <div className="text-xl font-bold">{overallHealthy ? 'Healthy' : 'Issues found'}</div>
             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{data.totalIssues} problem record(s) across all types</div>
           </div>
         </div>
         <div className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <HardDrive size={32} style={{ color: 'var(--primary)' }} />
+          <HardDrive size={32} style={{ color: 'var(--primary)' }} aria-hidden />
           <div>
             <div className="text-xl font-bold">{data.storage.localFileSizeFormatted}</div>
             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{data.storage.localFileCount.toLocaleString()} local files</div>
           </div>
         </div>
         <div className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Database size={32} style={{ color: 'var(--primary)' }} />
+          <Database size={32} style={{ color: 'var(--primary)' }} aria-hidden />
           <div>
             <div className="text-xl font-bold">{data.dbStats.total.toLocaleString()}</div>
             <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{data.dbStats.users} users · {data.dbStats.auditLogs} audit entries</div>
@@ -143,12 +148,9 @@ export default function HealthPage() {
           const pct = t.total === 0 ? 100 : Math.round(((t.total - (t.missingLocalCount + t.noMediaCount)) / t.total) * 100)
           return (
             <div key={t.type} className="card" style={{ padding: '1rem' }}>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-2">
                 <h3 className="text-sm font-semibold capitalize">{t.type}</h3>
-                <span className="text-xs font-semibold px-2 py-1 rounded-full"
-                  style={{ background: ok ? 'rgba(var(--success-rgb,16,185,129),0.15)' : 'rgba(var(--danger-rgb,239,68,68),0.15)', color: ok ? 'var(--success)' : 'var(--danger)' }}>
-                  {pct}% {ok ? 'ok' : 'issues'}
-                </span>
+                <Badge tone={ok ? 'success' : 'danger'}>{pct}% {ok ? 'ok' : 'issues'}</Badge>
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
                 <div className="flex justify-between"><span style={{ color: 'var(--muted-foreground)' }}>Total records</span><span className="font-semibold">{t.total.toLocaleString()}</span></div>
@@ -156,19 +158,21 @@ export default function HealthPage() {
                 <div className="flex justify-between"><span style={{ color: 'var(--muted-foreground)' }}>URL only</span><span>{t.withUrlOnly}</span></div>
                 <div className="flex justify-between"><span style={{ color: 'var(--muted-foreground)' }}>Missing local files</span>
                   <span style={{ color: t.missingLocalCount > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 600 }}>
-                    {t.missingLocalCount > 0 ? <span className="inline-flex items-center gap-1"><FileWarning size={13} /> {t.missingLocalCount}</span> : 0}
+                    {t.missingLocalCount > 0 ? <span className="inline-flex items-center gap-1"><FileWarning size={13} aria-hidden /> {t.missingLocalCount}</span> : 0}
                   </span>
                 </div>
                 <div className="flex justify-between"><span style={{ color: 'var(--muted-foreground)' }}>No media at all</span>
                   <span style={{ color: t.noMediaCount > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 600 }}>
-                    {t.noMediaCount > 0 ? <span className="inline-flex items-center gap-1"><EyeOff size={13} /> {t.noMediaCount}</span> : 0}
+                    {t.noMediaCount > 0 ? <span className="inline-flex items-center gap-1"><EyeOff size={13} aria-hidden /> {t.noMediaCount}</span> : 0}
                   </span>
                 </div>
               </div>
               {(t.missingLocalCount > 0 || t.noMediaCount > 0) && (
                 <details className="mt-3">
-                  <summary className="text-xs cursor-pointer" style={{ color: 'var(--primary)' }}>View problem IDs</summary>
-                  <div className="mt-2 max-h-40 overflow-auto rounded bg-(--background) p-2 text-xs" style={{ background: 'var(--background)' }}>
+                  <summary className="text-xs cursor-pointer" style={{ color: 'var(--primary)' }}>
+                    View problem IDs for {t.type}
+                  </summary>
+                  <div className="mt-2 max-h-40 overflow-auto rounded p-2 text-xs" style={{ background: 'var(--background)' }}>
                     {t.noMedia.length > 0 && <div className="mb-1">No media: {t.noMedia.map(n => `#${n.id}`).join(', ') || '-'}</div>}
                     {t.missingLocal.length > 0 && <div>Missing files: {t.missingLocal.map(m => `#${m.id}`).join(', ') || '-'}</div>}
                   </div>
@@ -183,16 +187,20 @@ export default function HealthPage() {
       <h2 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)' }}>Database Summary</h2>
       <div className="card overflow-x-auto mb-6">
         <table>
+          <caption className="sr-only">Row counts per database table</caption>
           <thead>
-            <tr><th>Table</th><th>Count</th></tr>
+            <tr>
+              <th scope="col">Table</th>
+              <th scope="col">Count</th>
+            </tr>
           </thead>
           <tbody>
-            <tr><td className="capitalize">Images</td><td>{data.dbStats.images.toLocaleString()}</td></tr>
-            <tr><td className="capitalize">Videos</td><td>{data.dbStats.videos.toLocaleString()}</td></tr>
-            <tr><td className="capitalize">News</td><td>{data.dbStats.news.toLocaleString()}</td></tr>
-            <tr><td className="capitalize">Audio</td><td>{data.dbStats.audio.toLocaleString()}</td></tr>
-            <tr><td className="capitalize">Users</td><td>{data.dbStats.users.toLocaleString()}</td></tr>
-            <tr><td className="capitalize">Audit logs</td><td>{data.dbStats.auditLogs.toLocaleString()}</td></tr>
+            <tr><th scope="row" className="capitalize font-normal text-left">Images</th><td>{data.dbStats.images.toLocaleString()}</td></tr>
+            <tr><th scope="row" className="capitalize font-normal text-left">Videos</th><td>{data.dbStats.videos.toLocaleString()}</td></tr>
+            <tr><th scope="row" className="capitalize font-normal text-left">News</th><td>{data.dbStats.news.toLocaleString()}</td></tr>
+            <tr><th scope="row" className="capitalize font-normal text-left">Audio</th><td>{data.dbStats.audio.toLocaleString()}</td></tr>
+            <tr><th scope="row" className="capitalize font-normal text-left">Users</th><td>{data.dbStats.users.toLocaleString()}</td></tr>
+            <tr><th scope="row" className="capitalize font-normal text-left">Audit logs</th><td>{data.dbStats.auditLogs.toLocaleString()}</td></tr>
           </tbody>
         </table>
       </div>

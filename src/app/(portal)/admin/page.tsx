@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { LayoutDashboard } from 'lucide-react'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 import type { MediaType } from '@/components/admin/MediaManager'
 import { jsonFetch } from '@/lib/jsonFetch'
+import { PageHeader } from '@/components/ui/kit'
 
 export default function AdminPage() {
   const router = useRouter()
@@ -25,11 +27,15 @@ export default function AdminPage() {
     router.push(`/admin/media/${tab}`)
   }
 
-  if (!ready) return <div>Loading...</div>
+  if (!ready) return <div>Loading…</div>
 
   return (
     <div>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>Dashboard</h1>
+      <PageHeader
+        title="Dashboard"
+        icon={<LayoutDashboard size={22} />}
+        description="Collection totals, activity, and sources across every media type."
+      />
       <AdminDashboard onBrowse={handleBrowse} />
     </div>
   )

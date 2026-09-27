@@ -8,14 +8,15 @@ export function ThemeToggle({ square = false }: { square?: boolean }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme')
-    const next =
-      saved === 'light' || saved === 'dark'
-        ? saved === 'dark'
-        : window.matchMedia('(prefers-color-scheme: dark)').matches
+    // `theme-init` in src/app/layout.tsx has already resolved the stored
+    // preference (or the OS setting) and set exactly one of .dark / .light
+    // before first paint. Read it back rather than recomputing, so this
+    // component can never disagree with the pre-paint value.
+    const root = document.documentElement
+    const isLight = root.classList.contains('light')
     const id = requestAnimationFrame(() => {
       setMounted(true)
-      setIsDark(next)
+      setIsDark(!isLight)
     })
     return () => cancelAnimationFrame(id)
   }, [])

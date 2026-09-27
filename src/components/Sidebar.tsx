@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { jsonFetch } from '@/lib/jsonFetch'
 import {
   LayoutDashboard,
@@ -13,7 +13,6 @@ import {
   Search,
   LogOut,
   LogIn,
-  Menu,
   X,
   Activity,
   ScrollText,
@@ -24,6 +23,7 @@ import {
   FileText,
   Library,
 } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 interface NavLink {
@@ -80,30 +80,36 @@ const adminSections: NavSection[] = [
   },
 ]
 
-const DESKTOP_QUERY = '(min-width: 768px)'
+/** Only admins can manage users, settings, and system health. */
+const systemLinks = ['/admin/users', '/admin/settings', '/admin/health']
 
-function subscribeDesktop(callback: () => void) {
-  const mq = window.matchMedia(DESKTOP_QUERY)
-  mq.addEventListener('change', callback)
-  return () => mq.removeEventListener('change', callback)
-}
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-function getDesktopSnapshot() {
-  return window.matchMedia(DESKTOP_QUERY).matches
-}
-
-export default function Sidebar() {
+export default function Sidebar({
+  open,
+  isDesktop,
+  onClose,
+}: {
+  open: boolean
+  isDesktop: boolean
+  onClose: () => void
+}) {
   const pathname = usePathname()
   const [username, setUsername] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [role, setRole] = useState<string>('')
   const [unread, setUnread] = useState(0)
-  const [open, setOpen] = useState(false)
-  const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, () => true)
+  const asideRef = useRef<HTMLElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     jsonFetch<{ username?: string; isAdmin?: boolean; role?: string }>('/api/me').then(d => {
-      if (d?.username) { setUsername(d.username); setIsAdmin(d.isAdmin || false); setRole(d.role || '') }
+      if (d?.username) {
+        setUsername(d.username)
+        setIsAdmin(d.isAdmin || false)
+        setRole(d.role || '')
+      }
     })
   }, [])
 
@@ -112,7 +118,7 @@ export default function Sidebar() {
     jsonFetch<{ unreadCount?: number }>('/api/admin/notifications?limit=1').then(d => {
       setUnread(d?.unreadCount || 0)
     })
-  }, [isAdmin])
+  }, [isAdmin, pathname])
 
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' })
@@ -122,67 +128,79 @@ export default function Sidebar() {
     window.location.href = '/login'
   }
 
-  const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
-  }
+  const isActive = useCallback(
+    (href: string) => {
+      if (href === '/') return pathname === '/'
+      // `/admin` must not light up for every /admin/* route, but
+      // `/admin/media/images` should light up for itself.
+      if (href === '/admin') return pathname === '/admin'
+      return pathname === href || pathname.startsWith(`${href}/`)
+    },
+    [pathname]
+  )
 
-  // Only admins can manage users, settings, and system health
-  const systemLinks = ['/admin/users', '/admin/settings', '/admin/health']
   const sections = isAdmin
     ? adminSections.map(section => ({
         ...section,
         links:
-          role === 'admin'
-            ? section.links
-            : section.links.filter(l => !systemLinks.includes(l.href)),
+          role === 'admin' ? section.links : section.links.filter(l => !systemLinks.includes(l.href)),
       }))
     : publicSections
 
-  const sidebarVisible = isDesktop || open
+  // Escape closes, Tab is trapped inside the drawer while it is modal.
+  useEffect(() => {
+    if (!open || isDesktop) return
+    const node = asideRef.current
+    if (!node) return
+    closeRef.current?.focus()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const items = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        el => el.offsetParent !== null || el === document.activeElement
+      )
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, isDesktop, onClose])
+
+  const visible = isDesktop || open
 
   return (
     <>
-      {/* Mobile overlay */}
       {open && !isDesktop && (
         <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.4)',
-            zIndex: 40,
-          }}
+          onClick={onClose}
+          aria-hidden
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
         />
       )}
 
-      {/* Hamburger button (mobile only) */}
-      {!isDesktop && (
-        <button
-          onClick={() => setOpen(o => !o)}
-          style={{
-            position: 'fixed',
-            top: '0.75rem',
-            left: '0.75rem',
-            zIndex: 60,
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: '0.5rem',
-            padding: '0.5rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--foreground)',
-            transition: 'left 0.25s ease',
-          }}
-        >
-          {open ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      )}
-
-      {/* Sidebar */}
       <aside
+        ref={asideRef}
+        id="portal-nav"
+        aria-label="Main navigation"
+        // Off-canvas while hidden on mobile: keep it out of the tab order and
+        // hide it from assistive tech instead of leaving it focusable behind
+        // the overlay.
+        aria-hidden={visible ? undefined : true}
+        inert={!visible ? true : undefined}
         style={{
           position: 'fixed',
           top: 0,
@@ -195,14 +213,15 @@ export default function Sidebar() {
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',
+          overscrollBehavior: 'contain',
           transition: 'transform 0.25s ease',
-          transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
+          transform: visible ? 'translateX(0)' : 'translateX(-100%)',
+          visibility: visible ? 'visible' : 'hidden',
         }}
       >
-        {/* Logo */}
         <div
           style={{
-            padding: '1.25rem 1.5rem',
+            padding: '0.875rem 1rem',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
@@ -210,6 +229,7 @@ export default function Sidebar() {
           }}
         >
           <span
+            aria-hidden
             style={{
               width: '28px',
               height: '28px',
@@ -229,18 +249,30 @@ export default function Sidebar() {
               fontSize: '1.0625rem',
               letterSpacing: '-0.02em',
               color: 'var(--foreground)',
+              flex: 1,
             }}
           >
             OSINT Portal
           </span>
+          {!isDesktop && (
+            <Button
+              ref={closeRef}
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={onClose}
+              aria-label="Close navigation"
+            >
+              <X size={18} aria-hidden />
+            </Button>
+          )}
         </div>
 
-        {/* Navigation */}
         <nav style={{ flex: 1, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
           {sections.map((section, si) => (
             <div key={si} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
               {section.label && (
-                <div
+                <h2
                   style={{
                     fontSize: '0.65rem',
                     fontWeight: 700,
@@ -248,10 +280,11 @@ export default function Sidebar() {
                     letterSpacing: '0.08em',
                     color: 'var(--muted)',
                     padding: '0.75rem 0.875rem 0.25rem',
+                    margin: 0,
                   }}
                 >
                   {section.label}
-                </div>
+                </h2>
               )}
               {section.links.map(({ href, label, icon: Icon }) => {
                 const active = isActive(href)
@@ -259,7 +292,8 @@ export default function Sidebar() {
                   <Link
                     key={href}
                     href={href}
-                    onClick={() => setOpen(false)}
+                    onClick={onClose}
+                    aria-current={active ? 'page' : undefined}
                     className={`nav-item${active ? ' active' : ''}`}
                     style={{
                       display: 'flex',
@@ -273,16 +307,31 @@ export default function Sidebar() {
                       color: active ? 'var(--primary-fg)' : 'var(--foreground)',
                     }}
                   >
-                    <Icon size={18} className="nav-icon" style={{ color: active ? 'var(--primary-fg)' : 'var(--muted)' }} />
+                    <Icon
+                      size={18}
+                      aria-hidden
+                      className="nav-icon"
+                      style={{ color: active ? 'var(--primary-fg)' : 'var(--muted)' }}
+                    />
                     <span style={{ flex: 1 }}>{label}</span>
                     {href === '/admin/notifications' && unread > 0 && (
-                      <span style={{
-                        fontSize: '0.65rem', fontWeight: 700, color: '#fff',
-                        background: 'var(--danger)', borderRadius: '999px',
-                        minWidth: '18px', height: '18px', padding: '0 4px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          color: 'var(--primary-fg)',
+                          background: 'var(--primary)',
+                          borderRadius: '999px',
+                          minWidth: '18px',
+                          height: '18px',
+                          padding: '0 4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
                         {unread > 99 ? '99+' : unread}
+                        <span className="sr-only"> unread notifications</span>
                       </span>
                     )}
                   </Link>
@@ -292,10 +341,9 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        {/* User area */}
         <div
           style={{
-            padding: '1rem 1.25rem',
+            padding: '0.875rem 1rem',
             borderTop: '1px solid var(--border)',
             display: 'flex',
             flexDirection: 'column',
@@ -305,45 +353,34 @@ export default function Sidebar() {
           <div className="flex justify-center">
             <ThemeToggle />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {username ? (
-            <>
-              <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{username}</span>
-              <button
-                onClick={handleLogout}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+            {username ? (
+              <>
+                <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{username}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  iconLeft={<LogOut size={14} aria-hidden />}
+                  style={{ color: 'var(--danger)' }}
+                >
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Link
+                href="/login"
                 style={{
-                  background: 'none',
-                  border: '1px solid var(--border)',
-                  borderRadius: '0.375rem',
-                  padding: '0.3rem 0.6rem',
-                  cursor: 'pointer',
-                  color: 'var(--muted)',
+                  fontSize: '0.8rem',
+                  textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.3rem',
-                  fontSize: '0.75rem',
-                  transition: 'color 0.2s, border-color 0.2s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)' }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
               >
-                <LogOut size={14} /> Logout
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              style={{
-                fontSize: '0.8rem',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-              }}
-            >
-              <LogIn size={14} /> Login
-            </Link>
-          )}
+                <LogIn size={14} aria-hidden /> Login
+              </Link>
+            )}
           </div>
         </div>
       </aside>

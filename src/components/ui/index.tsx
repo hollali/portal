@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useId, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
+import { useState, useEffect, useRef, useId, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X, AlertTriangle } from 'lucide-react'
 
@@ -194,6 +194,12 @@ interface ConfirmDialogProps {
   confirmLabel?: string
   cancelLabel?: string
   busy?: boolean
+  /**
+   * When set, the confirm button stays disabled until the user types this
+   * exact string. Use for irreversible bulk actions where a stray click would
+   * destroy a lot of data.
+   */
+  requireTyped?: string
   onConfirm: () => void
   onClose: () => void
 }
@@ -205,12 +211,27 @@ export function ConfirmDialog({
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
   busy = false,
+  requireTyped,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
   const titleId = useId()
   const descId = useId()
+  const inputId = useId()
   const cancelRef = useRef<HTMLButtonElement>(null)
+  const [typed, setTyped] = useState('')
+
+  // Reset the gate whenever the dialog is reopened, so a previous partial
+  // entry cannot carry over and pre-arm the next confirmation. Adjusting state
+  // during render (rather than in an effect) keeps it in the same commit and
+  // avoids an extra cascading render.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setTyped('')
+  }
+
+  const blocked = Boolean(requireTyped) && typed.trim() !== requireTyped
 
   return (
     <Modal
@@ -224,13 +245,30 @@ export function ConfirmDialog({
     >
       <div className="p-6">
         <h2 id={titleId} className="text-lg font-bold mb-2 flex items-center gap-2">
-          <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+          <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0 }} aria-hidden />
           {title}
         </h2>
         {message && (
-          <p id={descId} className="text-sm mb-6" style={{ color: 'var(--muted-foreground)' }}>
+          <div id={descId} className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>
             {message}
-          </p>
+          </div>
+        )}
+        {requireTyped && (
+          <div className="mb-4">
+            <label htmlFor={inputId} className="block text-xs font-semibold mb-1" style={{ color: 'var(--muted-foreground)' }}>
+              Type <code style={{ color: 'var(--foreground)' }}>{requireTyped}</code> to confirm
+            </label>
+            <input
+              id={inputId}
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              disabled={busy}
+              autoComplete="off"
+              spellCheck={false}
+              className="ui-input"
+              style={{ width: '100%', height: 36 }}
+            />
+          </div>
         )}
         <div className="flex justify-end gap-2">
           <button
@@ -244,52 +282,21 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || blocked}
             className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
-            style={{ background: 'var(--danger)', border: 'none', color: '#fff', cursor: busy ? 'not-allowed' : 'pointer' }}
+            style={{
+              background: 'var(--danger)',
+              border: 'none',
+              color: '#fff',
+              cursor: busy || blocked ? 'not-allowed' : 'pointer',
+              opacity: busy || blocked ? 0.55 : 1,
+            }}
           >
             {busy ? 'Please wait…' : confirmLabel}
           </button>
         </div>
       </div>
     </Modal>
-  )
-}
-
-interface AnimBtnProps {
-  children: ReactNode
-  onClick?: (e: ReactMouseEvent<HTMLButtonElement>) => void
-  title?: string
-  /** Required when the button renders an icon only — `title` alone is not announced reliably. */
-  'aria-label'?: string
-  disabled?: boolean
-  className?: string
-  style?: React.CSSProperties
-  type?: 'button' | 'submit' | 'reset'
-}
-
-export function AnimBtn({ children, onClick, title, disabled, className = '', style, type = 'button', ...rest }: AnimBtnProps) {
-  const [hover, setHover] = useState(false)
-  return (
-    <button
-      type={type}
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      {...rest}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className={`inline-flex items-center justify-center transition-all duration-200 ease-out ${className}`}
-      style={{
-        borderRadius: '0.375rem', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-        transform: hover && !disabled ? 'scale(1.1)' : 'scale(1)',
-        filter: hover && !disabled ? 'brightness(1.15)' : 'brightness(1)',
-        opacity: disabled ? 0.5 : 1,
-        ...style,
-      }}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -315,11 +322,13 @@ export function AnimLink({ children, href, target, rel, title, className = '', s
       {...rest}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className={`inline-flex items-center justify-center transition-all duration-200 ease-out no-underline ${className}`}
+      className={`inline-flex items-center justify-center transition-colors duration-150 no-underline ${className}`}
       style={{
         borderRadius: '0.375rem', cursor: 'pointer', textDecoration: 'none',
-        transform: hover ? 'scale(1.1)' : 'scale(1)',
-        filter: hover ? 'brightness(1.15)' : 'brightness(1)',
+        // Surface + text shift rather than scale(1.1): scaling moves the hit
+        // target out from under the pointer, which is easy to mis-click on the
+        // small thumbnail links in media tables.
+        background: hover ? 'var(--surface-hover)' : undefined,
         ...style,
       }}
     >
@@ -342,56 +351,33 @@ export function Skeleton({ className = '', style }: SkeletonProps) {
   )
 }
 
-interface ToastProps {
-  message: string
-  type?: 'success' | 'error'
-  onClose: () => void
-}
-
-export function Toast({ message, type = 'success', onClose }: ToastProps) {
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    requestAnimationFrame(() => setVisible(true))
-    const timer = setTimeout(() => {
-      setVisible(false)
-      setTimeout(onClose, 200)
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [onClose])
-
-  return createPortal(
-    <div
-      role="status"
-      className="fixed top-4 right-4 left-4 sm:left-auto z-[80] flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200"
-      style={{
-        background: type === 'error' ? 'var(--danger)' : 'var(--success)',
-        maxWidth: '24rem',
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(-10px)',
-      }}
-    >
-      <span>{message}</span>
-      <button onClick={onClose} className="ml-4 flex items-center rounded-full p-1 transition-colors hover:bg-white/20" style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
-        <X size={14} />
-      </button>
-    </div>,
-    document.body
-  )
-}
-
 interface EmptyStateProps {
   message: string
+  /** Optional supporting line — an empty state should say what to do next. */
+  title?: string
+  description?: string
   icon?: ReactNode
   action?: ReactNode
 }
 
-export function EmptyState({ message, icon, action }: EmptyStateProps) {
+export function EmptyState({ message, title, description, icon, action }: EmptyStateProps) {
   return (
     <div className="card flex flex-col items-center justify-center py-12 px-4 text-center">
-      {icon && <div className="mb-4 opacity-30">{icon}</div>}
-      <p style={{ color: 'var(--muted-foreground)' }}>{message}</p>
-      {action && <div className="mt-4">{action}</div>}
+      {icon && <div className="mb-4 opacity-30" aria-hidden>{icon}</div>}
+      {title && (
+        <p className="font-semibold" style={{ color: 'var(--foreground)' }}>
+          {title}
+        </p>
+      )}
+      <p className={title ? 'mt-1' : ''} style={{ color: 'var(--muted-foreground)', maxWidth: '46ch' }}>
+        {message}
+      </p>
+      {description && (
+        <p className="mt-2 text-sm" style={{ color: 'var(--muted)', maxWidth: '46ch' }}>
+          {description}
+        </p>
+      )}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   )
 }
@@ -408,7 +394,7 @@ export function SkeletonTable({ rows = 5, cols = 4 }: SkeletonTableProps) {
         <thead>
           <tr>
             {Array.from({ length: cols }).map((_, i) => (
-              <th key={i}><Skeleton style={{ height: '12px', width: '60%' }} /></th>
+              <th key={i} scope="col"><Skeleton style={{ height: '12px', width: '60%' }} /></th>
             ))}
           </tr>
         </thead>

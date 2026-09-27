@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Sidebar from "@/components/Sidebar";
+import PortalShell from "@/components/PortalShell";
 
 export const metadata: Metadata = {
   title: {
@@ -13,20 +13,8 @@ export default function PortalLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <>
-      <Sidebar />
-      <main
-        className="page-enter"
-        style={{
-          marginLeft: 'var(--sidebar-width)',
-          maxWidth: '1280px',
-          padding: '1.5rem 2rem',
-          minHeight: '100vh',
-        }}
-      >
-        {children}
-      </main>
-    </>
-  );
+  // The sidebar, topbar, and toast queue all need client state, so the whole
+  // chrome lives behind one boundary in PortalShell rather than being split
+  // across several client components here.
+  return <PortalShell>{children}</PortalShell>;
 }

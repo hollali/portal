@@ -1,10 +1,16 @@
 'use client'
 
-import { useEffect, useState, FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Settings, Save } from 'lucide-react'
-import { Toast } from '@/components/ui'
 import { jsonFetch } from '@/lib/jsonFetch'
+import { PageHeader, Button, Field, Input, useToast } from '@/components/ui/kit'
+
+const NUMERIC_FIELDS: { name: string; label: string; min: number; max?: number; hint?: string }[] = [
+  { name: 'defaultItemsPerPage', label: 'Items Per Page (public)', min: 5, max: 100 },
+  { name: 'searchResultsPerPage', label: 'Search Results Per Page', min: 5, max: 100 },
+  { name: 'maxItemsPerRun', label: 'Max Items Per Collection Run', min: 1 },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -12,7 +18,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const { toast } = useToast()
 
   useEffect(() => {
     jsonFetch<{ role?: string }>('/api/me').then(d => {
@@ -36,15 +43,45 @@ export default function SettingsPage() {
 
   const update = (key: string, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }))
+    // Clear the error as soon as the user edits the offending field.
+    setFieldErrors(prev => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  /** The API reports field-level problems in a `fields` map; surface them on the inputs. */
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {}
+    for (const f of NUMERIC_FIELDS) {
+      const raw = settings[f.name]
+      if (raw === undefined || raw === '') continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) {
+        errs[f.name] = 'Enter a number.'
+      } else if (n < f.min) {
+        errs[f.name] = `Must be at least ${f.min}.`
+      } else if (f.max !== undefined && n > f.max) {
+        errs[f.name] = `Must be at most ${f.max}.`
+      }
+    }
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      toast('Check the highlighted fields.', { tone: 'error' })
+      return false
+    }
+    return true
   }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!validate()) return
     setSaving(true)
-    const form = e.currentTarget
     const body: Record<string, string> = {}
-    for (const input of Array.from(form.querySelectorAll<HTMLInputElement>('input[name], textarea[name]'))) {
-      body[input.name] = input.value
+    for (const f of [...NUMERIC_FIELDS.map(f => f.name), 'portalName', 'defaultSource']) {
+      if (settings[f] !== undefined) body[f] = settings[f]
     }
     const res = await fetch('/api/admin/settings', {
       method: 'POST',
@@ -54,88 +91,91 @@ export default function SettingsPage() {
     const d = await res.json().catch(() => ({}))
     setSaving(false)
     if (res.ok) {
-      setToast({ message: 'Settings saved' })
+      toast('Settings saved.', { tone: 'success' })
       setSettings(d.settings || body)
+      setFieldErrors({})
     } else {
-      setToast({ message: d.error || 'Failed to save settings', type: 'error' })
+      if (d?.fields && typeof d.fields === 'object') setFieldErrors(d.fields)
+      toast(d.error || 'Failed to save settings.', { tone: 'error' })
     }
   }
 
   if (!isAdmin) {
-    return <div className="flex items-center justify-center min-h-[50vh]">Checking access...</div>
+    return <div className="flex items-center justify-center min-h-[50vh]">Checking access…</div>
   }
 
   return (
     <div className="page-enter">
-      <div className="flex items-center gap-2 mb-1">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <Settings size={20} style={{ color: 'var(--primary)' }} /> System Settings
-        </h1>
-      </div>
-      <p className="text-sm mb-6" style={{ color: 'var(--muted-foreground)' }}>
-        Configure portal-wide settings. Changes apply immediately.
-      </p>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <PageHeader
+        title="System Settings"
+        icon={<Settings size={22} />}
+        crumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Settings' }]}
+        description="Configure portal-wide settings. Changes apply immediately."
+      />
 
       {!loaded ? (
-        <div className="card p-6 text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading settings...</div>
+        <div className="card p-6 text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading settings…</div>
       ) : (
-        <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-          <div className="card p-6">
-            <h2 className="text-base font-bold mb-4">General</h2>
+        <form onSubmit={handleSubmit} className="max-w-2xl space-y-6" noValidate>
+          <fieldset className="card p-6">
+            <legend className="text-base font-bold mb-4">General</legend>
             <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1">Portal Name</label>
-                <input name="portalName" value={settings.portalName || ''} onChange={e => update('portalName', e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
-                <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>Displayed in the sidebar and page titles.</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1">Items Per Page (public)</label>
-                <input name="defaultItemsPerPage" type="number" min={5} max={100} value={settings.defaultItemsPerPage || '20'}
-                  onChange={e => update('defaultItemsPerPage', e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1">Search Results Per Page</label>
-                <input name="searchResultsPerPage" type="number" min={5} max={100} value={settings.searchResultsPerPage || '20'}
-                  onChange={e => update('searchResultsPerPage', e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
-              </div>
+              <Field label="Portal Name" hint="Displayed in the sidebar and page titles.">
+                <Input
+                  name="portalName"
+                  value={settings.portalName || ''}
+                  onChange={e => update('portalName', e.target.value)}
+                />
+              </Field>
+              {NUMERIC_FIELDS.slice(0, 2).map(f => (
+                <Field key={f.name} label={f.label} error={fieldErrors[f.name]}>
+                  <Input
+                    name={f.name}
+                    type="number"
+                    min={f.min}
+                    max={f.max}
+                    value={settings[f.name] || '20'}
+                    onChange={e => update(f.name, e.target.value)}
+                  />
+                </Field>
+              ))}
             </div>
-          </div>
+          </fieldset>
 
-          <div className="card p-6">
-            <h2 className="text-base font-bold mb-4">Collection</h2>
+          <fieldset className="card p-6">
+            <legend className="text-base font-bold mb-4">Collection</legend>
             <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1">Max Items Per Collection Run</label>
-                <input name="maxItemsPerRun" type="number" min={1} value={settings.maxItemsPerRun || '100'}
+              <Field label="Max Items Per Collection Run" error={fieldErrors.maxItemsPerRun}>
+                <Input
+                  name="maxItemsPerRun"
+                  type="number"
+                  min={1}
+                  value={settings.maxItemsPerRun || '100'}
                   onChange={e => update('maxItemsPerRun', e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1">Default Source Tag</label>
-                <input name="defaultSource" value={settings.defaultSource || ''} onChange={e => update('defaultSource', e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
-              </div>
+                />
+              </Field>
+              <Field label="Default Source Tag">
+                <Input
+                  name="defaultSource"
+                  value={settings.defaultSource || ''}
+                  onChange={e => update('defaultSource', e.target.value)}
+                />
+              </Field>
             </div>
-          </div>
+          </fieldset>
 
-          <div className="card p-6">
-            <h2 className="text-base font-bold mb-4">Security</h2>
+          <fieldset className="card p-6">
+            <legend className="text-base font-bold mb-4">Security</legend>
             <div className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
               <p className="mb-1"><strong>Session duration:</strong> 7 days (fixed)</p>
               <p>Passwords are hashed with bcrypt (cost 12). Admin actions are recorded in the audit log.</p>
             </div>
-          </div>
+          </fieldset>
 
           <div className="flex justify-end">
-            <button type="submit" disabled={saving} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
-              style={{ background: 'var(--primary)', color: 'var(--primary-fg)', cursor: saving ? 'not-allowed' : 'pointer', border: 'none' }}>
-              <Save size={14} /> {saving ? 'Saving...' : 'Save Settings'}
-            </button>
+            <Button type="submit" variant="primary" loading={saving} iconLeft={<Save size={14} aria-hidden />}>
+              Save Settings
+            </Button>
           </div>
         </form>
       )}

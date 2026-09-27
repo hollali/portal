@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Image as ImageIcon, Video, Newspaper, Headphones } from 'lucide-react'
-import { AnimBtn, SkeletonTable } from '@/components/ui'
+import { SkeletonTable } from '@/components/ui'
+import { Button } from '@/components/ui/kit'
 import type { MediaType } from '@/components/admin/MediaManager'
 
 interface SourceCount {
@@ -136,7 +137,7 @@ export default function AdminDashboard({ onBrowse }: { onBrowse: (tab: MediaType
                   ['Images', stats.trend.images, 'var(--primary)'],
                   ['Videos', stats.trend.videos, 'var(--focus)'],
                   ['News', stats.trend.news, 'var(--success)'],
-                  ['Audio', stats.trend.audio, '#f59e0b'],
+                  ['Audio', stats.trend.audio, 'var(--warning)'],
                 ] as [string, TrendPoint[], string][]
               ).map(([label, series, color]) => (
                 <div key={label}>
@@ -216,18 +217,9 @@ export default function AdminDashboard({ onBrowse }: { onBrowse: (tab: MediaType
             <div key={tab} className="card" style={{ padding: '1rem' }}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold">Top {label} Sources</h3>
-                <AnimBtn
-                  onClick={() => goBrowse(tab)}
-                  style={{
-                    fontSize: '0.7rem',
-                    background: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    padding: '0.2rem 0.5rem',
-                    color: 'var(--primary)',
-                  }}
-                >
+                <Button variant="secondary" size="xs" onClick={() => goBrowse(tab)}>
                   Browse
-                </AnimBtn>
+                </Button>
               </div>
               {list.length === 0 ? (
                 <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>

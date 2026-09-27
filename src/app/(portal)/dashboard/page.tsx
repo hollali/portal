@@ -137,17 +137,22 @@ export default function Dashboard() {
           <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Globe size={18} style={{ color: 'var(--primary)' }} /> Source Breakdown
           </h2>
-          <div className="table-wrap">
+          <div className="table-wrap table-cards">
             <table>
+              <caption className="sr-only">Item count by source</caption>
               <thead>
-                <tr><th>Source</th><th>Count</th><th>%</th></tr>
+                <tr>
+                  <th scope="col">Source</th>
+                  <th scope="col">Count</th>
+                  <th scope="col">%</th>
+                </tr>
               </thead>
               <tbody>
                 {Object.entries(stats.sources).slice(0, 15).map(([src, count]) => (
                   <tr key={src}>
-                    <td>{src}</td>
-                    <td>{count.toLocaleString()}</td>
-                    <td>{stats.total ? Math.round(count / stats.total * 100) : 0}%</td>
+                    <td data-label="Source">{src}</td>
+                    <td data-label="Count">{count.toLocaleString()}</td>
+                    <td data-label="%">{stats.total ? Math.round(count / stats.total * 100) : 0}%</td>
                   </tr>
                 ))}
               </tbody>

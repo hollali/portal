@@ -25,7 +25,8 @@ import {
   ImageOff,
   type LucideIcon,
 } from 'lucide-react'
-import { Modal, AnimBtn, AnimLink, Toast, SkeletonTable, EmptyState, ConfirmDialog } from '@/components/ui'
+import { Modal, AnimLink, SkeletonTable, EmptyState, ConfirmDialog } from '@/components/ui'
+import { Button, useToast } from '@/components/ui/kit'
 import { Pagination } from '@/components/ui/Pagination'
 import { localToMediaUrl, isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 
@@ -189,7 +190,7 @@ export default function MediaManager({
   const [data, setData] = useState<AdminData | null>(null)
   const [page, setPage] = useState(1)
   const [showAdd, setShowAdd] = useState(false)
-  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
+  const { toast } = useToast()
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [viewItem, setViewItem] = useState<MediaItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('details')
@@ -214,7 +215,13 @@ export default function MediaManager({
   const [bulkTagValue, setBulkTagValue] = useState('')
   const [bulkReassignValue, setBulkReassignValue] = useState('')
   const [bulkOperating, setBulkOperating] = useState(false)
-  const [confirm, setConfirm] = useState<{ title: string; message: ReactNode; onConfirm: () => Promise<void> } | null>(null)
+  const [confirm, setConfirm] = useState<{
+    title: string
+    message: ReactNode
+    onConfirm: () => Promise<void>
+    /** When set, the user must type this exactly to arm the confirm button. */
+    requireTyped?: string
+  } | null>(null)
   const confirmBusy = deleting
 
   const buildParams = useCallback(
@@ -320,11 +327,11 @@ export default function MediaManager({
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
     setDeleting(false)
     if (res.ok) {
-      setToast({ message: `Deleted ${selected.size} item(s)` })
+      toast(`Deleted ${selected.size} item(s)`)
       setSelected(new Set())
       fetchData()
     } else {
-      setToast({ message: 'Failed to delete', type: 'error' })
+      toast('Failed to delete', { tone: 'error' })
     }
   }
 
@@ -335,11 +342,11 @@ export default function MediaManager({
     formData.set('type', type)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
     if (res.ok) {
-      setToast({ message: 'Item deleted' })
+      toast('Item deleted')
       setViewItem(null)
       fetchData()
     } else {
-      setToast({ message: 'Failed to delete', type: 'error' })
+      toast('Failed to delete', { tone: 'error' })
     }
   }
 
@@ -354,11 +361,11 @@ export default function MediaManager({
     const d = await res.json().catch(() => ({}))
     setBulkImporting(false)
     if (res.ok) {
-      setToast({ message: `Imported ${d.created} record(s), skipped ${d.skipped} duplicate(s)` })
+      toast(`Imported ${d.created} record(s), skipped ${d.skipped} duplicate(s)`)
       setShowBulkImport(false)
       fetchData()
     } else {
-      setToast({ message: d.error || 'Failed to import', type: 'error' })
+      toast(d.error || 'Failed to import', { tone: 'error' })
     }
   }
 
@@ -377,11 +384,11 @@ export default function MediaManager({
     const d = await res.json().catch(() => ({}))
     setDeleting(false)
     if (res.ok) {
-      setToast({ message: `Deleted ${d.deleted} record(s)` })
+      toast(`Deleted ${d.deleted} record(s)`)
       setSelected(new Set())
       fetchData()
     } else {
-      setToast({ message: d.error || 'Failed to delete', type: 'error' })
+      toast(d.error || 'Failed to delete', { tone: 'error' })
     }
   }
 
@@ -396,8 +403,13 @@ export default function MediaManager({
   const askDeleteSelected = () => {
     if (selected.size === 0) return
     setConfirm({
-      title: `Delete ${selected.size} item(s)?`,
-      message: <>This will permanently delete the <strong>{selected.size}</strong> selected {type} record(s). This cannot be undone.</>,
+      title: `Delete ${selected.size} selected item(s)?`,
+      message: (
+        <>
+          This will permanently delete <strong>{selected.size}</strong> {type} record(s) you selected, and
+          remove their files from disk. It cannot be undone.
+        </>
+      ),
       onConfirm: () => runConfirmed(handleDeleteSelected),
     })
   }
@@ -409,11 +421,28 @@ export default function MediaManager({
       onConfirm: () => runConfirmed(() => handleDelete(id)),
     })
 
+  /** Human summary of the filters in force, so the confirm text is concrete. */
+  const activeFilterSummary = () => {
+    const parts: string[] = []
+    if (debouncedSearch.trim()) parts.push(`search “${debouncedSearch.trim()}”`)
+    if (source) parts.push(`source “${source}”`)
+    if (tags.trim()) parts.push(`tags “${tags.trim()}”`)
+    if (dateFrom) parts.push(`from ${dateFrom}`)
+    if (dateTo) parts.push(`to ${dateTo}`)
+    return parts.length > 0 ? parts.join(', ') : 'no filter (the entire table)'
+  }
+
   const askDeleteFiltered = () => {
     if (!data || data.total === 0) return
     setConfirm({
       title: 'Delete all filtered records?',
-      message: <>This will delete ALL <strong>{data.total}</strong> currently filtered {type} record(s). This cannot be undone.</>,
+      message: (
+        <>
+          This will permanently delete <strong>{data.total}</strong> {type} record(s) matching{' '}
+          <strong>{activeFilterSummary()}</strong>, and remove their files from disk. It cannot be undone.
+        </>
+      ),
+      requireTyped: `delete ${data.total}`,
       onConfirm: () => runConfirmed(handleDeleteFiltered),
     })
   }
@@ -431,13 +460,13 @@ export default function MediaManager({
     const d = await res.json().catch(() => ({}))
     setBulkOperating(false)
     if (res.ok) {
-      setToast({ message: `Updated tags on ${d.updated} item(s)` })
+      toast(`Updated tags on ${d.updated} item(s)`)
       setShowBulkOps(false)
       setBulkTagValue('')
       setSelected(new Set())
       fetchData()
     } else {
-      setToast({ message: d.error || 'Failed to update tags', type: 'error' })
+      toast(d.error || 'Failed to update tags', { tone: 'error' })
     }
   }
 
@@ -453,13 +482,13 @@ export default function MediaManager({
     const d = await res.json().catch(() => ({}))
     setBulkOperating(false)
     if (res.ok) {
-      setToast({ message: `Reassigned source on ${d.updated} item(s)` })
+      toast(`Reassigned source on ${d.updated} item(s)`)
       setShowBulkOps(false)
       setBulkReassignValue('')
       setSelected(new Set())
       fetchData()
     } else {
-      setToast({ message: d.error || 'Failed to reassign', type: 'error' })
+      toast(d.error || 'Failed to reassign', { tone: 'error' })
     }
   }
 
@@ -474,13 +503,11 @@ export default function MediaManager({
     const d = await res.json().catch(() => ({}))
     setCsvImporting(false)
     if (res.ok) {
-      setToast({
-        message: `Imported ${d.created} record(s)${d.failed ? `, ${d.failed} failed` : ''}`,
-      })
+      toast(`Imported ${d.created} record(s)${d.failed ? `, ${d.failed} failed` : ''}`)
       setShowCsvImport(false)
       fetchData()
     } else {
-      setToast({ message: d.error || 'Failed to import', type: 'error' })
+      toast(d.error || 'Failed to import', { tone: 'error' })
     }
   }
 
@@ -506,7 +533,7 @@ export default function MediaManager({
     a.download = `${type}_selected_${Date.now()}.${format}`
     a.click()
     URL.revokeObjectURL(url)
-    setToast({ message: `Exported ${items.length} selected item(s)` })
+    toast(`Exported ${items.length} selected item(s)`)
   }
 
   const handleAdd = async (e: FormEvent<HTMLFormElement>) => {
@@ -517,11 +544,11 @@ export default function MediaManager({
     formData.set('type', type)
     const res = await fetch(`/api/admin/${type}`, { method: 'POST', body: formData })
     if (res.ok) {
-      setToast({ message: 'Item added' })
+      toast('Item added')
       setShowAdd(false)
       fetchData()
     } else {
-      setToast({ message: 'Failed to add', type: 'error' })
+      toast('Failed to add', { tone: 'error' })
     }
   }
 
@@ -538,13 +565,13 @@ export default function MediaManager({
     setEditing(false)
     if (res.ok) {
       const d = await res.json().catch(() => ({}))
-      setToast({ message: `Updated #${viewItem.id}` })
+      toast(`Updated #${viewItem.id}`)
       setViewItem(d.item)
       setViewMode('details')
       fetchData()
     } else {
       const d = await res.json().catch(() => ({}))
-      setToast({ message: d.error || 'Failed to update', type: 'error' })
+      toast(d.error || 'Failed to update', { tone: 'error' })
     }
   }
 
@@ -582,166 +609,60 @@ export default function MediaManager({
 
   return (
     <div>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {showManagement && (
-          <AnimBtn
-            onClick={() => setShowAdd(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'var(--primary)',
-              color: 'var(--primary-fg)',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              gap: '0.375rem',
-            }}
-          >
+          <Button variant="primary" onClick={() => setShowAdd(true)}>
             <Plus size={14} /> Add New
-          </AnimBtn>
+          </Button>
         )}
         {showManagement && (
-          <AnimBtn
-            onClick={() => setShowBulkImport(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              color: 'var(--foreground)',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              gap: '0.375rem',
-            }}
-          >
+          <Button variant="secondary" onClick={() => setShowBulkImport(true)}>
             <ListPlus size={14} /> Bulk Import
-          </AnimBtn>
+          </Button>
         )}
         {showManagement && (
-          <AnimBtn
-            onClick={() => setShowCsvImport(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              color: 'var(--foreground)',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              gap: '0.375rem',
-            }}
-          >
+          <Button variant="secondary" onClick={() => setShowCsvImport(true)}>
             <FileInput size={14} /> CSV Import
-          </AnimBtn>
+          </Button>
         )}
         {showManagement && selected.size > 0 && (
-          <AnimBtn
-            onClick={() => setShowBulkOps(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              color: 'var(--primary)',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              gap: '0.375rem',
-            }}
-          >
+          <Button variant="secondary" style={{ color: 'var(--primary)' }} onClick={() => setShowBulkOps(true)}>
             <Tags size={14} /> Bulk Actions ({selected.size})
-          </AnimBtn>
+          </Button>
         )}
         {showManagement && data && data.total > 0 && (
-          <AnimBtn
-            onClick={askDeleteFiltered}
-            disabled={deleting}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'var(--danger)',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              gap: '0.375rem',
-            }}
-          >
+          <Button variant="danger" onClick={askDeleteFiltered}
+            disabled={deleting}>
             <Trash2 size={14} /> Delete All Filtered ({data.total})
-          </AnimBtn>
+          </Button>
         )}
         {showManagement && selected.size > 0 && (
-          <AnimBtn
-            onClick={askDeleteSelected}
-            disabled={deleting}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'var(--danger)',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              gap: '0.375rem',
-            }}
-          >
+          <Button variant="danger" onClick={askDeleteSelected}
+            disabled={deleting}>
             <Trash2 size={14} /> Delete ({selected.size})
-          </AnimBtn>
+          </Button>
         )}
         <div className="flex-1" />
         {selected.size > 0 && (
           <>
-            <AnimBtn
-              onClick={() => handleExportSelected('json')}
-              title="Export only selected rows"
-              style={{
-                padding: '0.5rem 0.75rem',
-                background: 'var(--card)',
-                border: '1px solid var(--primary)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                gap: '0.25rem',
-                color: 'var(--primary)',
-              }}
-            >
+            <Button variant="secondary" size="xs" style={{ color: 'var(--primary)' }} onClick={() => handleExportSelected('json')}
+              title="Export only selected rows">
               <Download size={12} /> Sel. JSON
-            </AnimBtn>
-            <AnimBtn
-              onClick={() => handleExportSelected('csv')}
-              title="Export only selected rows"
-              style={{
-                padding: '0.5rem 0.75rem',
-                background: 'var(--card)',
-                border: '1px solid var(--primary)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                gap: '0.25rem',
-                color: 'var(--primary)',
-              }}
-            >
+            </Button>
+            <Button variant="secondary" size="xs" style={{ color: 'var(--primary)' }} onClick={() => handleExportSelected('csv')}
+              title="Export only selected rows">
               <Download size={12} /> Sel. CSV
-            </AnimBtn>
+            </Button>
           </>
         )}
-        <AnimBtn
-          onClick={() => handleExport('json')}
-          style={{
-            padding: '0.5rem 0.75rem',
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            gap: '0.25rem',
-          }}
-        >
+        <Button variant="secondary" size="xs" onClick={() => handleExport('json')}>
           <Download size={12} /> JSON
-        </AnimBtn>
-        <AnimBtn
-          onClick={() => handleExport('csv')}
-          style={{
-            padding: '0.5rem 0.75rem',
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            gap: '0.25rem',
-          }}
-        >
+        </Button>
+        <Button variant="secondary" size="xs" onClick={() => handleExport('csv')}>
           <Download size={12} /> CSV
-        </AnimBtn>
+        </Button>
       </div>
 
       {/* Search & Filter */}
@@ -831,18 +752,9 @@ export default function MediaManager({
           }}
         />
         {hasFilters && (
-          <AnimBtn
-            onClick={clearFilters}
-            style={{
-              padding: '0.4rem 0.75rem',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              fontSize: '0.75rem',
-              color: 'var(--danger)',
-            }}
-          >
+          <Button variant="secondary" size="xs" style={{ color: 'var(--danger)' }} onClick={clearFilters}>
             Clear
-          </AnimBtn>
+          </Button>
         )}
       </div>
 
@@ -870,26 +782,16 @@ export default function MediaManager({
           icon={<FileText size={48} />}
           action={
             hasFilters ? (
-              <AnimBtn
-                onClick={clearFilters}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--foreground)',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                }}
-              >
+              <Button variant="secondary" onClick={clearFilters}>
                 Clear filters
-              </AnimBtn>
+              </Button>
             ) : undefined
           }
         />
       ) : (
         <>
-          <div className="card overflow-x-auto">
-            <table style={{ minWidth: type === 'images' ? '600px' : '800px' }}>
+          <div className="card table-wrap table-cards">
+            <table className="media-table" style={{ '--table-min': type === 'images' ? '600px' : '800px' } as React.CSSProperties}>
               <caption className="sr-only">
                 {MEDIA_LABELS[type]} records,{' '}
                 {data.total === 0
@@ -944,11 +846,11 @@ export default function MediaManager({
                     key={item.id}
                     className="stagger-item"
                     style={{
-                      background: selected.has(item.id) ? 'rgba(var(--primary-rgb, 21,61,108), 0.08)' : undefined,
+                      background: selected.has(item.id) ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : undefined,
                     }}
                   >
                     {showManagement && (
-                      <td>
+                      <td className="select-cell">
                         <input
                           type="checkbox"
                           checked={selected.has(item.id)}
@@ -958,43 +860,34 @@ export default function MediaManager({
                         />
                       </td>
                     )}
-                    <td className="font-semibold">{item.id}</td>
-                    <td>
+                    <td data-label="ID" className="font-semibold">{item.id}</td>
+                    <td data-label="Preview">
                       {type === 'images' && (
                         <MediaThumb item={item} onOpen={() => openView(item)} />
                       )}
                       {type === 'videos' && (
-                        <AnimBtn
-                          onClick={() => openView(item)}
+                        <Button variant="secondary" iconOnly style={{ width: '64px', height: '48px' }} onClick={() => openView(item)}
                           title="View video"
-                          aria-label={`View video ${item.title?.slice(0, 60) || `#${item.id}`}`}
-                          style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}
-                        >
+                          aria-label={`View video ${item.title?.slice(0, 60) || `#${item.id}`}`}>
                           <Play size={20} />
-                        </AnimBtn>
+                        </Button>
                       )}
                       {type === 'audio' && (
-                        <AnimBtn
-                          onClick={() => openView(item)}
+                        <Button variant="secondary" iconOnly style={{ width: '64px', height: '48px' }} onClick={() => openView(item)}
                           title="View audio"
-                          aria-label={`View audio ${item.title?.slice(0, 60) || `#${item.id}`}`}
-                          style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}
-                        >
+                          aria-label={`View audio ${item.title?.slice(0, 60) || `#${item.id}`}`}>
                           <Music size={20} />
-                        </AnimBtn>
+                        </Button>
                       )}
                       {type === 'news' && (
-                        <AnimBtn
-                          onClick={() => openView(item)}
+                        <Button variant="secondary" iconOnly style={{ width: '64px', height: '48px' }} onClick={() => openView(item)}
                           title="View article"
-                          aria-label={`View article ${item.title?.slice(0, 60) || `#${item.id}`}`}
-                          style={{ width: '64px', height: '48px', background: 'var(--muted)', padding: 0 }}
-                        >
+                          aria-label={`View article ${item.title?.slice(0, 60) || `#${item.id}`}`}>
                           <FileText size={20} />
-                        </AnimBtn>
+                        </Button>
                       )}
                     </td>
-                    <td className="text-sm leading-relaxed">
+                    <td data-label="Details" className="text-sm leading-relaxed">
                       {type === 'images' && (
                         <div>
                           <div className="font-semibold">Source: {item.source || '-'}</div>
@@ -1072,55 +965,31 @@ export default function MediaManager({
                         </div>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Actions" data-wide>
                       <div className="flex gap-1 justify-end">
-                        <AnimBtn
-                          onClick={() => openView(item)}
+                        <Button variant="secondary" iconOnly onClick={() => openView(item)}
                           title="View"
-                          aria-label={`View record #${item.id}`}
-                          style={{
-                            padding: '0.375rem',
-                            background: 'var(--card)',
-                            border: '1px solid var(--border)',
-                            color: 'var(--foreground)',
-                          }}
-                        >
+                          aria-label={`View record #${item.id}`}>
                           <Eye size={14} />
-                        </AnimBtn>
+                        </Button>
                         {showManagement && (
                           <>
-                            <AnimBtn
-                              onClick={() => {
+                            <Button variant="secondary" iconOnly style={{ color: 'var(--primary)' }} onClick={() => {
                                 setViewItem(item)
                                 setViewMode('edit')
                               }}
                               title="Edit"
-                              aria-label={`Edit record #${item.id}`}
-                              style={{
-                                padding: '0.375rem',
-                                background: 'var(--card)',
-                                border: '1px solid var(--border)',
-                                color: 'var(--primary)',
-                              }}
-                            >
+                              aria-label={`Edit record #${item.id}`}>
                               <Pencil size={14} />
-                            </AnimBtn>
-                            <AnimBtn
-                              onClick={() => {
+                            </Button>
+                            <Button variant="secondary" iconOnly style={{ color: 'var(--success)' }} onClick={() => {
                                 setViewItem(item)
                                 setViewMode('public')
                               }}
                               title="Public preview"
-                              aria-label={`Public preview of record #${item.id}`}
-                              style={{
-                                padding: '0.375rem',
-                                background: 'var(--card)',
-                                border: '1px solid var(--border)',
-                                color: 'var(--success)',
-                              }}
-                            >
+                              aria-label={`Public preview of record #${item.id}`}>
                               <Monitor size={14} />
-                            </AnimBtn>
+                            </Button>
                           </>
                         )}
                         {item.url && (
@@ -1140,14 +1009,11 @@ export default function MediaManager({
                           </AnimLink>
                         )}
                         {showManagement && (
-                          <AnimBtn
-                            onClick={() => askDelete(item.id)}
+                          <Button variant="danger" iconOnly onClick={() => askDelete(item.id)}
                             title="Delete"
-                            aria-label={`Delete record #${item.id}`}
-                            style={{ padding: '0.375rem', background: 'var(--danger)', color: 'white' }}
-                          >
+                            aria-label={`Delete record #${item.id}`}>
                             <Trash2 size={14} />
-                          </AnimBtn>
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -1222,18 +1088,9 @@ export default function MediaManager({
               </p>
             </div>
             <div className="flex gap-2 justify-end">
-              <AnimBtn
-                onClick={() => setShowAdd(false)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                }}
-              >
+              <Button variant="secondary" onClick={() => setShowAdd(false)}>
                 Cancel
-              </AnimBtn>
+              </Button>
               <button
                 type="submit"
                 className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold"
@@ -1303,18 +1160,9 @@ export default function MediaManager({
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <AnimBtn
-                onClick={() => setShowBulkImport(false)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                }}
-              >
+              <Button variant="secondary" onClick={() => setShowBulkImport(false)}>
                 Cancel
-              </AnimBtn>
+              </Button>
               <button
                 type="submit"
                 disabled={bulkImporting}
@@ -1378,18 +1226,9 @@ export default function MediaManager({
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <AnimBtn
-                onClick={() => setShowCsvImport(false)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                }}
-              >
+              <Button variant="secondary" onClick={() => setShowCsvImport(false)}>
                 Cancel
-              </AnimBtn>
+              </Button>
               <button
                 type="submit"
                 disabled={csvImporting}
@@ -1447,19 +1286,10 @@ export default function MediaManager({
                 }}
               />
               <div className="flex justify-end">
-                <AnimBtn
-                  onClick={handleBulkTag}
-                  disabled={bulkOperating || !bulkTagValue.trim()}
-                  style={{
-                    padding: '0.4rem 0.75rem',
-                    background: 'var(--primary)',
-                    color: 'var(--primary-fg)',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                  }}
-                >
+                <Button variant="primary" onClick={handleBulkTag}
+                  disabled={bulkOperating || !bulkTagValue.trim()}>
                   Apply Tags
-                </AnimBtn>
+                </Button>
               </div>
             </div>
             <div className="border-t" style={{ borderColor: 'var(--border)', paddingTop: '1rem' }}>
@@ -1476,19 +1306,10 @@ export default function MediaManager({
                 }}
               />
               <div className="flex justify-end">
-                <AnimBtn
-                  onClick={handleBulkReassign}
-                  disabled={bulkOperating || !bulkReassignValue.trim()}
-                  style={{
-                    padding: '0.4rem 0.75rem',
-                    background: 'var(--primary)',
-                    color: 'var(--primary-fg)',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                  }}
-                >
+                <Button variant="primary" onClick={handleBulkReassign}
+                  disabled={bulkOperating || !bulkReassignValue.trim()}>
                   Reassign Source
-                </AnimBtn>
+                </Button>
               </div>
             </div>
           </div>
@@ -1573,6 +1394,7 @@ export default function MediaManager({
         title={confirm?.title || 'Confirm delete'}
         message={confirm?.message}
         busy={confirmBusy}
+        requireTyped={confirm?.requireTyped}
         onConfirm={() => confirm?.onConfirm()}
         onClose={() => setConfirm(null)}
       />
@@ -1729,35 +1551,14 @@ function DetailsView({
               </a>
             )}
             {onEdit && (
-              <AnimBtn
-                onClick={onEdit}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'var(--card)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--primary)',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  gap: '0.375rem',
-                }}
-              >
+              <Button variant="secondary" style={{ color: 'var(--primary)' }} onClick={onEdit}>
                 <Pencil size={14} /> Edit
-              </AnimBtn>
+              </Button>
             )}
             {onDelete && (
-              <AnimBtn
-                onClick={onDelete}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: 'var(--danger)',
-                  color: 'white',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  gap: '0.375rem',
-                }}
-              >
+              <Button variant="danger" onClick={onDelete}>
                 <Trash2 size={14} /> Delete
-              </AnimBtn>
+              </Button>
             )}
           </div>
         </div>
@@ -1814,35 +1615,14 @@ function ModalActions({
         </a>
       )}
       {onEdit && (
-        <AnimBtn
-          onClick={onEdit}
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            color: 'var(--primary)',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            gap: '0.375rem',
-          }}
-        >
+        <Button variant="secondary" style={{ color: 'var(--primary)' }} onClick={onEdit}>
           <Pencil size={14} /> Edit
-        </AnimBtn>
+        </Button>
       )}
       {onDelete && (
-        <AnimBtn
-          onClick={onDelete}
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'var(--danger)',
-            color: 'white',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            gap: '0.375rem',
-          }}
-        >
+        <Button variant="danger" onClick={onDelete}>
           <Trash2 size={14} /> Delete
-        </AnimBtn>
+        </Button>
       )}
     </div>
   )

@@ -46,6 +46,17 @@ export default function RootLayout({
               "(function(){try{if('IntersectionObserver' in window){var r=document.documentElement;r.dataset.motion='js';setTimeout(function(){if(!r.dataset.motionReady){r.removeAttribute('data-motion')}},2000)}}catch(e){}})();",
           }}
         />
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            // Resolves the theme before first paint so there is no flash, and
+            // guarantees exactly one of .dark / .light is set — which is what
+            // lets globals.css keep a single light-mode token block.
+            __html:
+              "(function(){try{var s=localStorage.getItem('theme');var d=s?s==='dark':!window.matchMedia('(prefers-color-scheme: light)').matches;var r=document.documentElement;r.classList.remove('light','dark');r.classList.add(d?'dark':'light')}catch(e){}})();",
+          }}
+        />
         <MotionInit />
         {children}
       </body>
