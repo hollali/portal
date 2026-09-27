@@ -42,6 +42,20 @@ export interface SearchCandidate {
   href: string
   year: number | null
   excerpt: string
+  /**
+   * The record's own words, as plain text — verbatim source text, never a
+   * curator's description of it.
+   *
+   * This is the distinction the whole persona layer turns on. `excerpt` for a
+   * speech is editorial copy written about the speech ("The Speaker's opening
+   * remarks on the independence of Parliament…"); `body` is the speech. Quoting
+   * the first inside quotation marks and attributing it to a living person is
+   * the exact failure this field exists to prevent, so only `body` may be quoted.
+   *
+   * Empty for every collection that has no verbatim text — a photograph, a
+   * milestone or a scraped video row has none, and inventing one is not an option.
+   */
+  body: string
   hasTranscript: boolean
   /** Testimonial author role, where the collection has one. */
   role?: string | null
@@ -366,9 +380,22 @@ export function plainText(markdown: string): string {
     .replace(/`([^`]*)`/g, '$1')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-    .replace(/[*_>]{1,3}/g, ' ')
+    // A heading is document structure, not a sentence. Left in, it runs straight
+    // into the passage and reads as though the Speaker opened by saying
+    // "Financing the legislature A legislature that depends on…" — which
+    // matters, because these passages are quoted to the reader as his words.
+    .replace(/^\s{0,3}#{1,6}\s+.*$/gm, ' ')
+    // Emphasis wraps a word, so it leaves no space of its own: `*Mr. Speaker*`
+    // has to become "Mr. Speaker" and not "Mr. Speaker ", which would put a gap
+    // before the following comma.
+    .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2')
+    .replace(/(^|[\s(])[*_](?=\S)([^*_]*?\S)[*_]/g, '$1$2')
+    .replace(/^\s{0,3}>\s?/gm, '')
     .replace(/\s+/g, ' ')
+    // Punctuation orphaned by stripped markup.
+    .replace(/\s+([,.;:!?%])/g, '$1')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
     .trim()
 }
 
@@ -425,6 +452,10 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         href: `/archives/${archiveRouteForKind(kind)}/${slug}`,
         year: yearOf(r.year),
         excerpt: str(r.excerpt) || plainText(body) || str(r.title),
+        // Verbatim, and kept separate from `excerpt` above even when the two are
+        // the same string: the excerpt may have been typed by an editor, and only
+        // this one is safe to put in quotation marks.
+        body: body ? plainText(body) : '',
         hasTranscript: Boolean(body),
       })
     }
@@ -440,6 +471,9 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         // A video row has no caption or notes, so the category and channel are
         // the only honest context a result card can offer.
         excerpt: [str(r.category), str(r.channel)].filter(Boolean).join(' · '),
+        // A scraped video row is a title, a category and a channel. There is no
+        // transcript, so there is nothing here that may be quoted.
+        body: '',
         hasTranscript: false,
       })
     case 'audio':
@@ -452,6 +486,7 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         href: `/audio/${id}`,
         year: yearOf(r.year),
         excerpt: str(r.caption) || str(r.notes) || [str(r.artist), str(r.event)].filter(Boolean).join(' · '),
+        body: '',
         hasTranscript: false,
       })
     case 'news':
@@ -465,7 +500,11 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         // `date` holds ISO dates on some rows and RFC-2822 on others, so only a
         // leading four-digit year is trustworthy.
         year: yearOf(r.date),
+        // A news snippet is a journalist's sentence about what was said, not
+        // what was said. Quoting it in the Speaker's voice would attribute a
+        // reporter's words to him, so it is never eligible.
         excerpt: str(r.snippet) || str(r.notes) || str(r.sourceName),
+        body: '',
         hasTranscript: false,
       })
     case 'milestones':
@@ -478,6 +517,7 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         href: '/archives/milestones',
         year: yearOf(r.year),
         excerpt: str(r.description),
+        body: '',
         hasTranscript: false,
       })
     case 'testimonials':
@@ -489,7 +529,10 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         title: str(r.author),
         href: '/archives/testimonials',
         year: yearOf(r.year),
+        // A testimonial is somebody else speaking about him. It is a quotation,
+        // but not his, and the persona layer must not present it as his.
         excerpt: str(r.quote),
+        body: '',
         hasTranscript: false,
         role: str(r.role) || null,
       })
@@ -580,6 +623,16 @@ export function scoreCandidate(candidate: SearchCandidate, terms: string[]): Sco
 }
 
 /**
+ * How much a partial match is lifted for also touching the previous turn's topic.
+ *
+ * Small on purpose. This is a preference between records that already scored the
+ * same, not a way to smuggle an old topic into a new question — the terms
+ * themselves are never widened, so a reader who names a new subject still gets a
+ * search of that subject.
+ */
+const CONTEXT_BOOST = 1.18
+
+/**
  * Score, rank, cap and report. Records satisfying every term are preferred over
  * partial ones so a broad question still returns the most complete answer
  * available rather than whichever collection happened to be largest.
@@ -592,6 +645,7 @@ export function rankCandidates(
   candidates: SearchCandidate[],
   terms: string[],
   totals?: CollectionTotal[],
+  contextTerms: string[] = [],
 ): {
   mode: AskMatchMode
   results: ScoredCandidate[]
@@ -602,7 +656,22 @@ export function rankCandidates(
   const scored = candidates
     .map(c => scoreCandidate(c, terms))
     .filter(r => r.matched.size > 0)
-    .map(r => ({ ...r, score: r.score * (PRIORITY[r.candidate.collection] ?? 1) }))
+    .map(r => {
+      let score = r.score * (PRIORITY[r.candidate.collection] ?? 1)
+      // Conversation continuity, as a tie-break only.
+      //
+      // When the reader is still on a topic from a previous turn, a partial match
+      // that also touches that topic is likelier to be the record they meant than
+      // an equally partial one that ignores it. Restricted to partial matches on
+      // purpose: a record that already satisfies the whole question does not need
+      // help winning, and boosting it would inflate its score for no reason.
+      if (contextTerms.length > 0 && r.matched.size < terms.length) {
+        if (scoreCandidate(r.candidate, contextTerms).matched.size > 0) {
+          score *= CONTEXT_BOOST
+        }
+      }
+      return { ...r, score }
+    })
 
   const complete = scored.filter(r => r.matched.size === terms.length)
   const completeTotal = totals
@@ -686,15 +755,24 @@ function dedupeTotals(candidates: SearchCandidate[]): CollectionTotal[] {
   return [...seen.values()]
 }
 
-/** Search every published collection for the given terms. */
-export async function searchArchive(terms: string[]): Promise<ArchiveSearchResult> {
+/**
+ * Search every published collection for the given terms.
+ *
+ * `contextTerms` are terms from earlier turns in the conversation. They only
+ * influence the ordering of partial matches (see `CONTEXT_BOOST`); they are never
+ * added to `terms`, so the set of records that can match is unchanged.
+ */
+export async function searchArchive(
+  terms: string[],
+  contextTerms: string[] = [],
+): Promise<ArchiveSearchResult> {
   // `buildCandidateSql` refuses to build a query with no terms, and an AND over
   // nothing matches everything — so this is a guard, not a fallback path.
   if (terms.length === 0) {
     return { mode: 'none', terms, results: [], collectionCounts: [], totalMatched: 0 }
   }
   const { candidates, totals } = await collectCandidates(terms)
-  const ranked = rankCandidates(candidates, terms, totals)
+  const ranked = rankCandidates(candidates, terms, totals, contextTerms)
   return { ...ranked, terms }
 }
 

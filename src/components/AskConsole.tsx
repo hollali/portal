@@ -44,6 +44,8 @@ interface ChatMsg {
   content: string;
   result?: AskResult;
   failed?: boolean;
+  /** The reader pressed stop, as opposed to the request failing. */
+  stopped?: boolean;
 }
 
 const STORAGE_KEY = "askbagbin-chat-v1";
@@ -51,6 +53,19 @@ const MAX_PERSISTED = 40;
 
 /** Smallest comfortable target. Chips here were 36px, under the 44px guideline. */
 const HIT = 44;
+
+/** The composer stops growing here and scrolls; past this it is a reading pane. */
+const COMPOSER_MAX_H = 148;
+
+/**
+ * The composer and the API have to agree on how long a question is.
+ *
+ * /api/ask slices its input at 500 characters (see `queryTerms(raw.slice(0, 500))`),
+ * so the field is capped at the same number. Without a cap the field accepted
+ * any length and quietly discarded the overflow at the far end, which reads as
+ * the archive having ignored the end of the sentence.
+ */
+const MAX_QUESTION = 500;
 
 /**
  * Mirror the question into the address bar without navigating.
@@ -154,6 +169,45 @@ function normaliseResult(value: unknown): AskResult | undefined {
     totalMatched: num(raw.totalMatched) ?? 0,
     ...(num(raw.broaderMatched) ? { broaderMatched: num(raw.broaderMatched)! } : {}),
     suggested: strArray(raw.suggested),
+    ...(raw.conversation && typeof raw.conversation === 'object'
+      ? { conversation: normaliseConversation(raw.conversation) }
+      : {}),
+  };
+}
+
+/**
+ * Coerce the conversation block.
+ *
+ * Same reason as the rest of `normaliseResult`: a transcript saved before the
+ * persona existed comes back with no `conversation` at all, and one saved by a
+ * build where it was a different shape comes back with half of it. The renderer
+ * reads `quotes` unconditionally, so anything missing has to become an empty
+ * quote list rather than an exception.
+ */
+function normaliseConversation(value: unknown): NonNullable<AskResult["conversation"]> {
+  const raw = (value ?? {}) as Record<string, unknown>
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  return {
+    kind: raw.kind === "followup" || raw.kind === "unresolved" ? raw.kind : "new",
+    lead: str(raw.lead),
+    firstPerson: raw.firstPerson === true,
+    anchor: Array.isArray(raw.anchor)
+      ? raw.anchor.filter((a): a is string => typeof a === "string")
+      : [],
+    quotes: Array.isArray(raw.quotes)
+      ? raw.quotes
+          .filter((q): q is Record<string, unknown> => !!q && typeof q === "object")
+          .map(q => ({
+            text: str(q.text),
+            title: str(q.title),
+            href: str(q.href),
+            year: typeof q.year === "number" && Number.isFinite(q.year) ? q.year : null,
+            kindLabel: str(q.kindLabel),
+            collectionLabel: str(q.collectionLabel),
+          }))
+          // A quote with no text or nowhere to verify it is not a quotation.
+          .filter(q => q.text.length > 0 && q.href.length > 0)
+      : [],
   };
 }
 
@@ -170,15 +224,16 @@ function loadHistory(): ChatMsg[] {
       const m = entry as Record<string, unknown>;
       if (m.role !== "user" && m.role !== "assistant") continue;
       if (typeof m.content !== "string") continue;
-      // An assistant turn with no result and no failure flag renders nothing;
+      // An assistant turn with no result and no terminal flag renders nothing;
       // keeping it would leave an invisible gap in the transcript.
       const result = m.role === "assistant" ? normaliseResult(m.result) : undefined;
-      if (m.role === "assistant" && !result && m.failed !== true) continue;
+      if (m.role === "assistant" && !result && m.failed !== true && m.stopped !== true) continue;
       messages.push({
         role: m.role,
         content: m.content,
         ...(result ? { result } : {}),
         ...(m.failed === true ? { failed: true } : {}),
+        ...(m.stopped === true ? { stopped: true } : {}),
       });
     }
     return messages.slice(-MAX_PERSISTED);
@@ -497,6 +552,124 @@ function AskChip({
   );
 }
 
+/**
+ * What the answer looks like while it is still being found.
+ *
+ * "Searching the archive…" told the reader that time was passing. It did not
+ * tell them what was coming, so a two-second search and a twenty-second one were
+ * indistinguishable and both read as a stall. These bars are the real answer's
+ * shape — a short summary, then citation cards — so the wait has a visible
+ * destination, and the layout does not jump when the real answer replaces them.
+ *
+ * Marked `aria-hidden` and paired with the polite status line, which is what a
+ * screen reader actually hears. A skeleton read aloud bar by bar would be noise.
+ */
+function ThinkingSkeleton() {
+  const bar = (width: string, height = 11) => (
+    <span
+      className="ask-skeleton"
+      aria-hidden
+      style={{ display: "block", width, height, borderRadius: 6 }}
+    />
+  );
+  return (
+    <div aria-hidden style={{ display: "grid", gap: "0.7rem" }}>
+      <div style={{ display: "grid", gap: "0.45rem" }}>
+        {bar("92%")}
+        {bar("97%")}
+        {bar("58%")}
+      </div>
+      <div style={{ display: "grid", gap: "0.6rem", marginTop: "0.35rem" }}>
+        {[0, 1, 2].map(i => (
+          <div
+            key={i}
+            style={{
+              display: "grid",
+              gap: "0.4rem",
+              padding: "0.75rem 0.85rem",
+              border: "1px solid var(--p-border)",
+              borderRadius: 12,
+            }}
+          >
+            {bar("32%", 8)}
+            {bar(i === 2 ? "64%" : "86%", 12)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The Speaker's own words.
+ *
+ * This is the only place in the page where the first person appears, and it only
+ * appears inside these quotations. The framing around them states a source and
+ * nothing else, and every passage links to the record it was taken from — so a
+ * reader can check any sentence of it against the source in one click. Nothing in
+ * this block is generated, paraphrased or assembled.
+ */
+function PersonaQuotes({
+  quotes,
+  terms,
+}: {
+  quotes: NonNullable<AskResult["conversation"]>["quotes"];
+  terms: string[];
+}) {
+  if (quotes.length === 0) return null;
+  return (
+    <div style={{ display: "grid", gap: "0.85rem", margin: "0 0 1rem" }}>
+      {quotes.map((quote, i) => (
+        <figure
+          key={`${quote.href}-${i}`}
+          style={{
+            margin: 0,
+            padding: "0.9rem 1.1rem",
+            borderLeft: "3px solid var(--primary)",
+            borderRadius: "0 12px 12px 0",
+            background: "color-mix(in srgb, var(--primary) 5%, transparent)",
+          }}
+        >
+          <blockquote
+            style={{
+              margin: 0,
+              fontFamily: "var(--font-display), serif",
+              fontSize: "1.0625rem",
+              lineHeight: 1.55,
+              color: "var(--p-text-1)",
+              textWrap: "pretty",
+            }}
+          >
+            <span aria-hidden style={{ color: "var(--primary)", marginRight: "0.15em" }}>
+              “
+            </span>
+            <Highlight text={quote.text} terms={terms} />
+            <span aria-hidden style={{ color: "var(--primary)" }}>
+              ”
+            </span>
+          </blockquote>
+          <figcaption
+            style={{
+              marginTop: "0.6rem",
+              fontSize: "0.75rem",
+              fontFamily: "var(--font-mono), monospace",
+              color: "var(--p-text-3)",
+            }}
+          >
+            <Link
+              href={quote.href}
+              style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+            >
+              {quote.title}
+            </Link>
+            {quote.year ? ` · ${quote.year}` : ""} · {quote.kindLabel.toLowerCase()}
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -517,47 +690,66 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function AssistantReply({
   result,
   failed,
+  stopped,
   onRetry,
   onCopy,
   onFollowUp,
   copied,
+  busy,
 }: {
   result?: AskResult;
   failed?: boolean;
+  stopped?: boolean;
   onRetry?: () => void;
   onCopy: (text: string) => void;
   onFollowUp: (q: string) => void;
   copied: boolean;
+  /** A search is in flight, so these would be dropped on the floor. */
+  busy?: boolean;
 }) {
+  const retryButton = (label: string, icon: React.ReactNode) =>
+    onRetry && (
+      <button
+        type="button"
+        onClick={onRetry}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          marginTop: "0.75rem",
+          background: "none",
+          border: "1px solid var(--p-border-2)",
+          borderRadius: 999,
+          padding: "0.45rem 0.9rem",
+          color: "var(--p-text-1)",
+          fontSize: "0.82rem",
+          fontWeight: 600,
+          cursor: "pointer",
+          minHeight: HIT,
+        }}
+      >
+        {icon} {label}
+      </button>
+    );
+
+  if (stopped) {
+    return (
+      <div>
+        <p style={{ margin: 0, color: "var(--p-text-2)" }}>
+          Search stopped. Nothing was lost — the question is still here.
+        </p>
+        {retryButton("Run it again", <RefreshCw size={14} aria-hidden />)}
+      </div>
+    );
+  }
+
   if (failed) {
     return (
       <div>
         <p style={{ margin: 0, color: "var(--p-text-2)" }}>
           The archive could not be reached. Nothing was lost — try again.
         </p>
-        {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              marginTop: "0.75rem",
-              background: "none",
-              border: "1px solid var(--p-border-2)",
-              borderRadius: 999,
-              padding: "0.45rem 0.9rem",
-              color: "var(--p-text-1)",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              minHeight: HIT,
-            }}
-          >
-            <RefreshCw size={14} aria-hidden /> Try again
-          </button>
-        )}
+        {retryButton("Try again", <RefreshCw size={14} aria-hidden />)}
       </div>
     );
   }
@@ -632,11 +824,22 @@ function AssistantReply({
 
   return (
     <div style={{ minWidth: 0 }}>
-      <p style={{ margin: 0, color: "var(--p-text-1)" }}>
+      {/* Capped in `ch` rather than left to the column: the column is now wide
+          enough to fit citation cards two-up, but a summary paragraph stretched
+          to that width is unreadable. Prose keeps its measure, cards use the
+          space.
+
+          The persona opening ("In my own words, from …") is already the head of
+          `summary` — the server composes the two together so a partial-answer
+          disclosure can be placed *before* the quotation, which is the only order
+          that is honest. Rendering `conversation.lead` as well would print it
+          twice. */}
+      <p style={{ margin: 0, maxWidth: "68ch", color: "var(--p-text-1)" }}>
         <Highlight text={result.summary} terms={result.matchedTerms} />
       </p>
 
       <div style={{ marginTop: "0.85rem" }}>
+        <PersonaQuotes quotes={result.conversation?.quotes ?? []} terms={result.matchedTerms} />
         <TermsReadout result={result} />
         <MatchNotice result={result} />
       </div>
@@ -652,6 +855,11 @@ function AssistantReply({
               margin: 0,
               padding: 0,
               display: "grid",
+              // Citation cards are short, link-shaped blocks. Stacked in one
+              // column they made every answer twice as tall as it needed to be
+              // on a wide screen; two-up past ~900px of bubble width is where
+              // the card still has room for a title plus an excerpt.
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
               gap: "0.6rem",
             }}
           >
@@ -792,7 +1000,7 @@ function AssistantReply({
           <SectionLabel>Ask next</SectionLabel>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
             {result.suggested.slice(0, 3).map(s => (
-              <AskChip key={s} onClick={onFollowUp} label={s} />
+              <AskChip key={s} onClick={onFollowUp} label={s} disabled={busy} />
             ))}
           </div>
         </>
@@ -834,8 +1042,21 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   const [linkCopied, setLinkCopied] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>(ASK_SUGGESTIONS.slice(0, 3));
   const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // The latest transcript, for `ask` to read without taking `messages` as a
+  // dependency. `ask` is a `useCallback` keyed on `loading` so that asking a
+  // question does not re-trigger the boot effect; closing over `messages`
+  // directly would hand every call site a snapshot from an earlier render.
+  const messagesRef = useRef<ChatMsg[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  // Set only while a reader-initiated stop is in flight, so the composer can
+  // swap Send for Stop without also offering to cancel a teardown.
+  const stopRef = useRef<(() => void) | null>(null);
+  const [docked, setDocked] = useState(false);
   // Whether the reader is already at the end of the page. Only then is a new
   // turn worth pulling them to; scrolling someone out of a citation they were
   // mid-way through reading is the worst thing this page could do. Starts false
@@ -863,11 +1084,32 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Only a stop the reader asked for earns a "search stopped" turn. Unmount
+      // and "new conversation" also abort, and neither should leave a trace in a
+      // transcript that is being torn down or has already been cleared.
+      let stopAsked = false;
+      const onStop = () => {
+        stopAsked = true;
+        controller.abort();
+      };
+      stopRef.current = onStop;
+
       try {
         const res = await fetch("/api/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: text }),
+          // The transcript travels with the question so the server can resolve a
+          // follow-up against it. Without this, "more on that?" has no subject to
+          // carry forward and the page has to answer as if it were the first
+          // question of the conversation. Only user turns are sent: an assistant
+          // turn is a summary this page wrote, and treating it as something the
+          // reader asked would let the page answer its own words back to them.
+          body: JSON.stringify({
+            question: text,
+            messages: messagesRef.current
+              .filter(m => m.role === "user")
+              .map(m => ({ role: m.role, content: m.content })),
+          }),
           signal: controller.signal,
         });
 
@@ -899,7 +1141,14 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
         setMessages(prev => [...prev, { role: "assistant", content: "", failed: true }]);
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
+        if (stopRef.current === onStop) stopRef.current = null;
         setLoading(false);
+        if (stopAsked) {
+          // The question stays in the transcript; this is the turn that says the
+          // search for it was cut short, so the reader is never left looking at
+          // a question that appears to have been ignored.
+          setMessages(prev => [...prev, { role: "assistant", content: "", stopped: true }]);
+        }
       }
     },
     [loading],
@@ -909,6 +1158,12 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
     // Reading localStorage must happen after mount: the server has no access to
     // it, so doing this in a lazy initialiser would mismatch on hydration.
     const restored = loadHistory();
+    // Seed the transcript ref here rather than leaving it to the effect that
+    // keeps it in sync. This effect calls `ask` below, and effects run in
+    // declaration order, so that one has not happened yet — which would mean a
+    // question arriving from a shared link could not resolve against the
+    // conversation this reader already had open.
+    messagesRef.current = restored;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages(restored);
     setHydrated(true);
@@ -977,6 +1232,75 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  /**
+   * Grow the composer to fit what was typed, then stop.
+   *
+   * A question here is a sentence or two, not a keyword, so a single-line field
+   * was the wrong control: it scrolled its own text sideways, hid the rest of
+   * the question, and invited the short one-word questions the archive answers
+   * worst. Collapsing back to one row on an empty value keeps the resting
+   * height identical to the field this replaced, so nothing below it shifts.
+   */
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const next = Math.min(el.scrollHeight, COMPOSER_MAX_H);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > COMPOSER_MAX_H ? "auto" : "hidden";
+  }, [input, docked]);
+
+  /**
+   * Dock the composer once it has scrolled out of view.
+   *
+   * The composer stays at the top of the page on purpose — a reader should not
+   * have to scroll past a wall of citations to find the box that produced
+   * them. But after a few turns the top of the page is a long way up, and the
+   * only way to ask again would be to scroll all the way back. Docking solves
+   * both: the composer is still above the transcript, and it is still reachable
+   * once the reader is deep inside one.
+   *
+   * The bar is a view follower, not a layout sibling — it is measured on every
+   * scroll rather than placed by the document flow, so docking never reflows
+   * the transcript and never costs the reader their scroll position.
+   */
+  useEffect(() => {
+    // The composer's position in the document, captured while it is still in the
+    // flow. Docking lifts the form out of the flow entirely, so once it is
+    // docked its own rect describes the docked bar rather than the anchor point
+    // — measuring it then would flip the state straight back and the bar would
+    // strobe on every scroll event. This anchor is compared against instead.
+    let anchor: number | null = null;
+    let isDocked = false;
+
+    const measure = () => {
+      if (isDocked) {
+        // Back near the top? The in-flow composer is on screen again, so hand
+        // the page back to it.
+        if (anchor !== null && window.scrollY <= anchor + 8) {
+          isDocked = false;
+          setDocked(false);
+        }
+        return;
+      }
+      const el = composerRef.current;
+      if (!el) return;
+      anchor = el.getBoundingClientRect().top + window.scrollY;
+      if (window.scrollY > anchor + 8) {
+        isDocked = true;
+        setDocked(true);
+      }
+    };
+
+    measure();
+    window.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/ask", { signal: controller.signal })
@@ -1043,7 +1367,7 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
     <main
       style={{
         flex: 1,
-        maxWidth: 860,
+        maxWidth: 1000,
         margin: "0 auto",
         width: "100%",
         padding: "1.25rem 1.5rem 2rem",
@@ -1119,60 +1443,137 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
           viewport-height shell. A reader who has to scroll past a wall of
           citations to find the box that produced them is a reader who asks one
           question and leaves. The follow-up chips inside each answer are the
-          fast path to the next question. */}
+          fast path to the next question, and once the reader scrolls past this
+          box it follows them down as a docked bar.
+
+          It stays enabled while a search is in flight: someone who has just
+          watched a slow answer arrive can be drafting the follow-up before the
+          first one lands, and there is no reason to make them wait for a
+          round trip to start typing. */}
       <form
+        ref={composerRef}
         onSubmit={e => {
           e.preventDefault();
           void ask(input);
         }}
-        style={{ display: "flex", gap: "0.6rem" }}
+        style={
+          docked
+            ? {
+                position: "fixed",
+                left: "50%",
+                bottom: "max(0.7rem, env(safe-area-inset-bottom))",
+                transform: "translateX(-50%)",
+                width: "min(1000px, calc(100vw - 2rem))",
+                zIndex: 45,
+                display: "flex",
+                alignItems: "flex-end",
+                gap: "0.5rem",
+                padding: "0.4rem",
+                background: "color-mix(in srgb, var(--p-bg) 92%, transparent)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                border: "1px solid var(--p-border-3)",
+                borderRadius: 24,
+                boxShadow: "var(--p-shadow)",
+              }
+            : {
+                display: "flex",
+                alignItems: "flex-end",
+                gap: "0.6rem",
+                transition: "box-shadow 0.2s ease",
+              }
+        }
       >
         <label htmlFor="ask-question" className="sr-only">
           Ask a question about the archive
         </label>
-        <input
+        <textarea
           id="ask-question"
           ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
+          onKeyDown={e => {
+            // Enter asks; Shift+Enter is a newline. A question is prose, so the
+            // reader needs a way to write more than one line of it before
+            // sending, and the mobile keyboard is told which key does what.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              if (!loading) void ask(input);
+            }
+          }}
+          rows={1}
           placeholder="Ask about a speech, letter, theme or period…"
-          disabled={loading}
-          autoComplete="off"
+          maxLength={MAX_QUESTION}
           enterKeyHint="send"
+          autoComplete="off"
+          spellCheck
           style={{
             flex: 1,
             minWidth: 0,
             background: "var(--p-surface)",
             border: "1px solid var(--p-border-3)",
-            borderRadius: 999,
-            padding: "0.75rem 1.2rem",
-            minHeight: 48,
+            borderRadius: 20,
+            padding: "0.7rem 1.1rem",
+            minHeight: 46,
+            maxHeight: COMPOSER_MAX_H,
             color: "var(--p-text-1)",
             fontSize: "0.95rem",
+            lineHeight: 1.5,
+            fontFamily: "inherit",
+            resize: "none",
             outline: "none",
+            overflowY: "hidden",
           }}
         />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          aria-label="Send question"
-          style={{
-            background: "var(--primary)",
-            border: "none",
-            color: "var(--primary-fg)",
-            borderRadius: 999,
-            width: 48,
-            height: 48,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-            opacity: loading || !input.trim() ? 0.5 : 1,
-          }}
-        >
-          <Send size={18} aria-hidden />
-        </button>
+        {loading ? (
+          <button
+            type="button"
+            onClick={() => stopRef.current?.()}
+            aria-label="Stop searching"
+            title="Stop searching"
+            style={{
+              background: "var(--p-surface-2)",
+              border: "1px solid var(--p-border-3)",
+              color: "var(--p-text-1)",
+              borderRadius: 999,
+              width: 46,
+              height: 46,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{ width: 13, height: 13, borderRadius: 3, background: "currentColor" }}
+            />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            aria-label="Send question"
+            style={{
+              background: "var(--primary)",
+              border: "none",
+              color: "var(--primary-fg)",
+              borderRadius: 999,
+              width: 46,
+              height: 46,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: input.trim() ? "pointer" : "not-allowed",
+              opacity: input.trim() ? 1 : 0.5,
+              transition: "opacity 0.2s ease",
+            }}
+          >
+            <Send size={18} aria-hidden />
+          </button>
+        )}
       </form>
 
       {emptyChat && (
@@ -1255,7 +1656,7 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
             <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
               <div
                 style={{
-                  maxWidth: "82%",
+                  maxWidth: "min(82%, 32rem)",
                   background: "var(--primary)",
                   color: "var(--primary-fg)",
                   borderRadius: 18,
@@ -1277,7 +1678,7 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
               </span>
               <div
                 style={{
-                  maxWidth: "88%",
+                  maxWidth: "min(88%, 46rem)",
                   minWidth: 0,
                   background: "var(--p-surface)",
                   border: "1px solid var(--p-border)",
@@ -1292,11 +1693,15 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
                 <AssistantReply
                   result={m.result}
                   failed={m.failed}
+                  stopped={m.stopped}
                   copied={copiedIndex === i}
                   onCopy={text => onCopy(text, i)}
                   onFollowUp={q => void ask(q)}
+                  busy={loading}
                   onRetry={
-                    m.failed && lastUserQuestion ? () => void ask(lastUserQuestion) : undefined
+                    (m.failed || m.stopped) && lastUserQuestion
+                      ? () => void ask(lastUserQuestion)
+                      : undefined
                   }
                 />
               </div>
@@ -1311,16 +1716,17 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
             </span>
             <div
               style={{
+                flex: 1,
+                minWidth: 0,
+                maxWidth: "min(88%, 46rem)",
                 background: "var(--p-surface)",
                 border: "1px solid var(--p-border)",
                 borderRadius: 18,
                 borderTopLeftRadius: 6,
                 padding: "0.9rem 1.1rem",
-                fontSize: "0.9rem",
-                color: "var(--p-text-3)",
               }}
             >
-              Searching the archive…
+              <ThinkingSkeleton />
             </div>
           </div>
         )}
@@ -1329,6 +1735,13 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
       {/* The scroll anchor. The transcript is part of the page, not a scroller
           of its own, so this is what the page follows when a new turn lands. */}
       <div ref={endRef} aria-hidden style={{ height: 1 }} />
+
+      {/* The composer is fixed while docked, so it stops contributing height to
+          the page. This is the room that keeps the last citation in a long
+          answer from being left sitting underneath it. It belongs at the end of
+          the column — clearance at the top would just open a gap where the
+          composer used to be. */}
+      {docked && <div aria-hidden style={{ height: 78 }} />}
 
       <div
         style={{
@@ -1343,9 +1756,11 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
       >
         <MessageSquare size={12} aria-hidden style={{ marginTop: "0.15rem", flexShrink: 0 }} />
         <span>
-          Answers are keyword-matched against the live archive — each result links
-          straight to the item it came from, and each question gets a shareable
-          link. Conversational reasoning is planned but not yet enabled.
+          This is <strong style={{ color: "var(--p-text-2)" }}>not the Speaker himself</strong>. It
+          is a search of the published archive that answers in his voice: every passage in the
+          first person is quoted word for word from a speech, paper, letter or interview held in
+          this library, and links back to the record it came from. Nothing here is written by a
+          model and nothing is paraphrased — where the archive is silent, it says so.
         </span>
       </div>
       </main>

@@ -52,7 +52,7 @@ export default async function AskPage({
         <div
           style={{
             position: 'relative',
-            maxWidth: 860,
+            maxWidth: 1000,
             margin: '0 auto',
             padding: 'clamp(1.75rem, 3.5vw, 2.75rem) 1.5rem clamp(1.5rem, 3vw, 2rem)',
           }}

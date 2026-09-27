@@ -227,4 +227,36 @@ export interface AskResult {
    */
   broaderMatched?: number
   suggested: string[]
+  /**
+   * How this turn related to the turns before it, and the persona opening.
+   *
+   * Absent for answers that never reached a search — corpus counts, and turns
+   * with no subject to resolve.
+   */
+  conversation?: AskConversation
+}
+
+/** Verbatim passage plus the record it was taken from. */
+export interface AskPersonaQuote {
+  text: string
+  title: string
+  href: string
+  year: number | null
+  kindLabel: string
+  collectionLabel: string
+}
+
+export interface AskConversation {
+  kind: 'new' | 'followup' | 'unresolved'
+  /** The opening line, in the Speaker's voice where that is possible. */
+  lead: string
+  /**
+   * Passages quoted word for word. The first person only ever appears inside
+   * these, never in `lead` on its own authority.
+   */
+  quotes: AskPersonaQuote[]
+  /** True when the reply speaks in the first person at all. */
+  firstPerson: boolean
+  /** Earlier terms this turn was resolved against, for "carrying on from…". */
+  anchor: string[]
 }

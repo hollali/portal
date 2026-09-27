@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { getLibraryCounts } from '@/lib/libraryQueries'
 import { searchArchive, type ScoredCandidate } from '@/lib/askSearch'
 import {
+  buildVoice,
+  resolveQuestion,
+  suggestionsFromResult,
+  type PersonaVoice,
+} from '@/lib/askConversation'
+import {
   ASK_SUGGESTIONS,
   queryTerms,
   type AskCitation,
@@ -15,6 +21,9 @@ export const dynamic = 'force-dynamic'
 
 /** "How many speeches…", "count of documents" — a corpus question, not a search. */
 const COUNT_QUESTION = /\b(how many|how much|number of|count of|total number)\b/i
+
+/** Turns of history used to resolve a follow-up. */
+const MAX_HISTORY_TURNS = 6
 
 function snippet(text: string, max = 180): string {
   const clean = text.replace(/\s+/g, ' ').trim()
@@ -106,22 +115,22 @@ function describeBreadth(counts: AskCollectionCount[], shown: number, broaderTot
 }
 
 /**
- * The headline answer. A bare "the archive holds N items matching your question"
- * tells the reader nothing, so the summary leads with the best-matching record
- * and quotes it, then says how far the search reached.
+ * The headline answer.
  *
- * The lead is the top-ranked record whatever kind it is. Reading it off
- * `citations[0]` instead meant that a question whose best match was a milestone
- * or a testimonial announced the top *document* as the closest match, which is
- * precisely the claim the summary should never get wrong.
+ * The opening is no longer composed here — it comes from `buildVoice`, which is
+ * the only place allowed to decide whether this reply speaks in the first person.
+ * This function is responsible for the two things that have to stay attached to
+ * it: how far the search actually reached, and the terms it could not satisfy.
  *
- * The loose `any` path is where a keyword search most easily oversells itself:
- * nothing satisfied every term, so the summary says so in its first sentence
- * and names the terms the archive simply does not cover, rather than letting a
- * partial hit read as a complete answer.
+ * A partial answer that does not say it is partial is worse than no answer,
+ * because the reader has no way to tell the difference. So the disclosure leads
+ * for an incomplete answer, before any quotation — quoting a record confidently
+ * and only then admitting a third of the question went uncovered is the exact
+ * shape of an answer nobody should trust.
  */
 function buildSummary(
   mode: AskMatchMode,
+  voice: PersonaVoice,
   lead: ScoredCandidate | undefined,
   terms: string[],
   unmatched: string[],
@@ -131,30 +140,24 @@ function buildSummary(
 ): string {
   if (!lead) return noMatchSummary(terms)
 
-  const { candidate } = lead
-  const where = candidate.year ? ` (${candidate.year})` : ''
-  const kind = ` — ${candidate.kindLabel.toLowerCase()}`
-  const quote = candidate.excerpt && candidate.excerpt !== candidate.title
-    ? ` “${snippet(candidate.excerpt, 150)}”`
-    : ''
   const breadth = describeBreadth(counts, shown, broaderTotal)
-  const leadSentence = `Closest match: “${candidate.title}”${where}${kind}.`
 
-  if (mode === 'all') return `${leadSentence}${quote}${breadth}`
-
-  // Two genuinely different partial answers get two different explanations.
-  // `unmatched` is the union across every returned record, so an empty list here
-  // means the terms were covered — just never by one item.
-  if (unmatched.length > 0) {
+  if (mode === 'any' && unmatched.length > 0) {
     return (
       `No single item covers your whole question, and nothing in the archive mentions ` +
-      `${unmatched.map(u => `“${u}”`).join(' or ')}. ${leadSentence}${quote}${breadth}`
+      `${unmatched.map(u => `“${u}”`).join(' or ')}. ${voice.lead}${breadth}`
     )
   }
-  return (
-    `Your question spans several records — no single one covers every part of it, ` +
-    `so the answer below is assembled from the ${shown} closest match${shown === 1 ? '' : 'es'} between them. ${leadSentence}${quote}`
-  )
+
+  if (mode === 'any') {
+    return (
+      `Your question spans several records — no single one covers every part of it, ` +
+      `so the answer below is assembled from the ${shown} closest match${shown === 1 ? '' : 'es'} between them. ` +
+      `${voice.lead}${breadth}`
+    )
+  }
+
+  return `${voice.lead}${breadth}`
 }
 
 /**
@@ -219,7 +222,20 @@ export async function POST(request: NextRequest) {
       ? body.question
       : [...(body.messages || [])].reverse().find(m => m.role === 'user')?.content || ''
 
-  const terms = queryTerms(raw.slice(0, 500))
+  // The turns before this one, so "more on that?" and "and the debt?" can be
+  // resolved against what is already under discussion. Capped, and user turns
+  // only: an assistant turn is a summary we wrote, not something the reader asked.
+  const history = (body.messages || [])
+    .filter(m => m.role === 'user' && typeof m.content === 'string' && m.content.trim())
+    .map(m => m.content as string)
+    .slice(-MAX_HISTORY_TURNS)
+    // The turn being answered is still in the array on a client that sends the
+    // whole transcript; using it as its own history would make every question a
+    // follow-up to itself.
+    .filter(text => text.trim() !== raw.trim())
+
+  const resolved = resolveQuestion(raw, history)
+  const terms = resolved.terms
   const suggestions = await suggestFromThemes(terms, raw)
 
   const empty = (
@@ -252,11 +268,22 @@ export async function POST(request: NextRequest) {
   if (terms.length === 0) {
     return NextResponse.json(
       empty(
-        'Ask me about a speech, a letter, a theme or a period of the Speaker’s career — for example “parliamentary independence” or “education and the youth”.',
+        resolved.kind === 'followup'
+          ? 'I could not carry that forward — the earlier turns in this conversation did not give me a subject to keep going on. Try naming the speech, theme or period again.'
+          : 'Ask me about a speech, a letter, a theme or a period of the Speaker’s career — for example “parliamentary independence” or “education and the youth”.',
         'none',
         // No terms survived stopwording, so nothing is uncovered; a reader who
         // typed "who was he?" has not asked about a gap in the archive.
-        { unmatched: [] },
+        {
+          unmatched: [],
+          conversation: {
+            kind: resolved.kind,
+            lead: '',
+            quotes: [],
+            firstPerson: false,
+            anchor: resolved.anchor,
+          },
+        },
       ),
     )
   }
@@ -265,7 +292,10 @@ export async function POST(request: NextRequest) {
   // are split out below because the client already renders them as a
   // chronological timeline and as pull-quotes, which suit them better than a
   // generic result card.
-  const { mode, results, collectionCounts, totalMatched, broaderMatched } = await searchArchive(terms)
+  const { mode, results, collectionCounts, totalMatched, broaderMatched } = await searchArchive(
+    terms,
+    resolved.context,
+  )
 
   if (results.length === 0) {
     return NextResponse.json(empty(noMatchSummary(terms)))
@@ -315,7 +345,25 @@ export async function POST(request: NextRequest) {
   // result cards, but the reader still saw them — so they count towards what
   // the response is able to show, and the summary must not understate it.
   const shown = citations.length + timeline.length + testimonials.length
-  const summary = buildSummary(mode, results[0], terms, unmatched, collectionCounts, shown, broaderMatched)
+  const matchedTerms = terms.filter(t => covered.has(t))
+
+  const voice = buildVoice(resolved.kind, resolved.anchor, results)
+  const summary = buildSummary(
+    mode,
+    voice,
+    results[0],
+    terms,
+    unmatched,
+    collectionCounts,
+    shown,
+    broaderMatched,
+  )
+
+  // Suggestions from the records that were actually returned, because the global
+  // theme list was the same four chips on every answer and read as a fixed menu
+  // rather than a next step. The theme list stays as the fallback for turns that
+  // never reached a search.
+  const resultSuggestions = suggestionsFromResult(results, matchedTerms, raw)
 
   return NextResponse.json({
     summary,
@@ -325,10 +373,17 @@ export async function POST(request: NextRequest) {
     timeline,
     testimonials,
     collectionCounts,
-    matchedTerms: terms.filter(t => covered.has(t)),
+    matchedTerms,
     unmatched,
     totalMatched,
     ...(broaderMatched ? { broaderMatched } : {}),
-    suggested: suggestions,
+    suggested: resultSuggestions.length > 0 ? resultSuggestions : suggestions,
+    conversation: {
+      kind: resolved.kind,
+      lead: voice.lead,
+      quotes: voice.quotes,
+      firstPerson: voice.firstPerson,
+      anchor: resolved.anchor,
+    },
   } satisfies AskResult)
 }

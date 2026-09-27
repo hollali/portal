@@ -10,6 +10,7 @@ import {
   matchTerm,
   rankCandidates,
   scoreCandidate,
+  plainText,
   type SearchCandidate,
 } from '@/lib/askSearch'
 import { foldSuffix, queryTerms, termVariants } from '@/lib/askQuery'
@@ -286,6 +287,7 @@ function candidate(over: Partial<SearchCandidate> = {}): SearchCandidate {
     href: '/videos/1',
     year: 2024,
     excerpt: '',
+    body: '',
     hasTranscript: false,
     fields: [{ weight: 5, text: 'a video' }],
     matchTotal: 1,
@@ -462,5 +464,48 @@ describe('rankCandidates', () => {
     const documents = ranked.results.filter(r => r.candidate.collection === 'documents')
     expect(videos.length).toBeLessThanOrEqual(3)
     expect(documents).toHaveLength(1)
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+
+describe('plainText', () => {
+  // These bodies get quoted to the reader as the Speaker's own words, so a
+  // markup artefact surviving into the text is shown as though he said it.
+  const body = [
+    '## Financing the legislature',
+    '',
+    'A legislature that depends on the goodwill of the Executive **cannot fully**',
+    'exercise over the purse.',
+    '',
+    '### On poverty strategy',
+    '',
+    '*Mr. Speaker*, it has become fashionable to speak of poverty-reduction',
+    'strategies, and to treat them as a document rather than a duty.',
+    '',
+    '> The House sits, and the House decides.',
+  ].join('\n')
+
+  it('drops headings so they do not run into the first sentence', () => {
+    const out = plainText(body)
+    expect(out).not.toContain('Financing the legislature')
+    expect(out).not.toContain('On poverty strategy')
+    expect(out.startsWith('A legislature that depends')).toBe(true)
+  })
+
+  it('closes emphasis without leaving a gap before punctuation', () => {
+    const out = plainText(body)
+    expect(out).toContain('Mr. Speaker, it has become fashionable')
+    expect(out).not.toMatch(/\s[,.;:!?]/)
+  })
+
+  it('keeps the sentence itself intact', () => {
+    expect(plainText(body)).toContain(
+      'A legislature that depends on the goodwill of the Executive cannot fully exercise over the purse.',
+    )
+  })
+
+  it('unwraps a blockquote without gluing words together', () => {
+    expect(plainText(body)).toContain('The House sits, and the House decides.')
   })
 })
