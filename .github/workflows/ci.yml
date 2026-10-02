@@ -45,7 +45,11 @@ jobs:
         run: npm run build
 
   deploy:
-    name: Deploy to Vercel
+    # The caveat is in the job name on purpose. The gate below can no-op when
+    # VERCEL_* secrets are absent, and a job that reports success while doing
+    # nothing is indistinguishable from one that deployed — which is how two
+    # commits reached main with nothing going live.
+    name: Deploy to Vercel (skipped unless VERCEL_* secrets are set)
     needs: ci
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -58,9 +62,25 @@ jobs:
       - name: Check Vercel secrets
         id: gate
         run: |
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "VERCEL_* secrets not configured — skipping deploy"
+          missing=""
+          if [ -z "$VERCEL_TOKEN" ]; then missing="$missing VERCEL_TOKEN"; fi
+          if [ -z "$VERCEL_ORG_ID" ]; then missing="$missing VERCEL_ORG_ID"; fi
+          if [ -z "$VERCEL_PROJECT_ID" ]; then missing="$missing VERCEL_PROJECT_ID"; fi
+          if [ -n "$missing" ]; then
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            # Non-failing, but impossible to miss: an annotation on the run and a
+            # block on its summary. Silence here is what let main drift ahead of
+            # production unnoticed, so the skip says so rather than just logging.
+            echo "::warning title=Production deploy skipped::Missing repository secrets:$missing. CI is green but vercel deploy --prod did not run, so production is still serving an older commit than main."
+            {
+              echo "### :warning: Production deploy skipped"
+              echo
+              echo "Not set on this repository: \`$missing\`"
+              echo
+              echo "CI passed, but \`vercel deploy --prod\` never ran. **Production is serving an older commit than \`main\`.**"
+              echo
+              echo "Set them under Settings -> Secrets and variables -> Actions, then re-run this workflow."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "should_deploy=true" >> "$GITHUB_OUTPUT"
           fi
