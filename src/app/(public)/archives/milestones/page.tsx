@@ -4,6 +4,7 @@ import { BadgeCheck, Milestone as MilestoneIcon, Star } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,11 @@ export default async function MilestonesPage() {
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
+          <Breadcrumbs
+            tone="public"
+            className="mb-4"
+            crumbs={[{ label: 'Archives', href: '/archives' }, { label: 'Milestones' }]}
+          />
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Archive · Milestones</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0', color: 'var(--p-text-1)' }}>Milestones of <span className="p-serif">a public career</span></h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '38rem', margin: 0 }}>

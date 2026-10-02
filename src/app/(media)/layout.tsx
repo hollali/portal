@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import PublicHeader from '@/components/PublicHeader'
+import PublicFooter from '@/components/PublicFooter'
 
 export const metadata: Metadata = {
   title: {
@@ -17,13 +18,10 @@ export default function MediaLayout({
       <main id="content" style={{ maxWidth: 1180, margin: '0 auto', padding: '2rem 1.5rem 4rem' }} className="p-section">
         {children}
       </main>
-      <footer style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-2)' }}>
-        <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: '2rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--p-text-3)' }}>
-            © {new Date().getFullYear()} AlbanBagbin · Public profile & media archive
-          </span>
-        </div>
-      </footer>
+      {/* Not a bare copyright line: on mobile the header collapses into the
+          drawer, so this footer is one of the few permanently visible places
+          to reach the rest of the library from /videos, /news or /search. */}
+      <PublicFooter />
     </div>
   )
 }

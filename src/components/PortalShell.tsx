@@ -51,6 +51,10 @@ export default function PortalShell({ children }: { children: ReactNode }) {
 
   const closeNav = useCallback(() => setNavOpen(false), [])
 
+  // The topbar button toggles rather than only opening, so it can also close
+  // the drawer it opened — previously it could never undo itself.
+  const toggleNav = useCallback(() => setNavOpen(v => !v), [])
+
   return (
     <ToastProvider>
       <div ref={shellRef} className="portal-shell">
@@ -61,7 +65,7 @@ export default function PortalShell({ children }: { children: ReactNode }) {
         <Sidebar open={navOpen} isDesktop={isDesktop} onClose={closeNav} />
 
         <div className="portal-shell__body">
-          <Topbar onOpenNav={() => setNavOpen(true)} isDesktop={isDesktop} />
+          <Topbar onToggleNav={toggleNav} navOpen={navOpen} isDesktop={isDesktop} />
           <main id="main" tabIndex={-1} className="page-enter portal-shell__main">
             {children}
           </main>

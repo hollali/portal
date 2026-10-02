@@ -12,6 +12,7 @@ import {
 } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
 import { ARCHIVE_COLLECTION_NAV } from '@/lib/library'
 import {
   Calendar,
@@ -841,6 +842,11 @@ function TestimonialLibraryContent({ records }: { records: TestimonialRecord[] }
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
+          <Breadcrumbs
+            tone="public"
+            className="mb-4"
+            crumbs={[{ label: 'Archives', href: '/archives' }, { label: 'Testimonials' }]}
+          />
           <span style={{ ...mono, fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>
             Archive · Testimonials
           </span>

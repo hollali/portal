@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { renderMarkdown } from '@/lib/markdown'
 import PublicHeader from '@/components/PublicHeader'
+import PublicFooter from '@/components/PublicFooter'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,13 +38,9 @@ export default async function CmsPage({ params }: Props) {
         </h1>
         <div className="cms-prose" dangerouslySetInnerHTML={{ __html: html }} />
       </main>
-      <footer style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-2)' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '2rem 1.5rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--p-text-3)' }}>
-            © {new Date().getFullYear()} AlbanBagbin · Public profile & media archive
-          </span>
-        </div>
-      </footer>
+      {/* Not a bare copyright line: with the header collapsed into the drawer
+          on mobile, this is one of the few permanent ways off a CMS page. */}
+      <PublicFooter />
     </div>
   )
 }

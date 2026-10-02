@@ -1,12 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import Link from 'next/link'
+import { Breadcrumbs, type Crumb } from '@/components/ui/Breadcrumbs'
 
-export interface Crumb {
-  label: string
-  href?: string
-}
+export type { Crumb }
 
 export interface PageHeaderProps {
   title: string
@@ -28,33 +25,7 @@ export interface PageHeaderProps {
 export function PageHeader({ title, description, icon, crumbs, actions, meta }: PageHeaderProps) {
   return (
     <header className="mb-6">
-      {crumbs && crumbs.length > 0 && (
-        <nav aria-label="Breadcrumb" className="mb-2">
-          <ol className="flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--muted)' }}>
-            {crumbs.map((c, i) => {
-              const last = i === crumbs.length - 1
-              return (
-                <li key={`${c.label}-${i}`} className="flex items-center gap-1.5">
-                  {c.href && !last ? (
-                    <Link href={c.href} className="text-xs no-underline" style={{ color: 'var(--muted)' }}>
-                      {c.label}
-                    </Link>
-                  ) : (
-                    <span className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }} aria-current={last ? 'page' : undefined}>
-                      {c.label}
-                    </span>
-                  )}
-                  {!last && (
-                    <span aria-hidden style={{ color: 'var(--border-strong)' }}>
-                      /
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-          </ol>
-        </nav>
-      )}
+      {crumbs && <Breadcrumbs crumbs={crumbs} />}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">

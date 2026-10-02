@@ -1,14 +1,14 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Calendar, Download, ExternalLink, FileText, MapPin, Building2, Video, AudioLines, Image as ImageIcon, BookOpen, CircleCheck, Info } from 'lucide-react'
+import { Calendar, Download, ExternalLink, FileText, MapPin, Building2, Video, AudioLines, Image as ImageIcon, BookOpen, CircleCheck, Info } from 'lucide-react'
 import { KIND_ICON } from '@/lib/kindIcon'
 import { prisma } from '@/lib/prisma'
 import { renderMarkdown } from '@/lib/markdown'
 import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/media'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
-import { LIST_ROUTE_KINDS } from '@/lib/library'
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs'
+import { LIST_ROUTE_KINDS, archiveRouteForKind, collectionLabel } from '@/lib/library'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,15 +23,6 @@ const KIND_NAME: Record<string, string> = {
   note: 'Notes & Correspondence',
   letter: 'Notes & Correspondence',
   memo: 'Notes & Correspondence',
-}
-
-const KIND_PLURAL: Record<string, string> = {
-  speech: 'speeches',
-  paper: 'papers',
-  interview: 'interviews',
-  note: 'notes',
-  letter: 'notes',
-  memo: 'notes',
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -55,7 +46,6 @@ export default async function ArchiveDetailPage({ params }: Props) {
 
   const Icon = KIND_ICON[item.kind] ?? FileText
   const kindName = KIND_NAME[item.kind] || kind
-  const backLabel = KIND_PLURAL[item.kind] || KIND_PLURAL[kind] || kind
   const bodyHtml = item.body ? renderMarkdown(item.body) : null
 
   const videoEmbed = item.videoUrl ? getYouTubeEmbedUrl(item.videoUrl) : null
@@ -82,11 +72,17 @@ export default async function ArchiveDetailPage({ params }: Props) {
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.75rem, 5vw, 4.5rem) 1.5rem 2.5rem' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1.75rem' }}>
-            <Link href={`/archives/${kind}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-3)', textDecoration: 'none', fontSize: '0.85rem' }}>
-              <ArrowLeft size={14} /> Back to {backLabel}
-            </Link>
+          <Breadcrumbs
+            tone="public"
+            className="mb-4"
+            crumbs={[
+              { label: 'Archives', href: '/archives' },
+              { label: collectionLabel(archiveRouteForKind(item.kind)), href: `/archives/${archiveRouteForKind(item.kind)}` },
+              { label: item.title },
+            ]}
+          />
 
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.75rem' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.3rem 0.7rem', borderRadius: 999 }}>
               <Icon size={12} strokeWidth={2.25} /> {kindName}
             </span>

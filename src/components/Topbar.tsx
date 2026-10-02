@@ -52,10 +52,12 @@ export function breadcrumbFor(pathname: string): { label: string; href: string }
 }
 
 export default function Topbar({
-  onOpenNav,
+  onToggleNav,
+  navOpen,
   isDesktop,
 }: {
-  onOpenNav: () => void
+  onToggleNav: () => void
+  navOpen: boolean
   isDesktop: boolean
 }) {
   const pathname = usePathname()
@@ -149,7 +151,7 @@ export default function Topbar({
         display: 'flex',
         alignItems: 'center',
         gap: '0.75rem',
-        height: 56,
+        height: isDesktop ? 56 : 64,
         padding: '0 1rem',
         background: 'color-mix(in srgb, var(--background) 88%, transparent)',
         backdropFilter: 'blur(10px)',
@@ -161,9 +163,13 @@ export default function Topbar({
           variant="ghost"
           size="sm"
           iconOnly
-          onClick={onOpenNav}
-          aria-label="Open navigation"
-          aria-expanded={false}
+          onClick={onToggleNav}
+          // "Hide" rather than "Close": the drawer carries its own
+          // `Close navigation` button, and two controls sharing an accessible
+          // name is ambiguous to announce. `aria-expanded` carries the state
+          // either way.
+          aria-label={navOpen ? 'Hide navigation' : 'Open navigation'}
+          aria-expanded={navOpen}
           aria-controls="portal-nav"
         >
           <Menu size={18} aria-hidden />
@@ -223,9 +229,13 @@ export default function Topbar({
           onChange={e => setQ(e.target.value)}
           placeholder="Search…"
           className="ui-input"
-          style={{ height: 34, width: 'min(34vw, 15rem)', paddingLeft: '1.9rem', paddingRight: '1.6rem' }}
+          // 44px on a phone: the desktop 34px density hint is a pointer target
+          // there, not a tap target.
+          style={{ height: isDesktop ? 34 : 44, width: 'min(34vw, 15rem)', paddingLeft: '1.9rem', paddingRight: isDesktop ? '1.6rem' : '0.75rem' }}
         />
-        {!q && (
+        {/* The `/` hint is for a hardware keyboard. On a phone it sits over the
+            input as decoration and eats width the field needs. */}
+        {isDesktop && !q && (
           <kbd
             aria-hidden
             className="absolute pointer-events-none text-[0.65rem]"

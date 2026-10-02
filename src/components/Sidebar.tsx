@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   FileText,
   Library,
+  Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
@@ -350,6 +351,30 @@ export default function Sidebar({
             gap: '0.75rem',
           }}
         >
+          {/* The public library is a separate shell with its own header, so
+              nothing in `sections` can reach it and nothing on those pages can
+              reach this one. A footer row rather than a nav entry: it is a
+              different product, not a peer destination of the portal. */}
+          <Link
+            href="/"
+            onClick={onClose}
+            className="nav-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              minHeight: 44,
+              padding: '0.625rem 0.875rem',
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              textDecoration: 'none',
+              color: 'var(--foreground)',
+            }}
+          >
+            <Globe size={18} aria-hidden style={{ color: 'var(--muted)' }} />
+            <span style={{ flex: 1 }}>Public library</span>
+          </Link>
+
           <div className="flex justify-center">
             <ThemeToggle />
           </div>

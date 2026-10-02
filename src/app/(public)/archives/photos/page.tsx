@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PublicHeader from "@/components/PublicHeader";
 import PublicFooter from "@/components/PublicFooter";
+import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import {
   PHOTO_FACET_FIELDS,
   ARCHIVE_COLLECTION_NAV,
@@ -1096,6 +1097,14 @@ function PhotoLibraryContent() {
             padding: "clamp(3rem, 6vw, 4.5rem) 1.5rem",
           }}
         >
+          <Breadcrumbs
+            tone="public"
+            className="mb-4"
+            crumbs={[
+              { label: "Archives", href: "/archives" },
+              { label: "Photo Library" },
+            ]}
+          />
           <span
             style={{
               ...mono,

@@ -121,6 +121,31 @@ describe('Sidebar — mobile drawer', () => {
     expect(await screen.findByRole('button', { name: /open navigation/i })).toBeInTheDocument()
   })
 
+  it('tracks the drawer state on the menu button', async () => {
+    await renderShell()
+    const toggle = await screen.findByRole('button', { name: /open navigation/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveAttribute('aria-controls', 'portal-nav')
+
+    fireEvent.click(toggle)
+    // Previously hard-coded to `false`, so the button claimed to be collapsed
+    // while the drawer covered the screen.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /hide navigation/i })).toHaveAttribute('aria-expanded', 'true'),
+    )
+  })
+
+  it('closes the drawer from the menu button that opened it', async () => {
+    await renderShell()
+    fireEvent.click(await screen.findByRole('button', { name: /open navigation/i }))
+    const nav = document.querySelector('aside')!
+    await waitFor(() => expect(nav).not.toHaveAttribute('inert'))
+
+    fireEvent.click(screen.getByRole('button', { name: /hide navigation/i }))
+    await waitFor(() => expect(nav).toHaveAttribute('inert'))
+    expect(screen.getByRole('button', { name: /open navigation/i })).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('opens the drawer and removes aria-hidden', async () => {
     await renderShell()
     fireEvent.click(await screen.findByRole('button', { name: /open navigation/i }))

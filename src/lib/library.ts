@@ -62,6 +62,18 @@ export function archiveRouteForKind(kind: string): string {
   return entry ? entry[0] : 'notes'
 }
 
+/**
+ * Nav label for a collection route, taken from the first kind the route serves.
+ * This is what the header, the drawer and the footer already call these
+ * collections, so breadcrumbs reuse it instead of each page inventing a third
+ * variant — the list pages head themselves "Speeches & addresses", which is an
+ * editorial title, not a position in the hierarchy.
+ */
+export function collectionLabel(listKind: string): string {
+  const kind = LIST_ROUTE_KINDS[listKind as ListRouteKind]?.[0]
+  return kind ? KIND_CONFIG[kind].plural : listKind
+}
+
 export const FACET_FIELDS = ['year', 'event', 'location', 'person', 'institution', 'parliament', 'theme'] as const
 export type FacetField = (typeof FACET_FIELDS)[number]
 
