@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  CalendarRange,
   Check,
   Copy,
   ExternalLink,
@@ -36,7 +37,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { KIND_ICON } from "@/lib/kindIcon";
-import { ASK_SUGGESTIONS, type AskResult } from "@/lib/askQuery";
+import {
+  ASK_SUGGESTIONS,
+  describeCollections,
+  describeUnsearchable,
+  describeWindow,
+  type AskResult,
+} from "@/lib/askQuery";
 import { highlightTerms } from "@/lib/askHighlight";
 
 interface ChatMsg {
@@ -132,13 +139,26 @@ function normaliseResult(value: unknown): AskResult | undefined {
             excerpt: typeof c.excerpt === "string" ? c.excerpt : null,
             hasTranscript: bool(c.hasTranscript),
             matched: strArray(c.matched),
+            // An absolute http(s) URL only. A stored `url` is whatever a scraper
+            // put in the row, and a `javascript:` or `data:` one would execute in
+            // this page the moment a reader clicked it.
+            ...(typeof c.url === "string" && /^https?:\/\//i.test(c.url) ? { url: c.url } : {}),
+            ...(typeof c.sourceName === "string" && c.sourceName ? { sourceName: c.sourceName } : {}),
+            ...(typeof c.via === "string" && c.via ? { via: c.via } : {}),
+            ...(typeof c.captureHref === "string" && c.captureHref.startsWith("/")
+              ? { captureHref: c.captureHref }
+              : {}),
           }))
           .filter(c => c.href !== "")
       : [],
     timeline: Array.isArray(raw.timeline)
       ? raw.timeline
           .filter((t): t is Record<string, unknown> => !!t && typeof t === "object")
-          .map(t => ({ year: typeof t.year === "string" ? t.year : null, title: str(t.title) }))
+          .map(t => ({
+            year: typeof t.year === "string" ? t.year : null,
+            title: str(t.title),
+            ...(typeof t.href === "string" && t.href.startsWith("/") ? { href: t.href } : {}),
+          }))
       : [],
     testimonials: Array.isArray(raw.testimonials)
       ? raw.testimonials
@@ -147,6 +167,7 @@ function normaliseResult(value: unknown): AskResult | undefined {
             quote: str(t.quote),
             author: str(t.author),
             role: typeof t.role === "string" ? t.role : null,
+            ...(typeof t.href === "string" && t.href.startsWith("/") ? { href: t.href } : {}),
           }))
       : [],
     collectionCounts: Array.isArray(raw.collectionCounts)
@@ -172,6 +193,60 @@ function normaliseResult(value: unknown): AskResult | undefined {
     ...(raw.conversation && typeof raw.conversation === 'object'
       ? { conversation: normaliseConversation(raw.conversation) }
       : {}),
+    ...(normalisePeriod(raw.period) ? { period: normalisePeriod(raw.period)! } : {}),
+    ...(strArray(raw.undated).length > 0 ? { undated: strArray(raw.undated) } : {}),
+    ...(strArray(raw.collections).length > 0 ? { collections: strArray(raw.collections) } : {}),
+    ...(strArray(raw.unsearchable).length > 0
+      ? { unsearchable: strArray(raw.unsearchable) }
+      : {}),
+    ...(normaliseReading(raw.reading) ? { reading: normaliseReading(raw.reading)! } : {}),
+  };
+}
+
+/**
+ * Coerce the window of years an answer was restricted to.
+ *
+ * Both bounds are independently optional, because "since 2020" has no end and "up
+ * to 1998" has no start, and one bound can be present while the other is `null`
+ * rather than absent. A transcript saved before this field existed has none at
+ * all, which is not the same as a window with no bounds.
+ */
+function normalisePeriod(value: unknown): AskResult["period"] | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const year = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const from = year(raw.from);
+  const to = year(raw.to);
+  if (from === null && to === null) return undefined;
+  return {
+    from,
+    to,
+    label: typeof raw.label === "string" && raw.label ? raw.label : "",
+  };
+}
+
+/**
+ * Coerce a generated reading, and refuse one that cannot prove what it is.
+ *
+ * `generated: true` is the whole point of the field. A payload that arrives
+ * without it is not a reading this client knows how to label, and rendering it as
+ * though it came from the archive would put an unattributable interpretation
+ * into a page whose every other word is a stored quotation — so it is dropped
+ * rather than guessed at.
+ */
+function normaliseReading(value: unknown): AskResult["reading"] | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  if (raw.generated !== true) return undefined;
+  const text = typeof raw.text === "string" ? raw.text : "";
+  if (!text.trim()) return undefined;
+  return {
+    text,
+    generated: true,
+    basedOn: Array.isArray(raw.basedOn)
+      ? raw.basedOn.filter((x): x is string => typeof x === "string")
+      : [],
   };
 }
 
@@ -345,6 +420,112 @@ function TermsReadout({ result }: { result: AskResult }) {
  * What the answer could not do. A partial answer that does not say it is partial
  * is worse than no answer, because the reader has no way to tell the difference.
  */
+/**
+ * The window a dated answer was filtered to, above the cards it chose.
+ *
+ * Every record below this line was picked under this filter, and a reader who
+ * cannot see the filter will read a 2026 clipping as evidence about 2021. The
+ * sentence comes from `describeWindow` rather than being written here, so the
+ * summary and this banner cannot disagree about which records were shown.
+ */
+/**
+ * The filters the search actually ran under, above the records.
+ *
+ * A collection named in the question and a window of years are both restrictions the
+ * reader chose and cannot see in the cards. Naming them here is also what keeps a
+ * refusal honest: a restriction the reader typed is not the archive missing something.
+ */
+function WindowNotice({ result }: { result: AskResult }) {
+  const collections = result.collections ?? [];
+  const unsearchable = result.unsearchable ?? [];
+  if (!result.period && collections.length === 0 && unsearchable.length === 0) return null;
+  const window =
+    result.period &&
+    (result.period.label ||
+      describeWindow(result.period, result.undated ?? [], "shown").replace(/\.$/, ""));
+  const scope = collections.length > 0 ? describeCollections(collections) : null;
+  return (
+    <p
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "0.45rem",
+        margin: "0 0 0.85rem",
+        padding: "0.55rem 0.7rem",
+        borderRadius: 10,
+        border: "1px solid color-mix(in srgb, var(--primary) 26%, transparent)",
+        background: "color-mix(in srgb, var(--primary) 7%, transparent)",
+        fontSize: "0.8rem",
+        lineHeight: 1.5,
+        color: "var(--p-text-2)",
+      }}
+    >
+      <CalendarRange size={15} style={{ flexShrink: 0, marginTop: "0.1rem" }} aria-hidden="true" />
+      <span>
+        {scope ? <>{scope} </> : null}
+        {window ? <>Restricted to {window}. </> : null}
+        {result.undated && result.undated.length > 0 ? (
+          <span style={{ color: "var(--p-text-4)" }}>
+            {result.undated.join(" and ")} carry no date, so they are not in this window.
+          </span>
+        ) : null}{" "}
+        {unsearchable.length > 0 ? (
+          <span style={{ color: "var(--p-text-4)" }}>{describeUnsearchable(unsearchable)}</span>
+        ) : null}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * An interpretation of the records, labelled as one.
+ *
+ * Nothing sends this field today — `/ask` builds every sentence it shows from
+ * stored text — and it is rendered distinctly for the day something does: a
+ * generated reading belongs beside the quotations in a different voice, never
+ * inside the persona's paragraph, where a reader has been told every word is the
+ * Speaker's own.
+ */
+function GeneratedReading({ reading }: { reading: NonNullable<AskResult["reading"]> }) {
+  return (
+    <div
+      style={{
+        margin: "0 0 0.85rem",
+        padding: "0.7rem 0.8rem",
+        borderRadius: 10,
+        border: "1px dashed color-mix(in srgb, var(--p-text-4) 45%, transparent)",
+        fontSize: "0.8rem",
+        lineHeight: 1.6,
+        color: "var(--p-text-2)",
+      }}
+    >
+      <p
+        style={{
+          margin: "0 0 0.35rem",
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "0.62rem",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--p-text-4)",
+        }}
+      >
+        Generated reading &mdash; not his words
+      </p>
+      <p style={{ margin: 0 }}>{reading.text}</p>
+      {reading.basedOn.length > 0 ? (
+        <p style={{ margin: "0.4rem 0 0", fontSize: "0.72rem", color: "var(--p-text-4)" }}>
+          Drawn from {reading.basedOn.length} cited record
+          {reading.basedOn.length === 1 ? "" : "s"} above.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * What the answer could not do. A partial answer that does not say it is partial
+ * is worse than no answer, because the reader has no way to tell the difference.
+ */
 function MatchNotice({ result }: { result: AskResult }) {
   if (result.match !== "any") return null;
   const gap = result.unmatched.length > 0;
@@ -410,111 +591,166 @@ function CitationCard({
   allTerms: string[];
 }) {
   const Icon = KIND_ICON[citation.kind] ?? FileText;
+  // The card is not itself a link.
+  //
+  // It was, which meant a clipping could only ever lead the reader to this
+  // library's page for it — the one thing an archive can offer in place of the
+  // paper it took the words from. Adding the original as a link inside a link is
+  // invalid HTML that browsers resolve in unpredictable ways, so the card became a
+  // container with the archive page as the title's link and the sources beside it.
+  const sources = [
+    ...(citation.url
+      ? [
+          {
+            key: "original",
+            href: citation.url,
+            // Named by the paper where the row names one. When it only names the
+            // aggregator, the link says so: "via Google News" is a fact about how
+            // the archive found the clipping, and presenting that as the
+            // publication would put a search engine in the source line of a
+            // speech.
+            label: citation.sourceName || citation.via || "the original",
+            via: citation.sourceName ? citation.via : null,
+          },
+        ]
+      : []),
+    ...(citation.captureHref
+      ? [{ key: "capture", href: citation.captureHref, label: "as captured", via: null }]
+      : []),
+  ];
   return (
-    <li>
+    <li
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        textDecoration: "none",
+        color: "inherit",
+        border: "1px solid var(--p-border)",
+        background: "var(--p-surface-2)",
+        borderRadius: 12,
+        padding: "0.85rem 1rem",
+        transition: "border-color 0.2s, transform 0.2s",
+      }}
+      className="p-card-lift"
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "0.72rem",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--primary)",
+          marginBottom: "0.4rem",
+        }}
+      >
+        <Icon size={13} aria-hidden />
+        {citation.kindLabel}
+        {citation.year != null && (
+          <span style={{ color: "var(--p-text-4)" }}>· {citation.year}</span>
+        )}
+      </span>
       <Link
         href={citation.href}
         style={{
           display: "block",
-          textDecoration: "none",
-          color: "inherit",
-          border: "1px solid var(--p-border)",
-          background: "var(--p-surface-2)",
-          borderRadius: 12,
-          padding: "0.85rem 1rem",
-          transition: "border-color 0.2s, transform 0.2s",
+          fontWeight: 700,
+          fontSize: "0.95rem",
+          fontFamily: "var(--font-display), sans-serif",
+          lineHeight: 1.35,
+          color: "var(--p-text-1)",
         }}
-        className="p-card-lift"
       >
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.4rem",
-            fontFamily: "var(--font-mono), monospace",
-            fontSize: "0.72rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            color: "var(--primary)",
-            marginBottom: "0.4rem",
-          }}
-        >
-          <Icon size={13} aria-hidden />
-          {citation.kindLabel}
-          {citation.year != null && (
-            <span style={{ color: "var(--p-text-4)" }}>· {citation.year}</span>
-          )}
-        </span>
+        <Highlight text={citation.title} terms={allTerms} />
+      </Link>
+      {citation.excerpt && (
         <span
           style={{
             display: "block",
-            fontWeight: 700,
-            fontSize: "0.95rem",
-            fontFamily: "var(--font-display), sans-serif",
-            lineHeight: 1.35,
-            color: "var(--p-text-1)",
+            marginTop: "0.35rem",
+            fontSize: "0.82rem",
+            lineHeight: 1.55,
+            color: "var(--p-text-3)",
           }}
         >
-          <Highlight text={citation.title} terms={allTerms} />
+          <Highlight text={citation.excerpt} terms={allTerms} />
         </span>
-        {citation.excerpt && (
-          <span
+      )}
+      <span
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.3rem 0.85rem",
+          marginTop: "0.6rem",
+          fontSize: "0.78rem",
+          fontWeight: 600,
+          color: "var(--primary)",
+        }}
+      >
+        <Link href={citation.href}>
+          {citation.hasTranscript ? "Read the full transcript" : "Open in the archive"}
+        </Link>
+        {/* Named by the publication rather than "source": the point is that the
+            reader can tell whose page this is. */}
+        {sources.map(s => (
+          <Link
+            key={s.key}
+            href={s.href}
+            target={s.key === "original" ? "_blank" : undefined}
+            rel={s.key === "original" ? "noopener noreferrer" : undefined}
             style={{
-              display: "block",
-              marginTop: "0.35rem",
-              fontSize: "0.82rem",
-              lineHeight: 1.55,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
               color: "var(--p-text-3)",
+              fontWeight: 500,
             }}
           >
-            <Highlight text={citation.excerpt} terms={allTerms} />
+            {s.label}
+            {s.key === "original" ? (
+              <ExternalLink size={12} aria-hidden />
+            ) : (
+              <FileText size={12} aria-hidden />
+            )}
+            {s.via ? (
+              <span style={{ color: "var(--p-text-4)" }}>via {s.via}</span>
+            ) : null}
+          </Link>
+        ))}
+        {citation.matched.length > 0 && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              marginLeft: "auto",
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.65rem",
+              fontWeight: 400,
+              color: "var(--p-text-4)",
+            }}
+          >
+            matched
+            {citation.matched.map(term => (
+              <span
+                key={term}
+                style={{
+                  ...CHIP,
+                  padding: "0.05rem 0.4rem",
+                  fontSize: "0.65rem",
+                  color: "var(--primary)",
+                  borderColor: "color-mix(in srgb, var(--primary) 35%, transparent)",
+                }}
+              >
+                {term}
+              </span>
+            ))}
           </span>
         )}
-        <span
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "0.3rem",
-            marginTop: "0.6rem",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            color: "var(--primary)",
-          }}
-        >
-          {citation.hasTranscript ? "Read the full transcript" : "Open in the archive"}
-          {citation.matched.length > 0 && (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.25rem",
-                marginLeft: "auto",
-                fontFamily: "var(--font-mono), monospace",
-                fontSize: "0.65rem",
-                fontWeight: 400,
-                color: "var(--p-text-4)",
-              }}
-            >
-              matched
-              {citation.matched.map(term => (
-                <span
-                  key={term}
-                  style={{
-                    ...CHIP,
-                    padding: "0.05rem 0.4rem",
-                    fontSize: "0.65rem",
-                    color: "var(--primary)",
-                    borderColor: "color-mix(in srgb, var(--primary) 35%, transparent)",
-                  }}
-                >
-                  {term}
-                </span>
-              ))}
-            </span>
-          )}
-        </span>
-      </Link>
+      </span>
     </li>
   );
 }
@@ -852,6 +1088,8 @@ function AssistantReply({
 
       <div style={{ marginTop: "0.85rem" }}>
         <PersonaQuotes quotes={result.conversation?.quotes ?? []} terms={result.matchedTerms} />
+        {result.reading ? <GeneratedReading reading={result.reading} /> : null}
+        <WindowNotice result={result} />
         <TermsReadout result={result} />
         <MatchNotice result={result} />
       </div>
@@ -908,7 +1146,13 @@ function AssistantReply({
                   {m.year ?? "—"}
                 </span>
                 <span>
-                  <Highlight text={m.title} terms={result.matchedTerms} />
+                  {m.href ? (
+                    <Link href={m.href} style={{ color: "inherit" }}>
+                      <Highlight text={m.title} terms={result.matchedTerms} />
+                    </Link>
+                  ) : (
+                    <Highlight text={m.title} terms={result.matchedTerms} />
+                  )}
                 </span>
               </li>
             ))}
@@ -940,8 +1184,17 @@ function AssistantReply({
                     color: "var(--p-text-4)",
                   }}
                 >
-                  {t.author}
-                  {t.role ? `, ${t.role}` : ""}
+                  {t.href ? (
+                    <Link href={t.href} style={{ color: "inherit" }}>
+                      {t.author}
+                      {t.role ? `, ${t.role}` : ""}
+                    </Link>
+                  ) : (
+                    <>
+                      {t.author}
+                      {t.role ? `, ${t.role}` : ""}
+                    </>
+                  )}
                 </footer>
               </blockquote>
             ))}
@@ -952,15 +1205,40 @@ function AssistantReply({
       {/* Where the answer came from, including what was left out. The response is
           capped at ten records, so a reader told "12 records matched" needs to
           know they are looking at a sample. */}
+      {/* Disclosure rather than a section: on a phone this block pushed the
+          citations — the part of the answer the reader came for — below a row of
+          chips describing a search. The chips are still one tap away, and the
+          summary says how many there are so the reader knows what they are
+          choosing to open. On a wide screen the detail is simply shown, because
+          there is room for it and the affordance would be noise. */}
       {result.collectionCounts.length > 0 && (
-        <>
-          <SectionLabel>Searched across the archive</SectionLabel>
+        <section aria-labelledby="ask-breadth-heading">
+        {/* A `summary` is a button, not a heading, so it cannot be this section's
+            label for assistive technology. Without a real heading in the outline,
+            navigating by heading skipped straight past the block that says what
+            the search did not cover. */}
+        <h2 id="ask-breadth-heading" className="sr-only">
+          Searched across the archive
+        </h2>
+        <details className="ask-disclosure">
+          <summary className="ask-disclosure-summary">
+            Searched across the archive
+            <span style={{ color: "var(--p-text-4)" }}>
+              {" "}
+              &mdash; {result.collectionCounts.length} collection
+              {result.collectionCounts.length === 1 ? "" : "s"}
+              {result.undated && result.undated.length > 0
+                ? `, ${result.undated.length} left undated`
+                : ""}
+            </span>
+          </summary>
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
               alignItems: "center",
               gap: "0.35rem",
+              paddingTop: "0.5rem",
             }}
           >
             {result.collectionCounts.map(c => (
@@ -980,7 +1258,8 @@ function AssistantReply({
               </span>
             )}
           </div>
-        </>
+        </details>
+        </section>
       )}
 
       {/* The answer is capped at the strongest ten records. Someone who wants

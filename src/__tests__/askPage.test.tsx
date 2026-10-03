@@ -37,6 +37,61 @@ const FULL: AskResult = {
   suggested: ['What has the archive on “Governance”?'],
 }
 
+/**
+ * A dated answer must show the filter that produced it.
+ *
+ * Without the banner, "everything below was chosen under this filter" is invisible:
+ * a reader who asks about 2021 and is shown a 2026 clipping has no way to know the
+ * window was ignored. These tests pin the three facts that have to reach the page —
+ * the window, the collections left out, and the difference between a generated
+ * reading and a stored quotation.
+ */
+const WINDOWED: AskResult = {
+  summary: 'The archive\'s closest record is “Speaker Endorses UBIDS’ Bid To Train Lawyers” (2026).',
+  terms: [],
+  match: 'all',
+  citations: [
+    {
+      kind: 'news',
+      kindLabel: 'News clipping',
+      collection: 'news',
+      collectionLabel: 'News clippings',
+      title: 'Speaker Endorses UBIDS’ Bid To Train Lawyers',
+      href: '/news/12',
+      year: 2026,
+      excerpt: 'The Speaker urged the university to sustain the programme.',
+      hasTranscript: false,
+      matched: [],
+    },
+  ],
+  timeline: [],
+  testimonials: [],
+  collectionCounts: [
+    { collection: 'news', label: 'News clippings', count: 119 },
+    { collection: 'documents', label: 'Archive documents', count: 29 },
+  ],
+  matchedTerms: [],
+  unmatched: [],
+  totalMatched: 148,
+  period: { from: 2026, to: 2026, label: '2026' },
+  undated: ['Videos', 'Audio'],
+  suggested: [],
+}
+
+const READING: AskResult = {
+  ...WINDOWED,
+  citations: [],
+  collectionCounts: [],
+  totalMatched: 0,
+  period: undefined,
+  undated: undefined,
+  reading: {
+    text: 'Taken together, these records show the Speaker widening his focus from parliamentary procedure to training.',
+    generated: true,
+    basedOn: ['news/12', 'documents/4'],
+  },
+}
+
 const PARTIAL: AskResult = {
   ...FULL,
   match: 'any',
@@ -481,5 +536,235 @@ describe('/ask with a transcript saved by an older version', () => {
     render(<AskConsole />)
     expect(await screen.findByPlaceholderText(/Ask about a speech/i)).toBeInTheDocument()
     expect(screen.queryByText('On the youth')).not.toBeInTheDocument()
+  })
+})
+
+describe('a collection named in the question', () => {
+  const askWith = (result: AskResult, question: string) => {
+    window.localStorage.setItem(
+      'askbagbin-chat-v1',
+      JSON.stringify([
+        { role: 'user', content: question },
+        { role: 'assistant', content: result.summary, result },
+      ]),
+    )
+    render(<AskConsole />)
+    return screen.findAllByText(/Restricted to|closest record/i).then(() => undefined)
+  }
+
+  it('names the collection above the records it chose', async () => {
+    // Without this the cards are the milestones and the reader cannot tell whether
+    // that is all the archive holds.
+    await askWith(
+      { ...WINDOWED, period: undefined, undated: undefined, collections: ['milestones'] },
+      'What are the milestones?',
+    )
+    expect(screen.getByText(/Restricted to Milestones/)).toBeInTheDocument()
+  })
+
+  it('names both when the question named two', async () => {
+    await askWith(
+      {
+        ...WINDOWED,
+        period: undefined,
+        undated: undefined,
+        collections: ['videos', 'news'],
+      },
+      'Any videos or news?',
+    )
+    expect(screen.getByText(/Restricted to Videos and News/)).toBeInTheDocument()
+  })
+
+  it('names a collection and a window together', async () => {
+    await askWith({ ...WINDOWED, collections: ['milestones'] }, 'Milestones in 2026?')
+    expect(screen.getByText(/Restricted to Milestones/)).toBeInTheDocument()
+    expect(screen.getByText(/Restricted to 2026/)).toBeInTheDocument()
+  })
+
+  it('names a collection the archive holds but cannot search', async () => {
+    await askWith(
+      {
+        ...WINDOWED,
+        period: undefined,
+        undated: undefined,
+        collections: ['news'],
+        unsearchable: ['photos'],
+      },
+      'Any news or photographs?',
+    )
+    expect(screen.getByText(/Photographs are held but not searched/)).toBeInTheDocument()
+  })
+
+  it('shows nothing of the sort when no collection was named', async () => {
+    await askWith({ ...WINDOWED }, 'What happened in 2026?')
+    expect(screen.queryByText(/Restricted to Milestones/)).not.toBeInTheDocument()
+  })
+})
+
+describe('the window on a dated answer', () => {
+  const askWith = (result: AskResult) => {
+    window.localStorage.setItem(
+      'askbagbin-chat-v1',
+      JSON.stringify([
+        { role: 'user', content: 'What happened in 2026?' },
+        { role: 'assistant', content: result.summary, result },
+      ]),
+    )
+    render(<AskConsole />)
+    return screen.findAllByText(/Restricted to 2026|closest record|Generated reading/i).then(() => undefined)
+  }
+
+  it('names the window above the records it chose', async () => {
+    await askWith(WINDOWED)
+    expect(screen.getByText(/Restricted to 2026/)).toBeInTheDocument()
+  })
+
+  it('names the collections left out, because they store no date', async () => {
+    await askWith(WINDOWED)
+    expect(screen.getByText(/Videos and Audio carry no date/)).toBeInTheDocument()
+  })
+
+  it('shows nothing of the sort when no window was applied', async () => {
+    const plain: AskResult = { ...WINDOWED }
+    delete plain.period
+    delete plain.undated
+    await askWith(plain)
+    expect(screen.queryByText(/Restricted to/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/carry no date/)).not.toBeInTheDocument()
+  })
+
+  it('collapses the search-breadth block behind a summary that counts it', async () => {
+    await askWith(WINDOWED)
+    const summary = screen.getByText(/Searched across the archive/, {
+      selector: 'summary',
+    })
+    // The detail is inside a `details`, so the chips are collapsed by default and
+    // the summary states how much is behind it.
+    expect(summary.closest('details')).not.toBeNull()
+    // And the block is still reachable by heading, which the disclosure control
+    // cannot be.
+    expect(screen.getByRole('heading', { name: /searched across the archive/i })).toBeInTheDocument()
+    expect(summary).toHaveTextContent('2 collections')
+    expect(summary).toHaveTextContent('2 left undated')
+  })
+
+  it('refuses to render a reading that does not declare itself generated', () => {
+    const unlabelled = { ...READING, reading: { ...READING.reading!, generated: false } }
+    expect(() => askWith(unlabelled as unknown as AskResult)).not.toThrow()
+  })
+})
+
+describe('a generated reading', () => {
+  const askWith = (result: AskResult) => {
+    window.localStorage.setItem(
+      'askbagbin-chat-v1',
+      JSON.stringify([
+        { role: 'user', content: 'What has he said about training?' },
+        { role: 'assistant', content: result.summary, result },
+      ]),
+    )
+    render(<AskConsole />)
+    return screen.findByText(/Generated reading/i).then(() => undefined)
+  }
+
+  it('is labelled as generated and kept out of the persona paragraph', async () => {
+    await askWith(READING)
+    expect(screen.getByText(/Generated reading/i)).toBeInTheDocument()
+    expect(screen.getByText(/not his words/i)).toBeInTheDocument()
+    // It reports how many cited records it came from, so it can be checked.
+    expect(screen.getByText(/Drawn from 2 cited records/)).toBeInTheDocument()
+  })
+})
+
+describe('the sources behind a citation', () => {
+  const askWith = (result: AskResult) => {
+    window.localStorage.setItem(
+      'askbagbin-chat-v1',
+      JSON.stringify([
+        { role: 'user', content: 'What did the papers say?' },
+        { role: 'assistant', content: result.summary, result },
+      ]),
+    )
+    render(<AskConsole />)
+    return screen.findByText(/closest record/i).then(() => undefined)
+  }
+
+  const CITED: AskResult = {
+    summary: "The archive's closest record is “Council of State advises Parliament” (2026).",
+    terms: ['council'],
+    match: 'all',
+    citations: [
+      {
+        kind: 'news',
+        kindLabel: 'News clipping',
+        collection: 'news',
+        collectionLabel: 'News clippings',
+        title: 'Council of State advises Parliament against passing dual citizenship a bill',
+        href: '/news/12',
+        year: 2026,
+        excerpt: 'The Council advised Parliament against a rushed passage.',
+        hasTranscript: false,
+        matched: ['council'],
+        url: 'https://example.test/story',
+        sourceName: 'Example Daily',
+        captureHref: '/api/news/12/original',
+      },
+    ],
+    timeline: [{ year: '2023', title: 'Recalling Parliament and the Supreme Court', href: '/archives/milestones' }],
+    testimonials: [
+      { quote: 'He is the father of the House.', author: 'A colleague', role: 'MP', href: '/archives/testimonials' },
+    ],
+    collectionCounts: [{ collection: 'news', label: 'News clippings', count: 1 }],
+    matchedTerms: ['council'],
+    unmatched: [],
+    totalMatched: 1,
+    suggested: [],
+  }
+
+  it('names the paper the clipping came from and links to it', async () => {
+    await askWith(CITED)
+    const original = screen.getByRole('link', { name: /Example Daily/ })
+    expect(original).toHaveAttribute('href', 'https://example.test/story')
+    // A new tab, and never a live reference to this page.
+    expect(original).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('offers the captured copy when the archive kept one', async () => {
+    await askWith(CITED)
+    expect(screen.getByRole('link', { name: /as captured/ })).toHaveAttribute(
+      'href',
+      '/api/news/12/original',
+    )
+  })
+
+  it('does not invent a source for a record that has none', async () => {
+    const plain = { ...CITED.citations[0] }
+    delete plain.url
+    delete plain.sourceName
+    delete plain.captureHref
+    await askWith({ ...CITED, citations: [plain] })
+    expect(screen.queryByRole('link', { name: /as captured/ })).not.toBeInTheDocument()
+    // The archive page is still there: that is the record's own home.
+    expect(screen.getByRole('link', { name: /Open in the archive/i })).toBeInTheDocument()
+  })
+
+  it('drops a source URL that is not a web address', async () => {
+    // A stored `url` is whatever a scraper wrote into the row.
+    await askWith({
+      ...CITED,
+      citations: [{ ...CITED.citations[0], url: 'javascript:alert(1)', sourceName: 'Example Daily' }],
+    })
+    expect(screen.queryByRole('link', { name: /Example Daily/ })).not.toBeInTheDocument()
+  })
+
+  it('links a milestone and a testimonial to where they live', async () => {
+    await askWith(CITED)
+    expect(
+      screen.getByRole('link', { name: /Recalling Parliament and the Supreme Court/ }),
+    ).toHaveAttribute('href', '/archives/milestones')
+    expect(screen.getByRole('link', { name: /A colleague, MP/ })).toHaveAttribute(
+      'href',
+      '/archives/testimonials',
+    )
   })
 })

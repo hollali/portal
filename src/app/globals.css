@@ -1664,3 +1664,57 @@ a:hover {
   }
 }
 
+
+/* /ask: the search-breadth block. Collapsed on a phone, plain text past 640px.
+
+   The one-line summary is the phone affordance and the marker that says there is
+   something to open; past the breakpoint it is hidden and the body is forced
+   visible, so a wide screen shows the chips with no "closed" triangle lying about
+   them. Forced with a display rule rather than the `open` attribute because the
+   attribute cannot be set from CSS, and setting it in an effect would render the
+   disclosure closed for a frame on every load. */
+.ask-disclosure > .ask-disclosure-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  /* The same 44px the inline-styled controls in this island use: a disclosure
+     that has to be tapped twice as precisely as the buttons beside it is not a
+     disclosure, it is a test of the reader's aim. */
+  min-height: 44px;
+  margin-top: 1.1rem;
+  cursor: pointer;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-text-4);
+  list-style: none;
+}
+.ask-disclosure > .ask-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+.ask-disclosure > .ask-disclosure-summary::after {
+  content: "▸";
+  font-size: 0.8rem;
+  letter-spacing: 0;
+}
+.ask-disclosure[open] > .ask-disclosure-summary::after {
+  content: "▾";
+}
+@media (min-width: 641px) {
+  .ask-disclosure > .ask-disclosure-summary {
+    display: none;
+  }
+  .ask-disclosure:not([open]) > *:not(.ask-disclosure-summary) {
+    display: block;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ask-disclosure > .ask-disclosure-summary {
+    transition: color 0.2s;
+  }
+  .ask-disclosure > .ask-disclosure-summary:hover {
+    color: var(--p-text-2);
+  }
+}
