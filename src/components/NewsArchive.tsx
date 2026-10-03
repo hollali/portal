@@ -510,7 +510,7 @@ function LeadClipping({ item, onOpen }: { item: NewsItem; onOpen: (id: number) =
         }
       }}
       aria-label={`Open ${headline(item)}`}
-      className="p-card-lift"
+      className="p-card-lift news-lead-card"
       style={{
         gridColumn: '1 / -1',
         border: '1px solid var(--p-border)',
@@ -565,6 +565,7 @@ function LeadClipping({ item, onOpen }: { item: NewsItem; onOpen: (id: number) =
         </div>
       </div>
       <div
+        className="news-lead-aside"
         style={{
           padding: 'clamp(1.25rem, 3vw, 2rem)',
           background: 'linear-gradient(140deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent)',

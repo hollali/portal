@@ -1383,6 +1383,19 @@ a:hover {
   background: var(--p-bg);
 }
 @media (max-width: 767px) {
+  /* The lead "Latest" card is a two-pane grid on wide screens: the clipping's
+     own words on the left, the snippet and its actions on the right. The tracks
+     were fixed fractions with no minimum, so they never collapsed — on a 390px
+     phone the card is 342px wide and the right pane lands at ~116px, which wraps
+     both action pills to one word per line behind a stray vertical divider.
+     Stack it, and turn the pane divider into a horizontal rule. */
+  .news-lead-card {
+    grid-template-columns: 1fr !important;
+  }
+  .news-lead-aside {
+    border-left: none !important;
+    border-top: 1px solid var(--p-border);
+  }
   main .news-hero {
     margin-left: -1rem !important;
     margin-right: -1rem !important;
