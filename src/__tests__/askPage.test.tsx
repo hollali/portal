@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react'
 import AskConsole from '@/components/AskConsole'
 import type { AskResult } from '@/lib/askQuery'
 
@@ -89,6 +89,43 @@ async function ask(question: string, initialQuery: string | null = null) {
   const input = await screen.findByPlaceholderText(/Ask about a speech/i)
   fireEvent.change(input, { target: { value: question } })
   fireEvent.click(screen.getByLabelText('Send question'))
+}
+
+/** Every question the reader has actually sent, in order. */
+function postedQuestions(): string[] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(call => (call[1] as RequestInit | undefined)?.method === 'POST')
+    .map(call => (JSON.parse(String((call[1] as RequestInit).body)).question as string))
+}
+
+/**
+ * A POST that stays pending until released and rejects when aborted, the way a
+ * real request does. Without the abort listener the mock keeps a superseded
+ * request alive, and the test then passes for the wrong reason: the console
+ * behaves the same whether or not the request it withdrew was ever cancelled.
+ */
+function deferredPosts(result: AskResult = FULL) {
+  const pending: Array<() => void> = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') {
+        return Promise.resolve({ ok: true, json: async () => ({ suggested: [] }) } as Response)
+      }
+      return new Promise<Response>((resolve, reject) => {
+        const signal = init.signal as AbortSignal | undefined
+        const cancel = () => reject(new DOMException('Aborted', 'AbortError'))
+        if (signal?.aborted) return cancel()
+        signal?.addEventListener('abort', cancel)
+        pending.push(() => {
+          signal?.removeEventListener('abort', cancel)
+          resolve({ ok: true, json: async () => result } as Response)
+        })
+      })
+    }),
+  )
+  return { all: () => pending.forEach(release => release()) }
 }
 
 describe('/ask answer transparency', () => {
@@ -226,6 +263,161 @@ describe('/ask answers as links', () => {
     await ask('digitalisation youth')
     const link = await screen.findByRole('link', { name: /See every match in Search/ })
     expect(link).toHaveAttribute('href', '/search?q=digitalisation%20youth')
+  })
+})
+
+/**
+ * Six defects in the interaction layer, each of which makes the page look like it
+ * is answering the reader when it is not.
+ */
+describe('/ask interaction defects', () => {
+  it('leaves the question field a visible focus ring', async () => {
+    // The site rings `*:focus-visible` in globals.css. An inline `outline` outranks
+    // it, and this field carried `outline: "none"` — so the one control every
+    // visitor has to use had no keyboard focus indicator at all. jsdom resolves
+    // neither `:focus` nor `:focus-visible` in getComputedStyle, so the guard is
+    // on the suppression itself, which is the thing that was wrong.
+    await ask('digitalisation youth')
+    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+    expect(input.style.outline).not.toBe('none')
+  })
+
+  it('retries the question its own turn failed on', async () => {
+    // Every failure carries a "Try again". Handing it the newest question in the
+    // transcript meant asking A, failing, asking B and succeeding left A's retry
+    // re-running B — a button beside one error that quietly asks a different one.
+    let fail = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          if (fail) return { ok: false, status: 500 } as Response
+          return { ok: true, json: async () => FULL } as Response
+        }
+        return { ok: true, json: async () => ({ suggested: [] }) } as Response
+      }),
+    )
+    render(<AskConsole />)
+    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+
+    fireEvent.change(input, { target: { value: 'QUESTION-ONE' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+    await screen.findByText(/could not be reached/i)
+
+    fail = false
+    fireEvent.change(input, { target: { value: 'QUESTION-TWO' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+    await screen.findByText(/Closest match/)
+
+    // Both turns still have a retry button; the old one has to ask its own
+    // question, not the one above it.
+    fireEvent.click(screen.getAllByRole('button', { name: /try again/i })[0])
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.filter(call => (call[1] as RequestInit | undefined)?.method === 'POST')
+          .map(call => (JSON.parse(String((call[1] as RequestInit).body)).question as string)),
+      ).toEqual(['QUESTION-ONE', 'QUESTION-TWO', 'QUESTION-ONE']),
+    )
+  })
+
+  it('sends a question typed while a search is still running', async () => {
+    // The composer is deliberately left enabled mid-search so a follow-up can be
+    // drafted. Enter used to be swallowed with no feedback at all, leaving the
+    // reader with a typed question and no way to send it.
+    const release = deferredPosts()
+    render(<AskConsole />)
+    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+
+    fireEvent.change(input, { target: { value: 'first question' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+    await screen.findByLabelText('Stop searching')
+
+    fireEvent.change(input, { target: { value: 'second question' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(postedQuestions()).toEqual(['first question', 'second question']))
+    // The abandoned question leaves the transcript with its answer: a question
+    // with nothing under it is the dangling state the stop turn exists to avoid.
+    expect(screen.queryByText('first question')).not.toBeInTheDocument()
+
+    release.all()
+    expect(await screen.findByText(/Closest match/)).toBeInTheDocument()
+    expect(screen.getByText('second question')).toBeInTheDocument()
+  })
+
+  it('keeps the composer in its searching state when the replaced request settles', async () => {
+    // The superseded request finishing after its replacement must not report the
+    // search as finished. That swaps the Stop button back to Send while the new
+    // search is still running, so the reader is left with no way to stop it.
+    const release = deferredPosts()
+    render(<AskConsole />)
+    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+
+    fireEvent.change(input, { target: { value: 'first question' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+    await screen.findByLabelText('Stop searching')
+
+    fireEvent.change(input, { target: { value: 'second question' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(postedQuestions()).toHaveLength(2))
+
+    // The first request has now rejected with its AbortError, so its cleanup has
+    // run. The search is still in flight and has to say so.
+    await act(async () => {})
+    expect(screen.getByLabelText('Stop searching')).toBeInTheDocument()
+
+    release.all()
+    await waitFor(() => expect(screen.queryByLabelText('Stop searching')).not.toBeInTheDocument())
+    expect(await screen.findByText(/Closest match/)).toBeInTheDocument()
+  })
+
+  it('labels the sections of an answer as headings', async () => {
+    // The answer is a document. With `div`s, a screen reader navigating by heading
+    // found nothing inside it.
+    await ask('digitalisation youth')
+    expect(
+      await screen.findByRole('heading', { name: /1 item in the archive/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /searched across the archive/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /ask next/i })).toBeInTheDocument()
+  })
+
+  it('announces a copy confirmation rather than only showing it', async () => {
+    // "Copied" replacing "Copy sources" is a visual-only confirmation: nothing
+    // tells a screen reader it happened, so the button looks unchanged in effect.
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    await ask('digitalisation youth')
+    const button = await screen.findByRole('button', { name: /Copy sources/ })
+    expect(button.querySelector('[aria-live="polite"]')).toHaveTextContent('Copy sources')
+
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(button.querySelector('[aria-live="polite"]')).toHaveTextContent('Copied'),
+    )
+  })
+
+  it('renders two testimonials from one author without a key collision', async () => {
+    // `rankCandidates` deliberately returns both quotes from an author who has
+    // given two, so keying testimonials by author collided and left React
+    // reconciling two siblings that claimed to be the same node.
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...a) => {
+      errors.push(String(a[0]));
+    });
+answer = {
+      ...FULL,
+      testimonials: [
+        { quote: 'First quote from him.', author: 'Ama B', role: 'Member' },
+        { quote: 'Second quote from her.', author: 'Ama B', role: 'Member' },
+      ],
+    }
+    await ask('digitalisation youth')
+    expect(await screen.findByText('First quote from him.')).toBeInTheDocument()
+    expect(screen.getByText('Second quote from her.')).toBeInTheDocument()
+    expect(errors.filter(e => /same key/i.test(e))).toHaveLength(0)
+    spy.mockRestore();
   })
 })
 

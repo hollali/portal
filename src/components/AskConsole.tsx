@@ -670,12 +670,24 @@ function PersonaQuotes({
   );
 }
 
+/**
+ * A heading, not a styled div.
+ *
+ * An answer is a document with sections — the records it found, the timeline,
+ * the testimonials, the breadth of the search, what to ask next. Labelling those
+ * with `<div>`s meant a screen reader navigating by heading found nothing inside
+ * an answer, and had to read it top to bottom to find out what was in it.
+ *
+ * `h2`: the sections are the top-level structure of the answer, which itself sits
+ * directly under the page's `h1`.
+ */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div
+    <h2
       style={{
         fontFamily: "var(--font-mono), monospace",
         fontSize: "0.68rem",
+        fontWeight: 600,
         letterSpacing: "0.12em",
         textTransform: "uppercase",
         color: "var(--p-text-4)",
@@ -683,7 +695,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-    </div>
+    </h2>
   );
 }
 
@@ -908,9 +920,9 @@ function AssistantReply({
         <>
           <SectionLabel>What others have said</SectionLabel>
           <div style={{ display: "grid", gap: "0.75rem" }}>
-            {result.testimonials.map(t => (
+            {result.testimonials.map((t, i) => (
               <blockquote
-                key={t.author}
+                key={`${t.author}-${i}`}
                 style={{
                   margin: 0,
                   borderLeft: "2px solid var(--primary)",
@@ -1026,7 +1038,10 @@ function AssistantReply({
           }}
         >
           {copied ? <Check size={13} aria-hidden /> : <Copy size={13} aria-hidden />}
-          {copied ? "Copied" : "Copy sources"}
+          {/* The live region is on the label, not the button: it is the text change
+              that needs announcing, and putting it on the button would also
+              announce the icon swap. */}
+          <span aria-live="polite">{copied ? "Copied" : "Copy sources"}</span>
         </button>
       </div>
     </div>
@@ -1046,9 +1061,8 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   const composerRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // The latest transcript, for `ask` to read without taking `messages` as a
-  // dependency. `ask` is a `useCallback` keyed on `loading` so that asking a
-  // question does not re-trigger the boot effect; closing over `messages`
-  // directly would hand every call site a snapshot from an earlier render.
+  // dependency. Closing over `messages` directly would hand every call site a
+  // snapshot from an earlier render.
   const messagesRef = useRef<ChatMsg[]>([]);
   useEffect(() => {
     messagesRef.current = messages;
@@ -1056,6 +1070,10 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   // Set only while a reader-initiated stop is in flight, so the composer can
   // swap Send for Stop without also offering to cancel a teardown.
   const stopRef = useRef<(() => void) | null>(null);
+  // Requests abandoned because a newer question replaced them. Distinguishes
+  // "the reader moved on" from "the reader pressed stop": the first is silently
+  // withdrawn, the second earns a "search stopped" turn in the transcript.
+  const supersededRef = useRef(new Set<AbortController>());
   const [docked, setDocked] = useState(false);
   // Whether the reader is already at the end of the page. Only then is a new
   // turn worth pulling them to; scrolling someone out of a citation they were
@@ -1070,7 +1088,19 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   const ask = useCallback(
     async (question: string) => {
       const text = question.trim();
-      if (!text || loading) return;
+      if (!text) return;
+
+      // A question asked while a search is in flight replaces it rather than
+      // being dropped. The composer is deliberately left enabled mid-search, so a
+      // reader can have a follow-up ready; Enter used to be swallowed here with no
+      // feedback at all, which is the one outcome that leaves them with a typed
+      // question and no way to send it. Replacing matches what /search does with
+      // the same input, and stops being a race the reader has to notice.
+      const inFlight = abortRef.current;
+      if (inFlight) {
+        supersededRef.current.add(inFlight);
+        inFlight.abort();
+      }
 
       const userMsg: ChatMsg = { role: "user", content: text };
       setMessages(prev => [...prev, userMsg]);
@@ -1140,18 +1170,35 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
         if ((err as Error)?.name === "AbortError") return;
         setMessages(prev => [...prev, { role: "assistant", content: "", failed: true }]);
       } finally {
-        if (abortRef.current === controller) abortRef.current = null;
+        // `delete` reports whether it was there, so this both reads and clears
+        // the flag.
+        const superseded = supersededRef.current.delete(controller);
+        // Only the request that still owns the composer may clear the loading
+        // state. A superseded one finishing after its replacement would otherwise
+        // report the search as finished while the new one was still running, and
+        // the Stop button would swap back to Send mid-flight.
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setLoading(false);
+        }
         if (stopRef.current === onStop) stopRef.current = null;
-        setLoading(false);
         if (stopAsked) {
           // The question stays in the transcript; this is the turn that says the
-          // search for it was cut short, so the reader is never left looking at
-          // a question that appears to have been ignored.
+          // search for it was cut short, so the reader is never left looking at a
+          // question that appears to have been ignored.
           setMessages(prev => [...prev, { role: "assistant", content: "", stopped: true }]);
+        }
+        if (superseded) {
+          // Withdraw the abandoned question with its search. Left in place it would
+          // be a question in the transcript that never gets an answer — the exact
+          // dangling state the stop turn exists to avoid. Removed by identity
+          // rather than position: by now the replacement question is on screen, and
+          // "the last message" is no longer the one being abandoned.
+          setMessages(prev => prev.filter(m => m !== userMsg));
         }
       }
     },
-    [loading],
+    [],
   );
 
   useEffect(() => {
@@ -1176,8 +1223,8 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
     if (pending && pending !== lastAsked) void ask(pending);
 
     bootedRef.current = true;
-    // `ask` is deliberately not a dependency: it changes with `loading`, and
-    // re-running this would re-ask the shared question on every turn.
+    // `ask` is deliberately not a dependency: re-running this would re-ask the
+    // shared question on every turn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1346,8 +1393,27 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
     });
   };
 
-  const lastUserQuestion = [...messages].reverse().find(m => m.role === "user")?.content;
   const emptyChat = hydrated && messages.length === 0;
+
+  /**
+   * The question each turn belongs to, by index.
+   *
+   * Every failed and stopped turn carries a "Try again" button, and it has to ask
+   * *its own* question. It used to be handed the newest question in the
+   * transcript, so asking A, failing, asking B and succeeding left A's retry
+   * button asking B — a button labelled "Try again" beside one failure, quietly
+   * re-running a different question the reader had just got a good answer to.
+   *
+   * One forward pass rather than a backwards search per turn: each turn carries
+   * the question in effect when it was rendered, and a user's own turn carries
+   * itself.
+   */
+  const turnQuestion: (string | undefined)[] = [];
+  let latestQuestion: string | undefined;
+  for (const m of messages) {
+    if (m.role === "user") latestQuestion = m.content;
+    turnQuestion.push(latestQuestion);
+  }
 
   // The one line a screen reader hears for each completed turn. Reading the
   // full answer aloud is the alternative, and it is unusable.
@@ -1414,7 +1480,7 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
               }}
             >
               {linkCopied ? <Check size={13} aria-hidden /> : <Link2 size={13} aria-hidden />}
-              {linkCopied ? "Link copied" : "Copy link"}
+              <span aria-live="polite">{linkCopied ? "Link copied" : "Copy link"}</span>
             </button>
             <button
               type="button"
@@ -1449,7 +1515,9 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
           It stays enabled while a search is in flight: someone who has just
           watched a slow answer arrive can be drafting the follow-up before the
           first one lands, and there is no reason to make them wait for a
-          round trip to start typing. */}
+          round trip to start typing. Sending it then replaces the search in
+          flight — see `ask` — so a follow-up typed early can be fired without
+          waiting for the answer it was a follow-up to. */}
       <form
         ref={composerRef}
         onSubmit={e => {
@@ -1487,6 +1555,12 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
         <label htmlFor="ask-question" className="sr-only">
           Ask a question about the archive
         </label>
+        {/* No `outline: none` here. The site sets a focus ring on `*:focus-visible`
+            (globals.css), and an inline `outline` outranks it — which left the one
+            control every visitor has to use with no visible keyboard focus at all.
+            A text field always matches `:focus-visible` when focused, so the ring
+            shows for pointer focus too, which is what a reader expects from a box
+            they have just tapped. */}
         <textarea
           id="ask-question"
           ref={inputRef}
@@ -1498,7 +1572,7 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
             // sending, and the mobile keyboard is told which key does what.
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              if (!loading) void ask(input);
+              void ask(input);
             }
           }}
           rows={1}
@@ -1521,7 +1595,6 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
             lineHeight: 1.5,
             fontFamily: "inherit",
             resize: "none",
-            outline: "none",
             overflowY: "hidden",
           }}
         />
@@ -1699,8 +1772,10 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
                   onFollowUp={q => void ask(q)}
                   busy={loading}
                   onRetry={
-                    (m.failed || m.stopped) && lastUserQuestion
-                      ? () => void ask(lastUserQuestion)
+                    m.failed || m.stopped
+                      ? turnQuestion[i]
+                        ? () => void ask(turnQuestion[i]!)
+                        : undefined
                       : undefined
                   }
                 />
