@@ -26,6 +26,7 @@ import type {
 } from '@/lib/askQuery'
 import type { ConversationState } from '@/lib/askConversation'
 import type { CollectionTotal, SearchCandidate } from '@/lib/askSearch'
+import type { AskPeriod } from '@/lib/askQuery'
 import type { GoldenCase, Observation } from '@/lib/askEval'
 
 const SNAPSHOT_PATH = path.resolve(process.cwd(), 'src/__tests__/fixtures/askSnapshot.json')
@@ -54,6 +55,17 @@ interface SnapshotCase {
   id: string
   terms: string[]
   context: string[]
+  /**
+   * Whether this case was ranked as a listing rather than as a question, which is
+   * how "what happened in 2026?" — no terms, only years — and "any photographs?" —
+   * no terms, only a collection — are answered. Recorded per case rather than
+   * inferred from empty terms, because the two are not the same: a question whose
+   * terms were all stopwords and which named neither a year nor a collection is
+   * not a listing.
+   */
+  listing?: boolean
+  /** Collections the question named, when it restricted the search to some. */
+  collections?: string[]
   candidates: SnapshotCandidate[]
   totals: CollectionTotal[]
 }
@@ -89,16 +101,20 @@ interface Archive {
   resolveQuestion: (question: string) => ConversationState
   collectCandidates: (
     terms: string[],
+    period?: AskPeriod | null,
+    named?: string[],
   ) => Promise<{ candidates: SearchCandidate[]; totals: CollectionTotal[] }>
   rankCandidates: (
     candidates: SearchCandidate[],
     terms: string[],
     totals: CollectionTotal[],
+    contextTerms?: string[],
+    options?: { listing?: boolean },
     context: string[],
   ) => { mode: AskMatchMode; results: Array<{ candidate: SearchCandidate }> }
   scoreRetrieval: typeof import('@/lib/askEval')['scoreRetrieval']
   formatReport: typeof import('@/lib/askEval')['formatReport']
-  sourceKey: (source: { collection: string; title: string }) => string
+  sourceKey: (source: { collection: string; title: string; url?: string | null }) => string
 }
 
 async function loadArchive(): Promise<Archive> {
@@ -106,10 +122,13 @@ async function loadArchive(): Promise<Archive> {
   const conversation = await import('@/lib/askConversation')
   const search = await import('@/lib/askSearch')
   const evaluation = await import('@/lib/askEval')
+  const query = await import('@/lib/askQuery')
   const fixtures = await import('@/__tests__/fixtures/askGolden')
   return {
     golden: fixtures.ASK_GOLDEN,
     resolveQuestion: conversation.resolveQuestion,
+    parsePeriod: query.parsePeriod,
+    collectionFilter: query.collectionFilter,
     collectCandidates: search.collectCandidates,
     rankCandidates: search.rankCandidates as Archive['rankCandidates'],
     scoreRetrieval: evaluation.scoreRetrieval,
@@ -149,9 +168,19 @@ async function observeLive(archive: Archive): Promise<{
 
   for (const testCase of archive.golden) {
     const resolved = archive.resolveQuestion(testCase.question)
+    // The window is read exactly as the route reads it, so a dated question is
+    // measured through the same path a reader's would take. A harness that
+    // ignored it would report the untemporal search as the answer to it.
+    const period = archive.parsePeriod(testCase.question)
+    // Named collections come out of the terms and narrow the search, exactly as
+    // `searchArchive` does it, so a question answered under a collection filter is
+    // measured through the path the reader's takes.
+    const named = archive.collectionFilter(resolved.terms)
+    const terms = named.terms
+    const listing = terms.length === 0
     const started = Date.now()
-    const { candidates, totals } = await archive.collectCandidates(resolved.terms)
-    const ranked = archive.rankCandidates(candidates, resolved.terms, totals, resolved.context)
+    const { candidates, totals } = await archive.collectCandidates(terms, period, named.collections)
+    const ranked = archive.rankCandidates(candidates, terms, totals, resolved.context, { listing })
     latency.push(Date.now() - started)
 
     observations.set(testCase.id, {
@@ -161,8 +190,10 @@ async function observeLive(archive: Archive): Promise<{
     })
     cases.push({
       id: testCase.id,
-      terms: resolved.terms,
+      terms,
       context: resolved.context,
+      ...(listing ? { listing: true as const } : {}),
+      ...(named.collections.length ? { collections: named.collections } : {}),
       candidates: trimForSnapshot(candidates),
       totals,
     })
@@ -194,7 +225,13 @@ function readSnapshot(): Snapshot {
 function replay(archive: Archive, snapshot: Snapshot): Map<string, Observation> {
   const observations = new Map<string, Observation>()
   for (const entry of snapshot.cases) {
-    const ranked = archive.rankCandidates(entry.candidates, entry.terms, entry.totals, entry.context)
+    const ranked = archive.rankCandidates(
+      entry.candidates,
+      entry.terms,
+      entry.totals,
+      entry.context,
+      { listing: entry.listing === true },
+    )
     observations.set(entry.id, {
       id: entry.id,
       keys: ranked.results.map(result => archive.sourceKey(result.candidate)),

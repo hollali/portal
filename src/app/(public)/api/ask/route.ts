@@ -9,11 +9,21 @@ import {
   type PersonaVoice,
 } from '@/lib/askConversation'
 import {
+  ASK_COLLECTION_LABELS,
   ASK_SUGGESTIONS,
+  COLLECTION_PAGES,
+  collectionFilter,
+  describeCollections,
+  describeUnsearchable,
+  describeWindow,
+  NOT_ANSWERABLE_COLLECTIONS as NOT_ANSWERABLE,
+  parsePeriod,
   queryTerms,
   type AskCitation,
   type AskCollectionCount,
+  type AskCollectionName,
   type AskMatchMode,
+  type AskPeriod,
   type AskResult,
 } from '@/lib/askQuery'
 
@@ -25,9 +35,69 @@ const COUNT_QUESTION = /\b(how many|how much|number of|count of|total number)\b/
 /** Turns of history used to resolve a follow-up. */
 const MAX_HISTORY_TURNS = 6
 
-function noMatchSummary(terms: string[]): string {
+/**
+ * What to say when nothing is shown.
+ *
+ * Two different facts hide behind an empty result, and only one of them is
+ * "the archive holds nothing on this". Records can match a word of the question
+ * and still be dropped for not answering it — a relevance floor, a record that
+ * mentions "policy" in passing — and telling a reader who asked about a subject
+ * the archive plainly covers that nothing was ever published on it is the kind
+ * of sentence that makes an archive untrustworthy. `broaderTotal` is the count
+ * of records that mention at least one of the question's words, so the wording
+ * can admit what was found and refuse only the part that is not there.
+ */
+function noMatchSummary(
+  terms: string[],
+  broaderTotal = 0,
+  period: AskPeriod | null = null,
+  collections: string[] = [],
+): string {
   const shown = terms.slice(0, 3).join(', ')
-  return `Nothing published in the archive mentions ${shown ? `“${shown}”` : 'that'}. The archive holds specific speeches, papers, clippings and photographs rather than material on every subject, so a narrower or differently worded question is more likely to land.`
+  const subject = shown ? `“${shown}”` : 'that'
+  // "There is nothing in the photographs about poverty" and "there is nothing about
+  // poverty anywhere in the archive" are different sentences, and only the first is
+  // true — so the restriction is named even in a refusal.
+  const scope = collections.length > 0 ? ` ${describeCollections(collections)}` : ''
+
+  // A question that was only a window — "what happened in 1994?" — has no subject
+  // left to name, because the years were the whole question. Saying the archive
+  // "mentions that" tells the reader nothing, and worse, it reads as though
+  // something had been searched for and not found.
+  if (terms.length === 0 && period) {
+    return (
+      `${scope ? scope.slice(1) : ''}${describeWindow(period, [], 'empty')} The archive holds records ` +
+      `from a finite set of years, and this is not one of them — naming a year it does cover is more likely to land.`
+    )
+  }
+
+  // A collection named on its own that holds nothing searchable — "any videos?" over
+  // an archive with none — is a fact about the collection, so it says so rather than
+  // passing for a search that found nothing.
+  if (terms.length === 0) {
+    return (
+      `${describeCollections(collections)}That collection holds no published records to show, ` +
+      `which is worth saying plainly rather than passing for a search that found nothing.`
+    )
+  }
+
+  // Inside a window, "nothing" is a statement about the window and has to say so.
+  // The archive may hold records about the subject in other years, and an answer
+  // that did not mention that would read as a claim about the whole archive.
+  const window = period ? ` ${describeWindow(period, [], 'filtered')}` : ''
+
+  if (broaderTotal > 0) {
+    return (
+      `The archive mentions ${subject} in ${broaderTotal} record${broaderTotal === 1 ? '' : 's'}, ` +
+      `but none of ${broaderTotal === 1 ? 'it' : 'them'} answers the question as asked.${window}${scope} ` +
+      `Naming the subject more precisely, or asking for one part of it, is more likely to land.`
+    )
+  }
+
+  return (
+    `Nothing published in the archive mentions ${subject}.${window}${scope} ` +
+    `The archive holds specific speeches, papers, clippings and photographs rather than material on every subject, so a narrower or differently worded question is more likely to land.`
+  )
 }
 
 /**
@@ -88,11 +158,29 @@ async function suggestFromThemes(terms: string[] = [], asked = ''): Promise<stri
  * records: 3 that cover the whole question and 1,340 that each mention a piece
  * of it are not the same claim, and the sentence should not blur them.
  */
-function describeBreadth(counts: AskCollectionCount[], shown: number, broaderTotal = 0): string {
+function describeBreadth(
+  counts: AskCollectionCount[],
+  shown: number,
+  broaderTotal = 0,
+  order: 'relevance' | 'chronology' | 'collection' = 'relevance',
+): string {
   if (counts.length === 0) return ''
   const total = counts.reduce((sum, c) => sum + c.count, 0)
   const records = `${total} record${total === 1 ? '' : 's'}`
-  const hidden = total > shown ? `, the ${shown} strongest shown` : ''
+  // "The 2 strongest shown" is a claim about a ranking. A question that named only a
+  // window or only a collection has nothing to rank by — the records are in the
+  // order the collection or the years put them — so the sentence says which ones are
+  // on screen instead of inventing a judgement.
+  const hidden =
+    total > shown
+      ? `, ${
+          order === 'chronology'
+            ? `the earliest ${shown} shown`
+            : order === 'collection'
+              ? `the first ${shown} in the collection shown`
+              : `the ${shown} strongest shown`
+        }`
+      : ''
 
   const scope =
     counts.length === 1
@@ -130,11 +218,21 @@ function buildSummary(
   unmatched: string[],
   counts: AskCollectionCount[],
   shown: number,
-  broaderTotal = 0,
+  {
+    broaderTotal = 0,
+    windowed = false,
+  }: { broaderTotal?: number; windowed?: boolean } = {},
 ): string {
-  if (!lead) return noMatchSummary(terms)
+  if (!lead) return noMatchSummary(terms, broaderTotal)
 
-  const breadth = describeBreadth(counts, shown, broaderTotal)
+  const breadth = describeBreadth(
+    counts,
+    shown,
+    broaderTotal,
+    // With no words to rank by, the order the cards are in is the only order there
+    // was, and the sentence must name the one that applied.
+    terms.length === 0 ? (windowed ? 'chronology' : 'collection') : 'relevance',
+  )
 
   if (mode === 'any' && unmatched.length > 0) {
     return (
@@ -232,13 +330,36 @@ export async function POST(request: NextRequest) {
   const terms = resolved.terms
   const suggestions = await suggestFromThemes(terms, raw)
 
+  // Read off the question before the "no subject" check below, because a question
+  // can consist of nothing but a window. "What happened in 2026?" has no keywords
+  // left after stopwording — every one of them was a year the period has claimed —
+  // and it is not a question without a subject. It is the most direct one there is.
+  const period = parsePeriod(raw)
+
+  // A collection named in the question is a filter, not a subject. "What are the
+  // milestones from the 1990s?" points at one page of this site, so it decides which
+  // collections are searched and comes out of the words being searched for — leaving
+  // it in would require every record returned to contain the word "milestones", which
+  // is why that question used to come back empty.
+  const named = collectionFilter(terms)
+  const searchTerms = named.terms
+
+  // Not every collection can answer anything: the photograph library is browsable
+  // and searchable but every row of it is uncaptioned and undated. A reader who
+  // names it is told so and given the page to browse, because answering with
+  // records from other collections under a "Restricted to Photographs" heading
+  // would be a lie about where the pictures came from.
+  const unsearchable = named.collections.filter(c => c in NOT_ANSWERABLE)
+  const collections = named.collections.filter(c => !(c in NOT_ANSWERABLE))
+  const leftOut = describeUnsearchable(unsearchable)
+
   const empty = (
     summary: string,
     mode: AskMatchMode = 'none',
     extra: Partial<AskResult> = {},
   ): AskResult => ({
     summary,
-    terms,
+    terms: searchTerms,
     match: mode,
     citations: [],
     timeline: [],
@@ -247,7 +368,7 @@ export async function POST(request: NextRequest) {
     // With nothing to show, every term is uncovered. Saying so lets the client
     // show the reader exactly which words the archive could not satisfy.
     matchedTerms: [],
-    unmatched: terms,
+    unmatched: searchTerms,
     totalMatched: 0,
     suggested: suggestions,
     ...extra,
@@ -255,21 +376,30 @@ export async function POST(request: NextRequest) {
 
   // "How many speeches are there?" is a question about the corpus, not its
   // contents — searching for "many" can only ever return nothing.
-  if (COUNT_QUESTION.test(raw) && terms.length <= 2) {
+  if (COUNT_QUESTION.test(raw) && searchTerms.length <= 2) {
     return NextResponse.json(await answerCountQuestion(raw, suggestions))
   }
 
-  if (terms.length === 0) {
-    return NextResponse.json(
-      empty(
-        resolved.kind === 'followup'
+  if (searchTerms.length === 0 && !period && collections.length === 0) {
+    // A question made of nothing but the name of a collection the archive cannot
+    // search is answerable, and the answer is that collection and where to find it.
+    const asked = unsearchable
+      .map(c => ASK_COLLECTION_LABELS[c as AskCollectionName])
+      .join(' or ')
+      .toLowerCase()
+    const unsearchableOnly =
+      unsearchable.length > 0
+        ? `I cannot answer from the ${asked}: ${NOT_ANSWERABLE[unsearchable[0]]}. It is browsable at ${COLLECTION_PAGES[unsearchable[0]]}, and /search covers every collection at once.`
+        : resolved.kind === 'followup'
           ? 'I could not carry that forward — the earlier turns in this conversation did not give me a subject to keep going on. Try naming the speech, theme or period again.'
-          : 'Ask me about a speech, a letter, a theme or a period of the Speaker’s career — for example “parliamentary independence” or “education and the youth”.',
-        'none',
+          : 'Ask me about a speech, a letter, a theme or a period of the Speaker’s career — for example “parliamentary independence” or “education and the youth”.'
+    return NextResponse.json(
+      empty(unsearchableOnly, 'none',
         // No terms survived stopwording, so nothing is uncovered; a reader who
         // typed "who was he?" has not asked about a gap in the archive.
         {
           unmatched: [],
+          ...(unsearchable.length ? { unsearchable } : {}),
           conversation: {
             kind: resolved.kind,
             lead: '',
@@ -286,13 +416,26 @@ export async function POST(request: NextRequest) {
   // are split out below because the client already renders them as a
   // chronological timeline and as pull-quotes, which suit them better than a
   // generic result card.
-  const { mode, results, collectionCounts, totalMatched, broaderMatched } = await searchArchive(
-    terms,
-    resolved.context,
-  )
+  const { mode, results, collectionCounts, totalMatched, broaderMatched, undated } =
+    await searchArchive(searchTerms, resolved.context, period, collections)
 
   if (results.length === 0) {
-    return NextResponse.json(empty(noMatchSummary(terms)))
+    // `broaderMatched` counts every record that mentions any of the question's
+    // words, which is the claim the sentence now makes — the count of records
+    // matching all of them would understate what the archive holds and is zero
+    // for exactly the questions this wording exists for.
+    return NextResponse.json(
+      empty(
+        `${noMatchSummary(searchTerms, Math.max(broaderMatched ?? 0, totalMatched), period, collections)}${leftOut ? ` ${leftOut}` : ''}`,
+        mode,
+        {
+          ...(period ? { period } : {}),
+          ...(undated?.length ? { undated } : {}),
+          ...(collections.length ? { collections } : {}),
+          ...(unsearchable.length ? { unsearchable } : {}),
+        },
+      ),
+    )
   }
 
   const citations: AskCitation[] = []
@@ -307,7 +450,13 @@ export async function POST(request: NextRequest) {
     for (const term of matched) covered.add(term)
 
     if (candidate.collection === 'milestones') {
-      timeline.push({ year: candidate.year ? String(candidate.year) : null, title: candidate.title })
+      timeline.push({
+        year: candidate.year ? String(candidate.year) : null,
+        title: candidate.title,
+        // The reader has been shown the milestone; without this they cannot go
+        // and read what it actually says.
+        href: candidate.href,
+      })
       continue
     }
     if (candidate.collection === 'testimonials') {
@@ -315,6 +464,7 @@ export async function POST(request: NextRequest) {
         quote: bestPassage(candidate, [...matched], 160),
         author: candidate.title,
         role: candidate.role ?? null,
+        href: candidate.href,
       })
       continue
     }
@@ -336,27 +486,40 @@ export async function POST(request: NextRequest) {
       // Sorted for a stable chip order, and longest-first reads better than
       // query order when one term is a prefix of another.
       matched: [...matched].sort((a, b) => b.length - a.length || a.localeCompare(b)),
+      // Where the record came from, beside the archive page it now lives on. A
+      // reader who cannot reach the paper has no way to tell that from the
+      // archive not holding the record.
+      ...(candidate.url ? { url: candidate.url } : {}),
+      ...(candidate.sourceName ? { sourceName: candidate.sourceName } : {}),
+      ...(candidate.via ? { via: candidate.via } : {}),
+      ...(candidate.hasCapture && candidate.id !== undefined
+        ? { captureHref: `/api/news/${candidate.id}/original` }
+        : {}),
     })
   }
 
-  const unmatched = terms.filter(t => !covered.has(t))
+  const unmatched = searchTerms.filter(t => !covered.has(t))
   // Milestones and testimonials are rendered as their own sections rather than
   // result cards, but the reader still saw them — so they count towards what
   // the response is able to show, and the summary must not understate it.
   const shown = citations.length + timeline.length + testimonials.length
-  const matchedTerms = terms.filter(t => covered.has(t))
+  const matchedTerms = searchTerms.filter(t => covered.has(t))
 
   const voice = buildVoice(resolved.kind, resolved.anchor, results)
-  const summary = buildSummary(
-    mode,
-    voice,
-    results[0],
-    terms,
-    unmatched,
-    collectionCounts,
-    shown,
-    broaderMatched,
-  )
+  // The window is a statement about the search, not a thing the Speaker said, so
+  // it is appended outside the persona sentence. Bolting it onto the voice would
+  // put an archive-side fact into the mouth of a man whose every other word here
+  // is read verbatim from a stored record.
+  // The restriction is a statement about the search, not a thing the Speaker said,
+  // so it is appended outside the persona sentence alongside the window.
+  const summary =
+    buildSummary(mode, voice, results[0], searchTerms, unmatched, collectionCounts, shown, {
+      broaderTotal: broaderMatched,
+      windowed: period !== null,
+    }) +
+    (collections.length ? ` ${describeCollections(collections)}` : '') +
+    (period ? ` ${describeWindow(period, undated ?? [])}` : '') +
+    (leftOut ? ` ${leftOut}` : '')
 
   // Suggestions from the records that were actually returned, because the global
   // theme list was the same four chips on every answer and read as a fixed menu
@@ -366,7 +529,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     summary,
-    terms,
+    terms: searchTerms,
     match: mode,
     citations,
     timeline,
@@ -376,6 +539,10 @@ export async function POST(request: NextRequest) {
     unmatched,
     totalMatched,
     ...(broaderMatched ? { broaderMatched } : {}),
+    ...(period ? { period } : {}),
+    ...(undated?.length ? { undated } : {}),
+    ...(collections.length ? { collections } : {}),
+    ...(unsearchable.length ? { unsearchable } : {}),
     suggested: resultSuggestions.length > 0 ? resultSuggestions : suggestions,
     conversation: {
       kind: resolved.kind,

@@ -42,6 +42,8 @@ function candidate(over: Partial<SearchCandidate> = {}): SearchCandidate {
       'The cedi did not weaken because of the choices of any one man. It weakened ' +
       'because we chose, year after year, to spend money we had not earned.',
     hasTranscript: true,
+    url: null,
+    sourceName: null,
     fields: [{ weight: 5, text: 'cedi economy' }],
     matchTotal: 4,
     completeTotal: 1,

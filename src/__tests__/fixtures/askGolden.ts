@@ -110,10 +110,10 @@ export const ASK_GOLDEN: GoldenCase[] = [
     id: 'news-lgbtq-bill',
     question: 'What did he say about the anti-LGBTQ bill?',
     expect: news([
-      'Bagbin: Passage of anti-LGBTQ+ Bill surprising - CitiNewsroom.com',
-      'Speaker directs Parliament to reconsider anti-LGBTQ+ Bill again - Ghanaian Times - 3 Jun',
-      'Bagbin: Anti-LGBTQ+ Bill can be reconsidered despite passage - CitiNewsroom.com - 11 Jun',
-      "Bagbin: Anti-LGBTQ bill: 'It's not true that Parliament cannot reconsider a passed bill' — Speaker Bagbin - Modern Ghana - 11 Jun",
+      'Bagbin: Passage of anti-LGBTQ+ Bill surprising',
+      'Speaker directs Parliament to reconsider anti-LGBTQ+ Bill again - Ghanaian Times',
+      'Bagbin: Anti-LGBTQ+ Bill can be reconsidered despite passage',
+      'Anti-LGBTQ bill: \'It\'s not true that Parliament cannot reconsider a passed bill\' — Speaker Bagbin - Modern Ghana - 11 Jun',
     ]),
     note: 'Many rows cover this story. Any one of them is right; which of them leads decides the rank.',
   },
@@ -121,11 +121,10 @@ export const ASK_GOLDEN: GoldenCase[] = [
     id: 'news-dual-citizenship',
     question: 'dual citizenship bill',
     expect: news([
-      'Council of State advises Parliament against passage of dual citizenship bill - CitiNewsroom.com - 2 days ago - By Nii Ayikwei Okine',
-      'Council of State advises Parliament against passage of dual citizenship bill - CitiNewsroom.com',
-      'Council of State has advised against passage of dual citizenship Bill — Speaker tells Parliament - Modern Ghana - 2 days ago',
-      'Council of State has advised against passage of dual citizenship Bill — Speaker tells Parliament - Modern Ghana',
-      'Ghana’s Council of State Rejects Dual Citizenship Bill: A Test of Sovereignty Versus Diaspora Inclusion - Modern Ghana - 5 hours ago',
+      'Council of State advises Parliament against passage of dual citizenship bill',
+      'Council of State has advised against passage of dual citizenship Bill - Speaker tells Parliament - Modern Ghana - 2 days ago',
+      'Council of State has advised against passage of dual citizenship Bill - Speaker tells Parliament - Modern Ghana',
+      'Ghana\'s Council of State Rejects Dual Citizenship Bill: A Test of Sovereignty Versus Diaspora Inclusion - Modern Ghana',
       'Council of State advises Parliament against passing dual citizenship amendment Bill',
     ]),
     note: 'Eleven rows cover this story and four of them are the same clipping with and without the scraper’s provenance suffix. One card each.',
@@ -134,8 +133,8 @@ export const ASK_GOLDEN: GoldenCase[] = [
     id: 'news-council-of-state',
     question: 'What did the Council of State advise Parliament?',
     expect: news([
-      'Council of State advises Parliament against passage of dual citizenship bill - CitiNewsroom.com',
-      'Council of State has advised against passage of dual citizenship Bill — Speaker tells Parliament - Modern Ghana',
+      'Council of State advises Parliament against passage of dual citizenship bill',
+      'Council of State has advised against passage of dual citizenship Bill - Speaker tells Parliament - Modern Ghana',
       'Council of State advises Parliament against passing dual citizenship amendment Bill',
     ]),
   },
@@ -143,14 +142,16 @@ export const ASK_GOLDEN: GoldenCase[] = [
     id: 'news-constitution-amendment',
     question: 'Constitution Amendment Bill committee',
     expect: news([
-      'Bagbin refers Constitution Amendment Bill to committee - Graphic Online - 3 hours ago',
-      "Bagbin refers constitutional amendment bill to committee following Council of State's advice - Modern Ghana - 1 hour ago",
+      'Bagbin refers Constitution Amendment Bill to committee - Graphic Online',
+      'Bagbin refers Constitution Amendment Bill to committee',
+      'Bagbin refers constitutional amendment bill to committee following Council of State\'s advice - Modern Ghana',
+      'Bagbin refers constitutional amendment bill to committee following Council of State\'s advice',
     ]),
   },
   {
     id: 'news-presidential-directives',
     question: 'Presidential directives',
-    expect: news(['Bagbin: I am not bound by Presidential directives - CitiNewsroom.com']),
+    expect: news(['Bagbin: I am not bound by Presidential directives']),
     mode: 'all',
     note: 'One record. A partial answer here means the reader was shown the gap for a question with an exact answer.',
   },
@@ -158,106 +159,85 @@ export const ASK_GOLDEN: GoldenCase[] = [
     id: 'news-ubids',
     question: 'UBIDS',
     expect: news([
-      'Speaker Bagbin pledges government support for UBIDS - Ghana News Agency - 3 days ago - By Elsie Appiah-osei',
-      'Speaker Bagbin pledges government support for UBIDS, backs bid to train lawyers - 3News - 3 days ago',
+      'Speaker Bagbin pledges government support for UBIDS - Ghana News Agency',
+      'Speaker Bagbin pledges government support for UBIDS, backs bid to train lawyers',
     ]),
     note: 'An acronym. Nothing expands it, so it can only be found literally.',
   },
   {
     id: 'news-security-arrest',
     question: 'security agencies arrest MPs',
-    expect: news(['Security agencies need no permission to arrest MPs — Bagbin - Graphic Online - 22 May']),
+    expect: news(['Security agencies need no permission to arrest MPs - Bagbin - Graphic Online']),
   },
   {
     id: 'news-clean-up',
     question: 'national clean-up exercise',
     expect: news([
-      'Parliament backs National General Cleaning Days - Ghana News Agency - 2 days ago - By Godwill Arthur-Mensah',
-      'Join National general clean-up exercise – Bagbin to MPs - CitiNewsroom.com',
+      'Parliament backs National General Cleaning Days - Ghana News Agency',
+      'Join National general clean-up exercise - Bagbin to MPs',
       'Parliament suspends sitting on Friday for MPs to participate in National Day of General Cleaning',
     ]),
   },
   {
     id: 'news-community-service',
     question: 'Community Service Bill',
-    expect: news([
-      'Parliament approves Community Service Bill to reduce custodial sentencing - CitiNewsroom.com',
-    ]),
+    expect: news(['Parliament approves Community Service Bill to reduce custodial sentencing']),
   },
   {
     id: 'news-supreme-court',
     question: 'Supreme Court anniversary lecture',
     expect: news([
-      'Speaker to deliver lecture to commemorate 150th anniversary celebration of Ghana’s Supreme Court - Ghanaian Times - 12 Jun',
-      'Speaker to deliver lecture to commemorate 150th anniversary celebration of Ghana’s Supreme Court - Ghanaian Times',
+      'Speaker to deliver lecture to commemorate 150th anniversary celebration of Ghana\'s Supreme Court - Ghanaian Times - 12 Jun',
+      'Speaker to deliver lecture to commemorate 150th anniversary celebration of Ghana\'s Supreme Court - Ghanaian Times',
     ]),
     note: 'Two rows, one clipping: the scraper stored the same headline with and without its date suffix. One card, not two.',
   },
   {
     id: 'news-supreme-court-reform',
     question: 'Supreme Court judges appointment',
-    expect: news([
-      'Bagbin calls for reforms in appointment of Supreme Court judges - CitiNewsroom.com - 11 Jun',
-      'Bagbin calls for reforms in appointment of Supreme Court judges - CitiNewsroom.com',
-    ]),
+    expect: news(['Bagbin calls for reforms in appointment of Supreme Court judges']),
   },
   {
     id: 'news-peace-mission',
     question: 'IPU peace mission Russia Ukraine',
-    expect: news([
-      'Speaker Bagbin to represent Ghana on IPU peace mission for Russia-Ukraine war - Graphic Online - 30 Oct 2025',
-    ]),
+    expect: news(['Speaker Bagbin to represent Ghana on IPU peace mission for Russia-Ukraine war - Graphic Online']),
     note: 'Three proper nouns in one headline. Each is a term; the record has to hold all of them.',
   },
   {
     id: 'news-globalisation',
     question: 'xenophobia and globalisation',
-    expect: news([
-      'Africa must defend values from globalisation, xenophobia — Bagbin - Graphic Online - 2 Jun',
-    ]),
+    expect: news(['Africa must defend values from globalisation, xenophobia - Bagbin - Graphic Online']),
   },
   {
     id: 'news-inter-regional-trade',
     question: 'inter-regional trade',
     expect: news([
-      'Ghana best placed to drive inter-regional trade — Bagbin',
-      'Ghana ideal point for African, Euro, Gulf businesses - Bagbin woos investors at economic parliamentary forum - Graphic Online - 24 Jun',
+      'Ghana best placed to drive inter-regional trade - Bagbin',
+      'Ghana ideal point for African, Euro, Gulf businesses - Bagbin woos investors at economic parliamentary forum - Graphic Online',
       'Bagbin markets Ghana as “Gateway for Africa, Euro-Med & Gulf Trade” - Ghana News Agency',
     ]),
   },
   {
     id: 'news-black-stars',
     question: 'Black Stars',
-    expect: news([
-      'World Cup: We believe in you, make us proud – Bagbin to Black Stars - CitiNewsroom.com',
-    ]),
+    expect: news(['World Cup: We believe in you, make us proud - Bagbin to Black Stars']),
   },
   {
     id: 'news-flood-clean-up',
     question: 'flood clean-up exercise',
-    expect: news([
-      'Bagbin suspends Friday sitting for MPs to join flood clean-up exercise - CitiNewsroom.com - 2 days ago - By Nii Ayikwei Okine',
-      'Bagbin suspends Friday sitting for MPs to join flood clean-up exercise - CitiNewsroom.com',
-      'Bagbin suspends Friday sitting for MPs to join flood clean-up exercise',
-    ]),
+    expect: news(['Bagbin suspends Friday sitting for MPs to join flood clean-up exercise']),
     note: '“clean-up” has to survive the hyphen on both sides, and one headline stored three times is still one card.',
   },
   {
     id: 'news-mining',
     question: 'cryptocurrency mining',
-    expect: news([
-      'Mining must not become Upper East’s only dev’t strategy – Bagbin - CitiNewsroom.com',
-      'Mining must not become Upper East’s only dev’t strategy - Bagbin - CitiNewsroom.com',
-    ]),
+    expect: news(['Mining must not become Upper East’s only dev’t strategy - Bagbin']),
     note: 'Not a false positive after all: the archive does hold a clipping with “mining” in the headline, and it should be returned.',
   },
   {
     id: 'news-world-cup',
     question: 'World Cup performance analysis',
-    expect: news([
-      'World Cup: We believe in you, make us proud – Bagbin to Black Stars - CitiNewsroom.com - 17 Jun',
-      'World Cup: We believe in you, make us proud – Bagbin to Black Stars - CitiNewsroom.com',
-    ]),
+    expect: news(['World Cup: We believe in you, make us proud - Bagbin to Black Stars']),
     note: 'Also answerable. The archive has World Cup rows, so refusing the question would be the bug.',
   },
 
@@ -460,6 +440,107 @@ export const ASK_GOLDEN: GoldenCase[] = [
     note: '“tribute” is the term that matters; the word “Speaker” is a stopword in every row.',
   },
 
+
+  /* ---------------------------------------------------------------------- */
+  /* Questions that name a window of years                                    */
+  /*                                                                         */
+  /* The archive is uneven in time: seven curated documents carry years from   */
+  /* 2003 to 2023, the news runs to this year, and every video and audio row   */
+  /* has no date at all. A question about a span of years is therefore either  */
+  /* a chronology, a filter on the news, or nothing — and the answer has to be  */
+  /* able to say which.                                                        */
+  /* ---------------------------------------------------------------------- */
+  {
+    id: 'window-2021-2023',
+    question: 'What did he say between 2021 and 2023?',
+    expect: documents([
+      'Address on the State of the Nation',
+      'The Legislature and the Imperative of Independence',
+      'Digital Democracy and the Modern Parliament',
+    ]),
+    mode: 'all',
+    note:
+      'Only the window. Nothing in 2025 or 2026 may answer a question about 2021–2023, ' +
+      'and the archive holds 119 clippings from this year alone.',
+  },
+  /*
+   * A question that names a collection — "what are the milestones from the
+   * 1990s?" — is not covered here, and that is a gap rather than an oversight.
+   * "Milestones" reads as a subject, so the search looks for the word in a
+   * record's text; the four milestones of that decade do not contain it, and the
+   * answer is empty. Fixing it means treating a collection name as a collection
+   * rather than as a topic, which is a filter through `collectCandidates` and not
+   * a wording change. Until that exists, naming the decade alone gets the
+   * chronology, which is what the case below checks.
+   */
+
+  {
+    id: 'window-decade-only',
+    question: 'What happened in the 1990s?',
+    expect: milestones([
+      'Partner at the Law Trust Company',
+      'Elected to Parliament',
+      'Second term and growing influence',
+      'Majority Leader',
+    ]),
+    mode: 'all',
+    note:
+      'The same decade asked without naming a collection: the four milestones it ' +
+      'covers, oldest first, and nothing from any other year.',
+  },
+  {
+    id: 'window-collection-decade',
+    question: 'What are the milestones from the 1990s?',
+    expect: milestones([
+      'Partner at the Law Trust Company',
+      'Elected to Parliament',
+      'Second term and growing influence',
+      'Majority Leader',
+    ]),
+    mode: 'all',
+    note:
+      'The gap this file used to disclaim, closed: "milestones" is the name of a ' +
+      'page on this site, so it decides which collections are searched and comes ' +
+      'out of the words searched for. Read as a subject it required every record ' +
+      'returned to contain the word "milestones", and none of the four does, so ' +
+      'the answer was empty.',
+  },
+  {
+    id: 'collection-videos',
+    question: 'Any videos?',
+    expect: videos([
+      'RT HON ALBAN SK BAGBIN MESSAGE ON VANUATU\u2019S 43RD INDEPENDENCE ANNIVERSARY',
+      'NDC Flagbearer Race:  Alban Sumana K. Bagbin on Mpu ne Mpu',
+    ]),
+    mode: 'all',
+    note:
+      'A collection on its own is a question, not a missing subject: the newest ' +
+      'videos, in the order the videos page lists them.',
+  },
+  {
+    id: 'window-news-2026',
+    question: 'What happened in 2026?',
+    expect: news(['Council of State advises Parliament against passing dual citizenship amendment bill']),
+    mode: 'all',
+    note: 'A question with no subject at all: the year is the whole of it, and it has an answer.',
+  },
+  {
+    id: 'window-and-topic',
+    question: 'What did he say about Parliament since 2021?',
+    expect: milestones(['Speaker of the 8th Parliament']),
+    mode: 'all',
+    note:
+      'Both a subject and a window. The subject is not optional: a reader who asked ' +
+      'about Parliament does not want the other 147 records since 2021.',
+  },
+  {
+    id: 'window-none-1994',
+    question: 'What did he say in 1994?',
+    expectEmpty: true,
+    note:
+      'A year the archive does not cover. The answer must not say the archive is ' +
+      'silent about him in general.',
+  },
   /* ---------------------------------------------------------------------- */
   /* Questions the archive cannot answer                                       */
   /*                                                                             */

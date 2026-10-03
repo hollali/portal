@@ -12,9 +12,12 @@ import {
   scoreCandidate,
   plainText,
   bestPassage,
+  normaliseTitle,
+  sourceAccess,
+  publisherUrl,
   type SearchCandidate,
 } from '@/lib/askSearch'
-import { foldSuffix, queryTerms, termVariants } from '@/lib/askQuery'
+import { foldSuffix, parsePeriod, queryTerms, termVariants } from '@/lib/askQuery'
 
 /**
  * Regression guard for the class of bug that made the /ask feature look like it
@@ -131,9 +134,19 @@ describe('ask SQL specs', () => {
       .replace(/,$/, '')
       .split(',')
       .map(part => part.trim())
-    const identifiers = selected.map(part => {
+    const identifiers = selected.flatMap(part => {
+      // A part of the form `<expression> AS "name"` is the query naming something
+      // itself, so only what the expression reads has to exist. Without an alias
+      // the whole part is an identifier and must be a column.
       const alias = part.match(/AS "([^"]+)"$/)
-      return alias ? alias[1] : part
+      if (!alias) return [part]
+      return (
+        part
+          .slice(0, part.length - alias[0].length)
+          // Keywords, not columns.
+          .replace(/\b(?:IS|NOT|NULL|AND|OR|CASE|WHEN|THEN|END|CAST|COALESCE|TRUE|FALSE|SELECT)\b/gi, ' ')
+          .match(/[a-z_][a-z0-9_]*/gi) ?? []
+      )
     })
     const missing = identifiers.filter(
       name => !(columns.has(name) || [...columns.values()].includes(name)),
@@ -178,6 +191,22 @@ describe('ask SQL specs', () => {
     expect(() => askCandidateSql('news', ['a; DROP TABLE news'])).toThrow(/unsafe term/)
     expect(() => askCandidateSql('news', [])).toThrow(/no terms/)
     expect(() => askCandidateSql('nope', TERMS)).toThrow(/no SQL spec/)
+  })
+
+  it('allows an empty term list only when a window or a named collection makes it a question', () => {
+    // "What happened in 2024?" and "any photographs?" are both answerable, and an
+    // AND over nothing would match the whole table instead.
+    expect(() => askCandidateSql('news', [])).toThrow(/no terms/)
+    expect(() => askCandidateSql('news', [], parsePeriod('in 2024'))).not.toThrow()
+    expect(() => askCandidateSql('news', [], null, true)).not.toThrow()
+    // The predicate really is empty — `news` is the one spec with no `status`
+    // clause — so the `WHERE` is left off rather than emitted empty, which would
+    // be a syntax error caught and hidden by `safeCollection`.
+    const listing = askCandidateSql('news', [], null, true)
+    expect(listing).not.toContain('LIKE')
+    expect(listing).not.toMatch(/WHERE\s*\n/)
+    expect(listing).toContain('FROM news')
+    expect(listing).toContain('ORDER BY id DESC')
   })
 
   it('interpolates nothing but validated patterns and spec identifiers', () => {
@@ -290,6 +319,8 @@ function candidate(over: Partial<SearchCandidate> = {}): SearchCandidate {
     excerpt: '',
     body: '',
     hasTranscript: false,
+    url: null,
+    sourceName: null,
     fields: [{ weight: 5, text: 'a video' }],
     matchTotal: 1,
     completeTotal: 1,
@@ -432,6 +463,42 @@ describe('rankCandidates', () => {
       { collection: 'audio', label: 'Audio', matchTotal: 1, completeTotal: 1 },
     ])
     expect(ranked.results).toHaveLength(1)
+  })
+
+  /**
+   * The same clipping, scraped three times: once whole, once with a date, once
+   * with a date and a byline. All three carry the publisher that published them,
+   * so all three reduce to one headline and the reader gets one card.
+   */
+  it('does not report one clipping twice when a scraper changed its suffix', () => {
+    const hit = { weight: 5, text: 'citizenship' }
+    const plain = candidate({ title: 'Council of State opposes citizenship bill', fields: [hit] })
+    const withDate = candidate({
+      title: 'Council of State opposes citizenship bill - Graphic Online - 3 hours ago',
+      url: 'https://graphic.com.gh/news/citizenship',
+      fields: [hit],
+    })
+    const withByline = candidate({
+      title: 'Council of State opposes citizenship bill - Graphic Online - 3 hours ago - By Nii Ayikwei Okine',
+      url: 'https://graphic.com.gh/news/citizenship',
+      fields: [hit],
+    })
+    const ranked = rankCandidates([plain, withDate, withByline], ['citizenship'], [
+      { collection: 'news', label: 'News', matchTotal: 3, completeTotal: 3 },
+    ])
+    expect(ranked.results).toHaveLength(1)
+  })
+
+  it('keeps two episodes of one programme apart', () => {
+    // "… (2ND DEPUTY SPEAKER OF PARLIAMENT) PART ONE" and "PART TWO" share every
+    // word up to the eighth. Collapsing them would hide an episode.
+    const hit = { weight: 5, text: 'deputy' }
+    const one = candidate({ title: 'EXCLUSIVE WITH HON ALBAN BAGBIN (2ND DEPUTY SPEAKER) PART ONE', fields: [hit] })
+    const two = candidate({ title: 'EXCLUSIVE WITH HON ALBAN BAGBIN (2ND DEPUTY SPEAKER) PART TWO', fields: [hit] })
+    const ranked = rankCandidates([one, two], ['deputy'], [
+      { collection: 'videos', label: 'Videos', matchTotal: 2, completeTotal: 2 },
+    ])
+    expect(ranked.results).toHaveLength(2)
   })
 
   it('keeps two testimonials by the same author when the quotes differ', () => {
@@ -682,5 +749,275 @@ describe('bestPassage', () => {
   it('keeps a full excerpt whole rather than truncating needlessly', () => {
     const short = candidate({ excerpt: 'Bagbin calls for judicial independence.', body: '' })
     expect(bestPassage(short, ['judicial'], 150)).toBe('Bagbin calls for judicial independence.')
+  })
+})
+
+/**
+ * The headline a paper wrote, recovered from the headline a scraper stored.
+ *
+ * A scraper saves "<headline> - <publisher>", "… | 3 hours ago", and
+ * "… - <publisher> - 2 days ago - By <reporter>", while the reader needs only the
+ * first part. Getting this wrong is visible twice over: the same article is shown
+ * as several cards, and the same headline stored with and without its suffix
+ * reads as two different stories.
+ *
+ * A publisher comes off only when the host backs it up. A hardcoded list of
+ * Ghanaian papers would rot on the next scrape, and cutting at every dash would
+ * invent a different headline out of "Nominate Alban Bagbin as Speaker of 9th
+ * Parliament – Mahama tells NDC caucus", so a suffix qualifies only when every
+ * distinctive word in it appears in the host that published this very row. With
+ * no host, nothing is guessed.
+ *
+ * A date or byline needs no such backing: "… - 12 Jun" is metadata whoever
+ * scraped it, and leaving it in is what keeps one clipping on two cards.
+ */
+describe('normaliseTitle', () => {
+  const cases: Array<[string, string | null, string]> = [
+    // Provenance that must come off, checked against its own host.
+    ['Bagbin: I am not bound by Presidential directives - CitiNewsroom.com', 'www.citinewsroom.com', 'bagbin i am not bound by presidential directives'],
+    ['Speaker Bagbin pledges government support for UBIDS, backs bid to train lawyers - 3News', '3news.com', 'speaker bagbin pledges government support for ubids backs bid to train lawyers'],
+    ['Misleading! Video of Speaker Bagbin celebrating Black Stars goal unrelated to 2026 win over Panama, it\'s from 2022 - ghanafact.com', 'ghanafact.com', 'misleading video of speaker bagbin celebrating black stars goal unrelated to 2026 win over panama it s from 2022'],
+    ['Bagbin markets Ghana as \u201cGateway for Africa, Euro-Med & Gulf Trade\u201d - Ghana News Agency', 'www.ghananewsagency.org', 'bagbin markets ghana as gateway for africa euro med gulf trade'],
+    ['Alumni Spotlight - Rt. Hon. Kingsford Alban Sumana Bagbin', 'alumni.ug.edu.gh', 'alumni spotlight rt hon kingsford alban sumana bagbin'],
+    // A date or byline after the publisher must not stop the strip reaching it.
+    ['Bagbin refers constitution amendment bill to committee - Graphic Online - 3 hours ago', 'graphic.com.gh', 'bagbin refers constitution amendment bill to committee'],
+    ['Bagbin refers constitution amendment bill to committee - Graphic Online - 30 Oct 2025', 'graphic.com.gh', 'bagbin refers constitution amendment bill to committee'],
+    ['Parliament backs National General Cleaning Days - Ghana News Agency - 2 days ago - By Godwill Arthur-Mensah', 'www.ghananewsagency.org', 'parliament backs national general cleaning days'],
+    // A pipe ends the headline outright: nothing follows one in a headline.
+    ['Bagbin refers constitutional amendment bill to committee following Council of State\'s advice - Modern Ghana | 1 hour ago', 'www.modernghana.com.gh', 'bagbin refers constitutional amendment bill to committee following council of state s advice'],
+    // Interior dashes that are not provenance, and must survive whole.
+    ['Nominate Alban Bagbin as Speaker of 9th Parliament – Mahama tells NDC caucus', 'citinewsroom.com', 'nominate alban bagbin as speaker of 9th parliament mahama tells ndc caucus'],
+    ['African autocrats — and US right wing — demand “sovereignty” at a Family Values conference in Accra', 'citinewsroom.com', 'african autocrats and us right wing demand sovereignty at a family values conference in accra'],
+    ['Theatrics and drama should be sparingly invoked – Speaker Bagbin', 'citinewsroom.com', 'theatrics and drama should be sparingly invoked speaker bagbin'],
+    ['Alban Bagbin is my favourite Speaker in the fourth republic – Kofi Bentil', 'citinewsroom.com', 'alban bagbin is my favourite speaker in the fourth republic kofi bentil'],
+    // A suffix nobody can vouch for is left alone rather than guessed at.
+    ['Respect Africa\'s sovereignty, don\'t attach conditions to aid – Bagbin - CitiNewsroom.com', 'www.bing.com', 'respect africa s sovereignty don t attach conditions to aid bagbin citinewsroom com'],
+    // Never reduced to a bare publisher.
+    ['Alban Bagbin - CitiNewsroom.com', 'citinewsroom.com', 'alban bagbin'],
+  ]
+
+  for (const [raw, host, want] of cases) {
+    it(`reduces ${JSON.stringify(raw.slice(0, 56))}… to the headline`, () => {
+      expect(normaliseTitle(raw, host)).toBe(want)
+    })
+  }
+
+  it('collapses punctuation-only differences when no host is available', () => {
+    expect(normaliseTitle('Justice D. F. Annan’s passing')).toBe(
+      normaliseTitle('Justice D F Annan’s passing'),
+    )
+  })
+})
+
+describe('the date filter', () => {
+  const TERMS = ['economy']
+  const Y = { from: 2019, to: 2021, label: '2019–2021' }
+
+  it('restricts every collection that stores a date', () => {
+    for (const collection of ['documents', 'news', 'milestones', 'testimonials']) {
+      const sql = askCandidateSql(collection, TERMS, Y)
+      expect(sql).toMatch(/WHERE/)
+      expect(sql).toMatch(/>= 2019/)
+      expect(sql).toMatch(/<= 2021/)
+    }
+  })
+
+  it('leaves the collections that store none out of a dated answer', () => {
+    // Every video and audio row has a null `year`. Filtering on it would answer
+    // a question about 2019–2021 with a 2023 recording and call it evidence.
+    for (const collection of ['videos', 'audio']) {
+      expect(() => askCandidateSql(collection, TERMS, Y)).toThrow(/no date/i)
+    }
+  })
+
+  it('binds both ends of an open-ended window and nothing else', () => {
+    const since = askCandidateSql('documents', TERMS, { from: 2020, to: null, label: 'since 2020' })
+    expect(since).toMatch(/>= 2020/)
+    expect(since).not.toMatch(/<= /)
+    const until = askCandidateSql('documents', TERMS, { from: null, to: 1998, label: 'up to 1998' })
+    expect(until).toMatch(/<= 1998/)
+    expect(until).not.toMatch(/>= /)
+  })
+
+  it('reads a news date the way the columns actually hold it', () => {
+    // ISO on some rows, RFC 2822 on others. A leading four-character slice would
+    // read "Wed," as a year and filter every clipping out of every answer.
+    const sql = askCandidateSql('news', TERMS, { from: 2026, to: 2026, label: '2026' })
+    expect(sql).toMatch(/substring/)
+    expect(sql).toMatch(/\\d\{4\}/)
+  })
+
+  it('takes the earliest records of a window when there is no topic to rank by', () => {
+    // A take ordered by id would return only the newest rows of a decade, and
+    // "the 1990s" would show the 1990s' last year.
+    const sql = askCandidateSql('milestones', [], { from: 1990, to: 1999, label: 'the 1990s' })
+    expect(sql).toMatch(/ORDER BY \(.+\) ASC/)
+  })
+
+  it('still asks for a topic when the question gave one', () => {
+    const sql = askCandidateSql('milestones', TERMS, { from: 1990, to: 1999, label: 'the 1990s' })
+    expect(sql).toMatch(/ORDER BY \(CASE WHEN/)
+  })
+
+  it('is not built by interpolating anything the reader typed', () => {
+    const sql = askCandidateSql('news', TERMS, Y)
+    // Only the validated terms and integer bounds may appear in the query text.
+    const literals = sql.match(/'[^']*'/g) ?? []
+    for (const literal of literals) {
+      expect(literal).not.toMatch(/union|select|drop|;/i)
+    }
+    expect(sql).not.toMatch(/\$\{/)
+  })
+})
+
+describe('ranking a dated answer', () => {
+  /** A window with no topic: no terms, no totals, ranked chronologically. */
+  const asWindow = (candidates: SearchCandidate[]) =>
+    rankCandidates(candidates, [], undefined, [], { listing: true })
+
+  const doc = (year: number | null, title: string, text = '') =>
+    candidate({
+      collection: 'documents',
+      collectionLabel: 'Archive documents',
+      kind: 'speech',
+      kindLabel: 'Speech',
+      title,
+      year,
+      href: `/archives/documents/${year ?? 'undated'}`,
+      excerpt: text,
+      fields: [
+        { weight: 3, text: title },
+        ...(text ? [{ weight: 1, text }] : []),
+      ],
+    })
+
+  const milestone = (year: number, title: string) =>
+    candidate({
+      collection: 'milestones',
+      collectionLabel: 'Milestones',
+      kind: 'milestone',
+      kindLabel: 'Milestone',
+      title,
+      year,
+      href: '/archives/milestones',
+      fields: [{ weight: 3, text: title }],
+      matchTotal: 3,
+      completeTotal: 3,
+    })
+
+  it('orders a window oldest first, because that is the order it happened in', () => {
+    // Documents, because milestones are capped at two — that cap is about how
+    // much of the timeline to render, not about chronology.
+    const ranked = asWindow([
+      doc(2026, 'Newest'),
+      doc(2021, 'Oldest'),
+      doc(2023, 'Middle'),
+    ])
+    expect(ranked.results.map(r => r.candidate.title)).toEqual(['Oldest', 'Middle', 'Newest'])
+  })
+
+  it('counts every record in the window, not only the ones it can show', () => {
+    // "119 records matched, the 3 strongest shown" has to be true, and those two
+    // numbers come from different places.
+    const ranked = asWindow([
+      milestone(2021, 'Oldest'),
+      milestone(2026, 'Newest'),
+      milestone(2023, 'Middle'),
+    ])
+    expect(ranked.results).toHaveLength(2)
+    expect(ranked.totalMatched).toBe(3)
+  })
+
+  it('does not drop a window\'s records for weak term coverage', () => {
+    // With no topic there is nothing to cover, so the relevance floor would throw
+    // the whole window away and report "nothing published" for a year the archive
+    // plainly covers.
+    const ranked = asWindow([doc(2021, 'Address on the State of the Nation')])
+    expect(ranked.results).toHaveLength(1)
+    expect(ranked.mode).toBe('all')
+  })
+
+  it('keeps the floor for a question with both a topic and a window', () => {
+    const ranked = rankCandidates(
+      [
+        doc(2021, 'Passing mention', 'the economy was not discussed'),
+        doc(2022, 'On the state of the economy', 'the economy and the debt ceiling'),
+      ],
+      ['economy', 'debt'],
+    )
+    expect(ranked.results.map(r => r.candidate.title)).toContain('On the state of the economy')
+  })
+
+  it('leads with the record that answers the most of the question', () => {
+    const ranked = rankCandidates(
+      [
+        doc(2021, 'On the economy', 'the economy'),
+        doc(2022, 'On the economy and the debt', 'the economy and the debt ceiling'),
+      ],
+      ['economy', 'debt'],
+    )
+    expect(ranked.results[0].candidate.title).toBe('On the economy and the debt')
+  })
+})
+
+describe('where a clipping can actually be read', () => {
+  it('offers the publisher\'s own page, not the aggregator\'s', () => {
+    // 46 of the archive's 134 news rows store Bing's redirect address. Following
+    // it on the reader's behalf sends them through a search engine's feed and,
+    // for a reader on a metered connection or a slow link, past a page that has
+    // nothing to do with the Speech.
+    const wrapped =
+      'http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=6a51c5&url=https%3a%2f%2fwww.primenewsghana.com%2fpolitics%2fcouncil.html&c=1&mkt=en-ww'
+    const access = sourceAccess(wrapped, 'Bing News')
+    expect(access.url).toBe('https://www.primenewsghana.com/politics/council.html')
+    // And the publisher is named by its hostname, because the row's own name for
+    // it is the aggregator's.
+    expect(access.sourceName).toBe('www.primenewsghana.com')
+    expect(access.via).toBe('Bing News')
+  })
+
+  it('keeps an opaque aggregator link and says what it is', () => {
+    // A Google News address is a signed blob with the publisher's address inside
+    // it in no readable form. Unwrapping it would mean fetching it, and guessing
+    // would mean inventing a link; so it is served as stored and labelled.
+    const opaque = 'https://news.google.com/read/CBMiAAF95cUxQdGhla2ZMVTNvMGtSVEZaTjVFdjNsc05lWjBjUkZ0Z2xScXJsMlZqZWRt?hl=en-GH&gl=GH&ceid=GH%3Aen'
+    const access = sourceAccess(opaque, 'Google News')
+    expect(access.url).toBe(opaque)
+    expect(access.via).toBe('Google News')
+    // "Google News" must not be presented as the publication of a speech.
+    expect(access.sourceName).toBeNull()
+  })
+
+  it('leaves a direct publisher link alone', () => {
+    const access = sourceAccess('https://www.ghanaiantimes.com.gh/story', 'Ghanaian Times')
+    expect(access).toEqual({ url: 'https://www.ghanaiantimes.com.gh/story', sourceName: 'Ghanaian Times', via: null })
+  })
+
+  it('invents nothing for a record with no address', () => {
+    expect(sourceAccess(null, 'Some Channel')).toEqual({ url: null, sourceName: null, via: null })
+    expect(sourceAccess('', null).url).toBeNull()
+  })
+
+  it('refuses an address that is not one', () => {
+    // A stored `url` is whatever a scraper wrote. Handing it to a reader as a
+    // link is fine; handing it to the browser as a scheme is not.
+    expect(sourceAccess('not a url', 'Odd').url).toBeNull()
+    expect(sourceAccess('javascript:alert(1)', 'Odd').url).toBeNull()
+  })
+
+  it('does not let a wrapped address point somewhere that is not a web page', () => {
+    const wrapped = 'http://www.bing.com/news/apiclick.aspx?url=javascript%3aalert(1)'
+    expect(sourceAccess(wrapped, 'Bing News').url).toBe(wrapped)
+  })
+
+  it('collapses duplicates against the publisher, so one clipping is not shown twice', () => {
+    // The same story fetched through Bing and stored again with the paper's own
+    // address is one clipping. Compared against `bing.com` they are two records.
+    const viaBing = 'http://www.bing.com/news/apiclick.aspx?url=https%3a%2f%2fwww.ghanaiantimes.com.gh%2fa-story'
+    expect(publisherUrl(viaBing)).toBe('https://www.ghanaiantimes.com.gh/a-story')
+    const title = 'Council of State advises Parliament against a rushed bill'
+    expect(normaliseTitle(title, 'www.ghanaiantimes.com.gh')).toBe(
+      normaliseTitle(`${title} - Ghanaian Times`, 'www.ghanaiantimes.com.gh'),
+    )
   })
 })

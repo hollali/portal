@@ -17,7 +17,7 @@
  */
 
 import type { AskMatchMode } from './askQuery'
-import { CANDIDATE_TITLE_MAX, normaliseTitle } from './askSearch'
+import { CANDIDATE_TITLE_MAX, hostOf, normaliseTitle } from './askSearch'
 
 /**
  * One reader question, and what a good answer has to contain.
@@ -58,38 +58,14 @@ export interface GoldenCase {
  * 128-character headline could never match the 120-character card the reader is
  * shown, and the case would report a search failure that is really a fixture bug.
  */
-export function sourceKey(source: { collection: string; title: string }): string {
-  const title = normaliseTitle(source.title.slice(0, CANDIDATE_TITLE_MAX))
+export function sourceKey(source: { collection: string; title: string; url?: string | null }): string {
+  const title = normaliseTitle(source.title.slice(0, CANDIDATE_TITLE_MAX), hostOf(source.url ?? null))
   return `${source.collection}|${title}`
 }
 
 /** Build a case's `expect` list from readable titles, so the fixture stays legible. */
 export function expectKeys(collection: string, titles: string[]): string[] {
   return titles.map(title => sourceKey({ collection, title }))
-}
-
-/**
- * How many leading words identify a headline.
- *
- * The scrapers appended provenance to news titles — " - CitiNewsroom.com - 2
- * days ago - By Nii Ayikwei Okine" — and stored the same clipping with it, with
- * part of it, and without it. `normaliseTitle` keeps those words, so the three
- * rows are three different keys and the pipeline cannot collapse them. Comparing
- * headlines on their first few words is the closest an eval can get to "is this
- * the same clipping" without re-implementing the strip.
- */
-const HEADLINE_WORDS = 8
-
-/**
- * The identity of a clipping for duplicate detection.
- *
- * A title shorter than `HEADLINE_WORDS` is compared whole, because its first
- * eight words are the whole title and prefixes of short titles collide on things
- * like "majority leader" and "minority leader".
- */
-export function headlineKey(title: string): string {
-  const words = title.split(' ')
-  return words.length > HEADLINE_WORDS ? words.slice(0, HEADLINE_WORDS).join(' ') : title
 }
 
 /** What the pipeline actually showed, in rank order. */
@@ -196,13 +172,15 @@ export function scoreRetrieval(
 
     const bestRank = found.length > 0 ? found[0].rank : 0
 
-    // Compared on the headline half of the key, so the same clipping stored with
-    // and without its provenance suffix is caught, and the same row surfaced
-    // from two collections is caught too.
+    // Compared on the headline half of the key, so the same row surfaced from two
+    // collections is caught too. The whole normalised headline is the identity,
+    // not its first few words: "EXCLUSIVE WITH HON ALBAN BAGBIN (2ND DEPUTY
+    // SPEAKER OF PARLIAMENT) PART ONE" and "… PART TWO" are two episodes of a
+    // programme, and an eight-word prefix called them one record.
     const seenTitles = new Set<string>()
     const duplicateTitles: string[] = []
     for (const key of keys) {
-      const title = headlineKey(key.slice(key.indexOf('|') + 1))
+      const title = key.slice(key.indexOf('|') + 1)
       if (seenTitles.has(title)) {
         if (!duplicateTitles.includes(title)) duplicateTitles.push(title)
       }
