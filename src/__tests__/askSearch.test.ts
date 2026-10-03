@@ -11,6 +11,7 @@ import {
   rankCandidates,
   scoreCandidate,
   plainText,
+  bestPassage,
   type SearchCandidate,
 } from '@/lib/askSearch'
 import { foldSuffix, queryTerms, termVariants } from '@/lib/askQuery'
@@ -361,11 +362,23 @@ describe('rankCandidates', () => {
   })
 
   it('omits the broader count when the two are the same', () => {
-    const ranked = rankCandidates([candidate()], ['corruption'], [
+    const ranked = rankCandidates([candidate({ fields: [{ weight: 5, text: 'corruption' }] })], ['corruption'], [
       { collection: 'videos', label: 'Videos', matchTotal: 7, completeTotal: 7 },
     ])
     expect(ranked.broaderMatched).toBeUndefined()
     expect(ranked.collectionCounts[0].broader).toBeUndefined()
+  })
+
+  it('drops a collection whose every record is below the relevance floor', () => {
+    // The database said seven videos mentioned "corruption"; the floor decides
+    // none of them is worth showing. Printing "7 videos" beside an empty list
+    // would be the page claiming coverage the reader cannot see.
+    const ranked = rankCandidates([candidate({ fields: [{ weight: 5, text: 'a video' }] })], ['corruption'], [
+      { collection: 'videos', label: 'Videos', matchTotal: 7, completeTotal: 0 },
+    ])
+    expect(ranked.results).toHaveLength(0)
+    expect(ranked.totalMatched).toBe(0)
+    expect(ranked.collectionCounts).toEqual([])
   })
 
   it('prefers complete matches and reports them as the total in that mode', () => {
@@ -467,6 +480,110 @@ describe('rankCandidates', () => {
   })
 })
 
+/**
+ * The relevance floor.
+ *
+ * Every candidate is by definition a record that matched at least one term, so
+ * without a floor the archive answers anything at all: "quantum computing policy"
+ * came back with the Water Resources ministry milestone, matched on the word
+ * "policy" in its description. A confident-looking non-answer is worse than the
+ * refusal the reader would otherwise get, because it looks like coverage.
+ */
+describe('the relevance floor', () => {
+  const threeTerms = ['quantum', 'computing', 'policy']
+
+  it('drops a partial match that covers too little of the question', () => {
+    const milestone = candidate({
+      collection: 'milestones',
+      title: 'Minister for Water Resources',
+      fields: [
+        { weight: 5, text: 'minister for water resources' },
+        { weight: 4, text: 'oversees water policy and irrigation' },
+      ],
+    })
+    const ranked = rankCandidates([milestone], threeTerms, [
+      { collection: 'milestones', label: 'Milestones', matchTotal: 1, completeTotal: 0 },
+    ])
+    expect(ranked.results).toHaveLength(0)
+  })
+
+  it('drops a match that only describes the subject rather than naming it', () => {
+    // "cattle ranching in the North East" is in neither title nor caption of this
+    // milestone, only in the description as a region he attended school in. The
+    // words match; the subject does not.
+    const school = candidate({
+      collection: 'milestones',
+      title: 'Attended Tamale Secondary School',
+      fields: [
+        { weight: 5, text: 'attended tamale secondary school' },
+        { weight: 4, text: 'in the northern region of ghana, near the north east' },
+      ],
+    })
+    const ranked = rankCandidates([school], ['cattle', 'ranching', 'north', 'east'], [
+      { collection: 'milestones', label: 'Milestones', matchTotal: 1, completeTotal: 0 },
+    ])
+    expect(ranked.results).toHaveLength(0)
+  })
+
+  it('keeps a record naming the subject in its title', () => {
+    const clip = candidate({
+      collection: 'news',
+      title: 'Ghana to host quantum computing summit',
+      fields: [{ weight: 5, text: 'ghana to host quantum computing summit' }],
+    })
+    const ranked = rankCandidates([clip], ['quantum', 'summit', 'policy'], [
+      { collection: 'news', label: 'News', matchTotal: 1, completeTotal: 0 },
+    ])
+    expect(ranked.results).toHaveLength(1)
+  })
+
+  it('keeps a record that covers every term however weakly it matched', () => {
+    // Nothing is complete here, so the mode is partial and the floor applies. A
+    // record holding all three words has still answered the question, and it must
+    // not lose to a stronger title match on one of them.
+    const weak = candidate({
+      title: 'weak',
+      fields: [
+        { weight: 1, text: 'quantum' },
+        { weight: 1, text: 'computing' },
+        { weight: 1, text: 'policy' },
+      ],
+    })
+    const ranked = rankCandidates([weak], threeTerms, [
+      { collection: 'videos', label: 'Videos', matchTotal: 1, completeTotal: 0 },
+    ])
+    expect(ranked.results.map(r => r.candidate.title)).toEqual(['weak'])
+  })
+
+  it('leaves complete answers alone', () => {
+    const complete = candidate({
+      title: 'complete',
+      fields: [
+        { weight: 5, text: 'quantum computing' },
+        { weight: 1, text: 'policy' },
+      ],
+    })
+    const ranked = rankCandidates([complete], threeTerms, [
+      { collection: 'videos', label: 'Videos', matchTotal: 1, completeTotal: 1 },
+    ])
+    expect(ranked.mode).toBe('all')
+    expect(ranked.results).toHaveLength(1)
+  })
+
+  it('keeps a single-term question at one match', () => {
+    // "E-Levy" must not be thrown out for naming it once, which is why the floor
+    // is a fraction of the question rather than a term count.
+    const speech = candidate({
+      collection: 'documents',
+      fields: [{ weight: 6, text: 'e levy bill' }],
+    })
+    const ranked = rankCandidates([speech], ['levy'], [
+      { collection: 'documents', label: 'Archive documents', matchTotal: 1, completeTotal: 1 },
+    ])
+    expect(ranked.results).toHaveLength(1)
+  })
+})
+
 /* -------------------------------------------------------------------------- */
 
 describe('plainText', () => {
@@ -507,5 +624,63 @@ describe('plainText', () => {
 
   it('unwraps a blockquote without gluing words together', () => {
     expect(plainText(body)).toContain('The House sits, and the House decides.')
+  })
+})
+
+describe('bestPassage', () => {
+  // A card shows 150 characters of a long speech. Before this existed it showed
+  // whatever came first in the file, so a reader asking about one subject was
+  // shown a paragraph about another and concluded the archive did not cover it.
+  const long = candidate({
+    excerpt: 'The Speaker on the state of the nation.',
+    body: [
+      'The House opens with a statement of business for the week.',
+      'Members then rise to observe a minute of silence for the fallen.',
+      'A colleague asks about the state of the opposition benches and their conduct.',
+      'The Speaker replies that the House will return to the state of the nation later.',
+    ].join(' '),
+  })
+
+  it('windows around the match instead of the opening of the record', () => {
+    const out = bestPassage(long, ['opposition'], 120)
+    expect(out).toContain('opposition benches')
+    expect(out).not.toContain('a minute of silence')
+    // Marked as an excerpt, so it does not read as the whole record.
+    expect(out.startsWith('…')).toBe(true)
+    expect(out.endsWith('…')).toBe(true)
+  })
+
+  it('prefers the record’s own words over the editorial summary', () => {
+    // The excerpt is written *about* the speech. The body is the speech. Quoting
+    // the first as his words is the mistake this field distinction prevents.
+    const out = bestPassage(long, ['conduct'], 120)
+    expect(out).toContain('their conduct')
+  })
+
+  it('falls back to the opening when nothing in the record matches', () => {
+    const out = bestPassage(long, ['no such term'], 60)
+    expect(out.startsWith('The Speaker on the state')).toBe(true)
+    expect(out.length).toBeLessThanOrEqual(61)
+  })
+
+  it('never cuts mid-word', () => {
+    const out = bestPassage(long, ['conduct'], 45)
+    expect(out.endsWith('…')).toBe(true)
+    // The visible text has to be an unbroken run of the record: if the character
+    // after it in the source is a letter, a word has been cut in half.
+    const visible = out.replace(/^…/, '').replace(/…$/, '')
+    const at = long.body!.indexOf(visible)
+    expect(at).toBeGreaterThan(0)
+    expect(long.body![at + visible.length]).toMatch(/[. ]/)
+  })
+
+  it('handles a record with no body, such as a scraped video row', () => {
+    const media = candidate({ excerpt: 'Address to Parliament · GBC', body: '', fields: [] })
+    expect(bestPassage(media, ['parliament'], 100)).toBe('Address to Parliament · GBC')
+  })
+
+  it('keeps a full excerpt whole rather than truncating needlessly', () => {
+    const short = candidate({ excerpt: 'Bagbin calls for judicial independence.', body: '' })
+    expect(bestPassage(short, ['judicial'], 150)).toBe('Bagbin calls for judicial independence.')
   })
 })

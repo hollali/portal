@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getLibraryCounts } from '@/lib/libraryQueries'
-import { searchArchive, type ScoredCandidate } from '@/lib/askSearch'
+import { bestPassage, searchArchive, type ScoredCandidate } from '@/lib/askSearch'
 import {
   buildVoice,
   resolveQuestion,
@@ -24,12 +24,6 @@ const COUNT_QUESTION = /\b(how many|how much|number of|count of|total number)\b/
 
 /** Turns of history used to resolve a follow-up. */
 const MAX_HISTORY_TURNS = 6
-
-function snippet(text: string, max = 180): string {
-  const clean = text.replace(/\s+/g, ' ').trim()
-  if (clean.length <= max) return clean
-  return clean.slice(0, max).replace(/\s+\S*$/, '') + '…'
-}
 
 function noMatchSummary(terms: string[]): string {
   const shown = terms.slice(0, 3).join(', ')
@@ -318,7 +312,7 @@ export async function POST(request: NextRequest) {
     }
     if (candidate.collection === 'testimonials') {
       testimonials.push({
-        quote: snippet(candidate.excerpt, 160),
+        quote: bestPassage(candidate, [...matched], 160),
         author: candidate.title,
         role: candidate.role ?? null,
       })
@@ -332,7 +326,12 @@ export async function POST(request: NextRequest) {
       title: candidate.title,
       href: candidate.href,
       year: candidate.year,
-      excerpt: candidate.excerpt ? snippet(candidate.excerpt, 150) : null,
+      // The window around the match, not the opening of the record. A hundred and
+      // fifty characters from the top of a long speech is almost never the part
+      // the reader asked about, and a card showing the wrong paragraph is worse
+      // than no card at all: the reader concludes the archive does not cover the
+      // subject, when the subject was in the document the whole time.
+      excerpt: bestPassage(candidate, [...matched], 150) || null,
       hasTranscript: candidate.hasTranscript,
       // Sorted for a stable chip order, and longest-first reads better than
       // query order when one term is a prefix of another.

@@ -89,11 +89,20 @@ export interface CollectionCount {
   collection: string
   label: string
   /**
-   * Records in this collection that satisfy the same bar the results were
-   * selected under: every term, or at least one depending on the mode.
+   * Records in this collection that satisfied the same bar the results were
+   * selected under: every term, or — for a partial answer — enough of them to be
+   * worth showing at all.
+   *
+   * Counted from the surviving pool in the partial case rather than in the
+   * database, because this is the number the page prints as "N records matched"
+   * and the reader has to be able to find N of them on screen.
    */
   count: number
-  /** Records matching any term, reported only when it is a larger number. */
+  /**
+   * Every record mentioning at least one term, counted in the database. Reported
+   * only when it is the larger number, because "these words appear elsewhere in
+   * the archive" is a true and useful thing to say about a partial answer.
+   */
   broader?: number
 }
 
@@ -101,7 +110,7 @@ export interface ArchiveSearchResult {
   mode: AskMatchMode
   terms: string[]
   results: ScoredCandidate[]
-  /** How many records each collection matched, counted in the database. */
+  /** How many records each collection matched, by the bar the results were picked under. */
   collectionCounts: CollectionCount[]
   totalMatched: number
   /** Records matching any term, when that is more than `totalMatched`. */
@@ -399,8 +408,100 @@ export function plainText(markdown: string): string {
     .trim()
 }
 
+/**
+ * The part of a record that actually matched, pulled out of the surrounding text.
+ *
+ * A citation card shows a hundred and fifty characters of a document. For a
+ * long speech, that is almost never the hundred and fifty characters the reader
+ * asked about — it is whatever came first in the file. The reader gets a card
+ * that says "speech on parliamentary independence" above a paragraph about
+ * committee procedure, and concludes the archive does not cover the subject.
+ *
+ * So the window follows the match. This is not summarisation: it is the record's
+ * own words, verbatim, cut at sentence boundaries where one is near.
+ */
+export function bestPassage(candidate: SearchCandidate, terms: string[], max = 180): string {
+  // The body is the record's own words and the likeliest place for the phrase the
+  // reader typed, so it is searched first. The excerpt is the fallback: for
+  // scraped media it is usually the only prose the row carries.
+  const variants = [...new Set(terms.flatMap(t => termVariants(t)).filter(Boolean))]
+  // Word-start match, the same rule `matchTerm` applies, so the window centres on
+  // a word the record actually matched rather than one buried inside another.
+  const patternFor = (list: string[]) =>
+    new RegExp(`(?<![a-zA-Z0-9])(?:${list.map(escapeRegExp).join('|')})`, 'i')
+
+  /**
+   * First hit in the text, preferring the reader's own words over the stems they
+   * expand to. Asking about "independence" and being shown the first sentence
+   * containing "independent" is a worse answer than the sentence that says
+   * "independence" fifty words later.
+   */
+  const hit = (text: string): { at: number } | null => {
+    if (!text || variants.length === 0) return null
+    for (const group of [terms, variants]) {
+      const usable = group.filter(t => /^[a-z0-9]+$/i.test(t))
+      if (usable.length === 0) continue
+      const found = patternFor(usable).exec(text)
+      if (found) return { at: found.index }
+    }
+    return null
+  }
+
+  const body = plainText(candidate.body ?? '')
+  const excerpt = candidate.excerpt ?? ''
+  const inBody = hit(body)
+  const found = inBody ?? hit(excerpt)
+  const text = inBody ? body : excerpt
+  if (!found) return clip(excerpt, max)
+
+  // Bias the window to the text *before* the match: a reader scanning for a phrase
+  // wants the sentence that introduces it, not the one that resumes after it.
+  const start = wordStart(text, Math.max(0, found.at - Math.min(40, Math.floor(max / 4))))
+  const end = windowEnd(text, start, max)
+
+  return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`
+}
+
+/** Back up to the beginning of the word containing `at`, never past the text. */
+function wordStart(text: string, at: number): number {
+  const space = text.lastIndexOf(' ', at)
+  return space > 0 ? space + 1 : 0
+}
+
+/**
+ * Close a window at a sentence boundary if one falls in its second half, so the
+ * passage reads as a complete thought. Otherwise cut at the last space, because
+ * ending mid-word ("the Committe") reads as a rendering fault rather than as an
+ * excerpt.
+ */
+function windowEnd(text: string, start: number, max: number): number {
+  const hard = Math.min(text.length, start + max)
+  if (hard >= text.length) return text.length
+  const stop = text.lastIndexOf('. ', hard)
+  if (stop > start + Math.floor(max / 2)) return stop + 1
+  const space = text.lastIndexOf(' ', hard)
+  return space > start ? space : hard
+}
+
+/** Leading `max` characters, cut at a word boundary. Used when nothing matched. */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text.trim()
+  const cut = text.lastIndexOf(' ', max)
+  return `${text.slice(0, cut > 0 ? cut : max).trim()}…`
+}
+
+/**
+ * Longest title a candidate may carry.
+ *
+ * Scraper headlines run to 150 characters and more with their source and
+ * timestamp appended. Exported because the retrieval eval has to cap its
+ * expectations identically: it identifies records the way the reader sees them,
+ * and a title the reader never sees cannot be an expectation.
+ */
+export const CANDIDATE_TITLE_MAX = 120
+
 function fallbackTitle(parts: Array<[string, string | null | undefined]>, id: number, noun: string): string {
-  for (const [, v] of parts) if (v && String(v).trim()) return String(v).trim().slice(0, 120)
+  for (const [, v] of parts) if (v && String(v).trim()) return String(v).trim().slice(0, CANDIDATE_TITLE_MAX)
   return `${noun} #${id}`
 }
 
@@ -554,11 +655,20 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
 const dedupeKey = (c: SearchCandidate): string =>
   c.collection === 'testimonials' ? `${c.title}|${c.excerpt}` : normaliseTitle(c.title)
 
-const normaliseTitle = (title: string): string =>
-  title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+export function normaliseTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
 
-/** Fetch and normalise every searchable collection in parallel. */
-async function collectCandidates(
+/**
+ * Fetch and normalise every searchable collection in parallel.
+ *
+ * Exported for the retrieval eval in `scripts/ask-eval.ts`, which needs the
+ * candidate pool the database returned rather than only the ten rows that
+ * survived ranking — a change to this query that quietly narrows the pool is
+ * invisible in the final results, and it is the change most likely to cost
+ * recall.
+ */
+export async function collectCandidates(
   terms: string[],
 ): Promise<{ candidates: SearchCandidate[]; totals: CollectionTotal[] }> {
   const perCollection = await Promise.all(
@@ -633,6 +743,55 @@ export function scoreCandidate(candidate: SearchCandidate, terms: string[]): Sco
 const CONTEXT_BOOST = 1.18
 
 /**
+ * How much of the question a partial match has to cover to be shown at all, and
+ * how strong the field it matched in has to be.
+ *
+ * Without a floor the archive answers *anything* — every candidate is, by
+ * definition, a record that matched at least one term, so a question the archive
+ * cannot answer still comes back with cards. "quantum computing policy" returned
+ * the Water Resources ministry milestone, matched on the word "policy" in its
+ * description, and "cattle ranching in the North East" returned the Tamale
+ * secondary school milestone, matched on the region. Both were confident-looking
+ * non-answers.
+ *
+ * Two conditions, and the second is what actually catches them:
+ *
+ *  - coverage — at least half the question's terms. This is stricter than "more
+ *    than one": a one-word question about the North East would then be thrown out
+ *    for naming it once.
+ *  - a strong field — the single most informative match has to sit in a title or
+ *    caption. A record that only matches inside a description or snippet is
+ *    saying something *about* the subject, which is a lead rather than an answer,
+ *    and a lead is not what a mode-'any' result list is for.
+ *
+ * The second condition deliberately cannot apply to a record that matches every
+ * term. Such a record has answered the question even if each term landed in a
+ * description, and dropping it in favour of a stronger title match on half the
+ * question would be exactly the score-over-coverage mistake the ranking below
+ * exists to prevent. A database count can promise zero complete matches while a
+ * fetched row covers every term, so this is reachable rather than theoretical.
+ *
+ * The floor applies to partial answers only. Records satisfying every term have
+ * already answered the question, and it is not this gate's business to second-
+ * guess them.
+ */
+const MIN_PARTIAL_COVERAGE = 0.5
+const STRONG_FIELD_WEIGHT = 5
+
+/** Whether a match is informative enough to put in front of a reader. */
+function isWorthShowing(r: ScoredCandidate, termCount: number): boolean {
+  if (termCount <= 0) return false
+  if (r.matched.size >= termCount) return true
+  if (r.matched.size / termCount < MIN_PARTIAL_COVERAGE) return false
+  return r.candidate.fields.some(
+    f =>
+      f.weight >= STRONG_FIELD_WEIGHT &&
+      f.text &&
+      [...r.matched].some(term => termVariants(term).some(v => matchTerm(f.text, v))),
+  )
+}
+
+/**
  * Score, rank, cap and report. Records satisfying every term are preferred over
  * partial ones so a broad question still returns the most complete answer
  * available rather than whichever collection happened to be largest.
@@ -700,12 +859,23 @@ export function rankCandidates(
     return (b.candidate.year ?? 0) - (a.candidate.year ?? 0)
   })
 
+  // What the reader will actually see. In mode-'any' the floor above decides
+  // what that is, and the counts below are taken from it, because they are the
+  // numbers the page reports and a reader must be able to find them on screen.
+  const shown: ScoredCandidate[] =
+    mode === 'all' ? pool : pool.filter(r => isWorthShowing(r, terms.length))
+  const visible = new Set(shown)
+
   const counts: CollectionCount[] = (totals ?? dedupeTotals(candidates))
     .filter(t => (mode === 'all' ? t.completeTotal : t.matchTotal) > 0)
     .map(t => {
-      const count = mode === 'all' ? t.completeTotal : t.matchTotal
+      const visibleInCollection = scored.filter(
+        r => r.candidate.collection === t.collection && visible.has(r),
+      ).length
+      const count = mode === 'all' ? t.completeTotal : visibleInCollection
       return { collection: t.collection, label: t.label, count, broader: t.matchTotal }
     })
+    .filter(c => c.count > 0)
     .map(c => (c.broader !== undefined && c.broader > c.count ? c : { ...c, broader: undefined }))
     .sort((a, b) => b.count - a.count)
 
@@ -715,7 +885,7 @@ export function rankCandidates(
   const used: Record<string, number> = {}
   const seen = new Set<string>()
   const results: ScoredCandidate[] = []
-  for (const r of pool) {
+  for (const r of shown) {
     // Collapsing duplicates here rather than at fetch time means the strongest
     // version of a record is the one that survives, whatever collection it came
     // from. Counts above still describe every row in the archive.

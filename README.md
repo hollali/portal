@@ -187,6 +187,7 @@ All scripts run against the database via `DATABASE_URL` loaded from `.env`.
 | `npx tsx scripts/migrate-cpa-profile.ts`     | Migrate the CPA Africa Region member profile into the news library. |
 | `npx tsx scripts/backfill-media.ts`          | Back-fill archive occasions and auto-categorise videos/audio. |
 | `npx tsx scripts/backfill-news-html.ts`      | Copy archived news-clipping raw HTML into the database (`raw_html`) and untrack the files. |
+| `npx tsx scripts/ask-eval.ts`               | Retrieval eval for `/ask`: recall@k, MRR, duplicate and refusal rates against the live archive. `report` (default), `snapshot` or `replay`. |
 
 ## Database Schema
 
@@ -278,6 +279,32 @@ npx prisma validate
 ```
 
 The CI pipeline (`.github/workflows/ci.yml`) runs Prisma validation, lint, type-check and a production build on every push and pull request, then deploys the `main` branch to Vercel when the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets are configured. A gated Netlify alternative is included (commented out).
+
+### Retrieval eval for /ask
+
+`/ask` is the one feature whose quality is not visible in the unit tests: they assert that the SQL covers every collection and that a partial answer says so, not that a good question returns the right record. The eval closes that gap.
+
+```bash
+npm run eval:ask              # measure against the live archive
+npm run eval:ask -- --keys    # same, and print what each failing case returned
+npm run eval:ask -- replay    # measure against the frozen snapshot, no database
+npm run eval:ask -- snapshot  # re-freeze the snapshot after changing the queries
+```
+
+- `src/__tests__/fixtures/askGolden.ts` — 59 questions a reader would plausibly type, each naming the records a good answer has to contain. Expectations were written by reading the records, never by recording what the search returns.
+- `src/lib/askEval.ts` — the metrics. Pure; no database.
+- `src/__tests__/askRetrieval.test.ts` — the CI gate, replaying `src/__tests__/fixtures/askSnapshot.json` through `rankCandidates`. The thresholds are floors at the measured baseline, so raise them as defects are fixed.
+- `scripts/ask-eval.ts` — the runner. `report` is the honest number; the replay cannot see a change to the candidate queries, only to the ranking.
+
+Baseline at the time of writing, against the live archive: recall@1 81.1%, recall@5 96.2%, recall@10 98.1%, MRR 0.884, ~206ms p50 per question. Two defects are open and visible in every run:
+
+| Metric        | Now    | Defect                                                                                          |
+|---------------|--------|-------------------------------------------------------------------------------------------------|
+| `no duplicates` | 79.7% | `normaliseTitle` keeps the scraper's provenance suffix, so a clipping stored with and without it survives dedupe and is shown twice. Thirteen of the 59 cases, and almost everything still failing. |
+| `video-fourth-republic` | fail | "fourth" does not reach a headline that writes the ordinal as "4th", and the answer degrades to an unrelated document. |
+
+The eval has already earned its keep twice. It found that the pipeline had no minimum-relevance threshold — every candidate is by definition a record that matched a term, so the archive answered *anything*, including "quantum computing policy" with the Water Resources ministry milestone, matched on the word "policy" in its description. `rankCandidates` now drops a partial match that covers less than half the question's terms or that only ever matched inside a description rather than a title or caption, which took `empty accuracy` from 50% to 100%. It also showed a card's excerpt was the first 150 characters of a record rather than the part the reader asked about; `bestPassage` now windows the record's own words around the match.
+
 
 ## Deployment
 
