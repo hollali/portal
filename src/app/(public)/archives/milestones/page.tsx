@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { BadgeCheck, Milestone as MilestoneIcon, Star } from 'lucide-react'
+import { BadgeCheck, Milestone as MilestoneIcon, Star, type LucideIcon } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: 'The landmark moments of a thirty-year public career.',
 }
 
-const CATEGORY_META: Record<string, { label: string; icon: React.ElementType }> = {
+const CATEGORY_META: Record<string, { label: string; icon: LucideIcon }> = {
   'early-life': { label: 'Early Life', icon: Star },
   education: { label: 'Education', icon: Star },
   career: { label: 'Career & Politics', icon: MilestoneIcon },

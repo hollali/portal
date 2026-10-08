@@ -1,0 +1,8 @@
+{
+  "_comment": "Tune these normalized photo coordinates (0 to 1) against speaker.jpg during local calibration.",
+  "leftEye": { "x": 0.405, "y": 0.405 },
+  "rightEye": { "x": 0.595, "y": 0.405 },
+  "mouthCentre": { "x": 0.5, "y": 0.62 },
+  "mouthWidth": 0.18,
+  "jawLineY": 0.82
+}

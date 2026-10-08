@@ -1,5 +1,8 @@
 "use client";
 
+/* These effects hydrate browser-owned transcript state and persist it externally. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 /**
  * The interactive half of /ask, as a client island under a server-rendered page.
  *
@@ -17,7 +20,8 @@
  * localStorage.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -35,6 +39,14 @@ import {
   Search,
   Send,
   Sparkles,
+  PanelLeft,
+  Pause,
+  Play,
+  SkipForward,
+  UserRound,
+  UserRoundX,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { KIND_ICON } from "@/lib/kindIcon";
 import {
@@ -44,7 +56,151 @@ import {
   describeWindow,
   type AskResult,
 } from "@/lib/askQuery";
+import { guideState } from "@/lib/avatarState";
+import {
+  GUIDE_LINES,
+  guideDateRestriction,
+  guideExcludedCollections,
+  guideRestriction,
+  guideUnsearchableCollections,
+  guideUnmatchedTerms,
+} from "@/lib/guideLines";
+import { speechAvailable } from "./AvatarStage";
+import { buildSpeakCitation, buildSpeakText, speakableForResult } from "@/lib/speakText";
 import { highlightTerms } from "@/lib/askHighlight";
+import { createPresenter, presenterReducer, type PresenterState } from "@/lib/presenter";
+
+/**
+ * The guide is loaded on its own, off the critical path.
+ *
+ * Three is a large dependency and a WebGL context is not free, so a visitor who
+ * asks one question and reads the answer should never pay for a figure they did
+ * not ask for. `ssr: false` because the scene reads `document` and the audio
+ * work has to wait for a gesture anyway.
+ */
+const AvatarStage = dynamic(() => import("./AvatarStage"), {
+  ssr: false,
+  loading: () => (
+    <div
+      style={{
+        padding: "0.8rem",
+        borderRadius: 18,
+        border: "1px solid var(--p-border)",
+        background: "var(--p-surface-2)",
+        fontSize: "0.72rem",
+        color: "var(--p-text-4)",
+      }}
+    >
+      Loading the guide…
+    </div>
+  ),
+});
+
+/**
+ * Where history stops being a column and becomes a drawer.
+ *
+ * This must agree with the `max-xl:` classes on the sidebar and with the shell
+ * geometry in globals.css; all three say 1280px. They are separate expressions
+ * because CSS cannot be read from JS and JS cannot lay out, and the cost of
+ * letting them drift is a reader on a tablet with a 214px transcript.
+ */
+const DRAWER_MAX_WIDTH = "(max-width: 1279px)";
+
+/**
+ * A breakpoint, as something to *behave* differently rather than to lay out.
+ *
+ * Layout here is CSS, so the server and the client agree about it without
+ * either of them knowing the viewport. That matters more than it sounds: this
+ * console used to branch on `isMobile` for widths, paddings and the docked
+ * composer's position, which meant the server shipped the desktop geometry —
+ * the 300px guide rail included — to every phone and then corrected it after
+ * hydration. On the connections this page is built for, that correction is a
+ * visible reflow of the whole console.
+ *
+ * So the only things left that consult the viewport are the ones CSS genuinely
+ * cannot do: closing the history drawer behind a selection, and defaulting it
+ * shut on a phone. Both happen after the reader has interacted.
+ */
+function useNarrowViewport(): boolean {
+  return useSyncExternalStore(
+    (onChange: () => void) => {
+      const mq = window.matchMedia(DRAWER_MAX_WIDTH);
+      if (typeof mq.addEventListener === "function") mq.addEventListener("change", onChange);
+      else if (typeof mq.addListener === "function") mq.addListener(onChange);
+      return () => {
+        if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", onChange);
+        else if (typeof mq.removeListener === "function") mq.removeListener(onChange);
+      };
+    },
+    () => window.matchMedia(DRAWER_MAX_WIDTH).matches,
+    () => false,
+  );
+}
+
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(
+    onChange => {
+      if (typeof window.matchMedia !== "function") return () => undefined;
+      const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    () => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => false,
+  );
+}
+
+/** Remembers a reader's decision to send the guide away, across visits. */
+const GUIDE_DISMISSED_KEY = "askbagbin-guide-dismissed";
+
+/**
+ * The reader's decision, as external state.
+ *
+ * `localStorage` is not available while this renders on the server, and reading
+ * it during render would make the first client render disagree with the markup
+ * that was sent. `useSyncExternalStore` is the way to hold a value like this:
+ * React gets `false` on the server, the real answer on the client, and no
+ * effect has to re-render the console to catch up afterwards. The listener set
+ * exists because two guides can be on the page at once — the rail on a wide
+ * screen and the captions on a narrow one.
+ */
+const guideDismissalListeners = new Set<() => void>();
+
+function readGuideDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(GUIDE_DISMISSED_KEY) === "1";
+  } catch {
+    /* a reader with storage blocked simply sees the guide */
+    return false;
+  }
+}
+
+function subscribeGuideDismissed(onChange: () => void): () => void {
+  guideDismissalListeners.add(onChange);
+  // Another tab deciding the same thing should not leave this one stale.
+  window.addEventListener("storage", onChange);
+  return () => {
+    guideDismissalListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function setGuideDismissed(next: boolean): void {
+  try {
+    if (next) window.localStorage.setItem(GUIDE_DISMISSED_KEY, "1");
+    else window.localStorage.removeItem(GUIDE_DISMISSED_KEY);
+  } catch {
+    /* a reader with storage blocked gets the guide back next time, which is fine */
+  }
+  for (const listener of guideDismissalListeners) listener();
+}
+import ChatHistorySidebar, {
+  createNewChat,
+  loadAllChats,
+  saveAllChats,
+  type PersistedChat,
+} from "./ChatHistorySidebar";
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -361,6 +517,34 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
   );
 }
 
+/** Highlights the word currently reached by speechSynthesis's character index. */
+function PresenterExcerpt({ text, charIndex }: { text: string; charIndex: number }) {
+  if (!text) return null;
+  const index = Math.max(0, Math.min(text.length, charIndex));
+  const before = text.slice(0, index);
+  const relativeStart = before.search(/\S+$/);
+  const start = relativeStart < 0 ? 0 : relativeStart;
+  const relativeEnd = text.slice(index).search(/\s/);
+  const end = relativeEnd < 0 ? text.length : index + relativeEnd;
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark
+        style={{
+          background: "color-mix(in srgb, var(--primary) 34%, transparent)",
+          color: "inherit",
+          borderRadius: 3,
+          padding: "0 0.12em",
+          boxShadow: "0 0 0 1px color-mix(in srgb, var(--primary) 32%, transparent)",
+        }}
+      >
+        {text.slice(start, end)}
+      </mark>
+      {text.slice(end)}
+    </>
+  );
+}
+
 const CHIP: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -369,7 +553,10 @@ const CHIP: React.CSSProperties = {
   fontFamily: "var(--font-mono), monospace",
   borderRadius: 999,
   padding: "0.2rem 0.55rem",
-  border: "1px solid var(--p-border-2)",
+  // Longhand, so callers can override borderColor without mixing shorthand.
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "var(--p-border-2)",
   color: "var(--p-text-3)",
   background: "var(--p-surface-2)",
   whiteSpace: "nowrap",
@@ -583,12 +770,88 @@ function MatchNotice({ result }: { result: AskResult }) {
   );
 }
 
+/**
+ * The sources behind the latest answer, kept beside the transcript on wide
+ * screens so a reader can check a claim without scrolling back to the cards.
+ *
+ * The numbers match the cards and "Copy sources", so the three always agree. It
+ * lists only what the answer already returned: no claim-level mapping is implied.
+ */
+function SourceRail({ citations }: { citations: AskResult["citations"] }) {
+  if (citations.length === 0) return null;
+  return (
+    <section
+      aria-labelledby="ask-source-rail-heading"
+      className="hidden xl:block"
+      style={{ marginTop: "0.9rem", paddingTop: "0.8rem", borderTop: "1px solid var(--p-border)" }}
+    >
+      <h2
+        id="ask-source-rail-heading"
+        style={{
+          margin: 0,
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "0.66rem",
+          fontWeight: 600,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--p-text-4)",
+        }}
+      >
+        Sources for this answer
+      </h2>
+      <ol style={{ listStyle: "none", margin: "0.6rem 0 0", padding: 0, display: "grid", gap: "0.55rem" }}>
+        {citations.map((c, i) => (
+          <li
+            key={c.href}
+            style={{ display: "grid", gridTemplateColumns: "1.4rem minmax(0, 1fr)", gap: "0.5rem", alignItems: "start" }}
+          >
+            <span
+              aria-hidden
+              style={{
+                display: "inline-grid",
+                placeItems: "center",
+                height: 20,
+                borderRadius: 6,
+                background: "color-mix(in srgb, var(--primary) 14%, transparent)",
+                color: "var(--primary)",
+                fontSize: "0.72rem",
+                fontWeight: 700,
+              }}
+            >
+              {i + 1}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <Link
+                href={c.href}
+                style={{ display: "block", color: "var(--p-text-1)", fontSize: "0.8rem", fontWeight: 600, lineHeight: 1.35 }}
+              >
+                {c.title}
+              </Link>
+              <span
+                style={{ fontFamily: "var(--font-mono), monospace", fontSize: "0.66rem", color: "var(--p-text-4)" }}
+              >
+                {c.kindLabel}
+                {c.year != null ? ` · ${c.year}` : ""}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function CitationCard({
   citation,
   allTerms,
+  presentation,
+  number,
 }: {
   citation: AskResult["citations"][number];
   allTerms: string[];
+  presentation?: { active: boolean; index: number; total: number; charIndex: number };
+  /** 1-based position in the answer, matching the numbering in "Copy sources". */
+  number?: number;
 }) {
   const Icon = KIND_ICON[citation.kind] ?? FileText;
   // The card is not itself a link.
@@ -620,19 +883,39 @@ function CitationCard({
   ];
   return (
     <li
+      className="ask-citation-card p-card-lift"
       style={{
         display: "flex",
         flexDirection: "column",
         textDecoration: "none",
         color: "inherit",
+        // The active state lives in CSS (`.ask-citation-card[data-active]`), so this
+        // inline style never changes between renders. Changing a border property
+        // inline on every scroll-driven re-render is what React warned about.
         border: "1px solid var(--p-border)",
         background: "var(--p-surface-2)",
         borderRadius: 12,
         padding: "0.85rem 1rem",
         transition: "border-color 0.2s, transform 0.2s",
       }}
-      className="p-card-lift"
+      data-active={presentation?.active ? "true" : undefined}
+      aria-current={presentation?.active ? "true" : undefined}
     >
+      {presentation?.active && (
+        <span
+          style={{
+            alignSelf: "flex-start",
+            marginBottom: "0.45rem",
+            color: "var(--primary)",
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "0.62rem",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+          }}
+        >
+          Now presenting {presentation.index + 1} of {presentation.total}
+        </span>
+      )}
       <span
         style={{
           display: "inline-flex",
@@ -646,6 +929,24 @@ function CitationCard({
           marginBottom: "0.4rem",
         }}
       >
+        {number !== undefined && (
+          <span
+            aria-label={`Source ${number}`}
+            style={{
+              display: "inline-grid",
+              placeItems: "center",
+              minWidth: 20,
+              height: 20,
+              padding: "0 0.3rem",
+              borderRadius: 6,
+              background: "color-mix(in srgb, var(--primary) 14%, transparent)",
+              color: "var(--primary)",
+              fontWeight: 700,
+            }}
+          >
+            {number}
+          </span>
+        )}
         <Icon size={13} aria-hidden />
         {citation.kindLabel}
         {citation.year != null && (
@@ -675,7 +976,14 @@ function CitationCard({
             color: "var(--p-text-3)",
           }}
         >
-          <Highlight text={citation.excerpt} terms={allTerms} />
+           {presentation?.active ? (
+             <PresenterExcerpt
+               text={citation.excerpt}
+               charIndex={Math.max(0, presentation.charIndex - (buildSpeakCitation(citation)?.lead.length ?? 0) - 2)}
+             />
+           ) : (
+             <Highlight text={citation.excerpt} terms={allTerms} />
+           )}
         </span>
       )}
       <span
@@ -944,6 +1252,7 @@ function AssistantReply({
   onFollowUp,
   copied,
   busy,
+  presentation,
 }: {
   result?: AskResult;
   failed?: boolean;
@@ -954,6 +1263,7 @@ function AssistantReply({
   copied: boolean;
   /** A search is in flight, so these would be dropped on the floor. */
   busy?: boolean;
+  presentation?: PresenterState;
 }) {
   const retryButton = (label: string, icon: React.ReactNode) =>
     onRetry && (
@@ -1113,9 +1423,41 @@ function AssistantReply({
               gap: "0.6rem",
             }}
           >
-            {result.citations.map(c => (
-              <CitationCard key={c.href} citation={c} allTerms={result.matchedTerms} />
-            ))}
+            {result.citations.map((c, index) => {
+              const presenting = presentation && presentation.visibleCards.length < result.citations.length;
+              if (presenting && !presentation.visibleCards.includes(index)) {
+                return (
+                  <li
+                    key={c.href}
+                    aria-hidden
+                    style={{
+                      minHeight: 92,
+                      border: "1px dashed var(--p-border-2)",
+                      borderRadius: 12,
+                      background: "color-mix(in srgb, var(--p-surface-2) 55%, transparent)",
+                    }}
+                  />
+                );
+              }
+              return (
+                <CitationCard
+                  key={c.href}
+                  citation={c}
+                  number={index + 1}
+                  allTerms={result.matchedTerms}
+                  presentation={
+                    presentation && presentation.activeIndex === index
+                      ? {
+                          active: true,
+                          index,
+                          total: result.citations.length,
+                          charIndex: presentation.spokenCharIndex,
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })}
           </ul>
         </>
       )}
@@ -1327,7 +1669,26 @@ function AssistantReply({
   );
 }
 
-export default function AskConsole({ initialQuery = null }: { initialQuery?: string | null }) {
+export default function AskConsole({
+  initialQuery = null,
+  guide = false,
+  portrait = false,
+}: {
+  initialQuery?: string | null;
+  /**
+   * Whether the animated guide is allowed on this page at all. Resolved on the
+   * server from a setting, so the Speaker's office can have the likeness removed
+   * without a deploy. Defaults to false here so a caller that forgets it cannot
+   * put a presenter on the page by accident.
+   */
+  guide?: boolean;
+  /**
+   * Whether the guide may show his photograph. Off until the Speaker's office has
+   * approved the likeness in writing. With it off, the guide still speaks its
+   * captions and presents excerpts, but no face is drawn.
+   */
+  portrait?: boolean;
+}) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState("");
@@ -1335,9 +1696,43 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>(ASK_SUGGESTIONS.slice(0, 3));
+  const [chats, setChats] = useState<PersistedChat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const isMobile = useNarrowViewport();
+  // `null` means "the reader has not said", and the answer follows the viewport:
+  // history is a column beside the transcript on a wide screen and a drawer over
+  // it on a phone. Deriving it beats syncing it in an effect, which is both an
+  // extra render on every /ask load and a window where the two disagree — and it
+  // has the better behaviour at the edges, since turning a phone sideways no
+  // longer slams the drawer shut behind somebody reading a citation.
+  const [sidebarChoice, setSidebarChoice] = useState<boolean | null>(null);
+  // Keep the reading surface primary. History is available from the toolbar and
+  // opens on demand instead of occupying the first viewport by default.
+  const sidebarOpen = sidebarChoice ?? false;
+  const setSidebarOpen = useCallback((next: boolean) => setSidebarChoice(next), []);
+  // The guide reports its own speech state back, because the page — not the
+  // figure — decides which pose it is in: speaking outranks searching, so a
+  // follow-up fired mid-sentence must not flip the head to a thinking tilt.
+  const [guideSpeaking, setGuideSpeaking] = useState(false);
+  const [presenter, setPresenter] = useState<PresenterState>(() => createPresenter());
+  const presenterResultRef = useRef<AskResult | undefined>(undefined);
+  const [presentationAction, setPresentationAction] = useState<{
+    type: "stop" | "pause" | "resume";
+    token: number;
+  }>({ type: "stop", token: 0 });
+  const reducedMotion = useReducedMotion();
+  const [captionOnly, setCaptionOnly] = useState(() => !speechAvailable());
+  // A reader's own choice to send the guide away. Separate from `guide`, which
+  // is the site's decision: this one is reversible and remembered.
+  const guideDismissed = useSyncExternalStore(
+    subscribeGuideDismissed,
+    readGuideDismissed,
+    () => false,
+  );
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // The latest transcript, for `ask` to read without taking `messages` as a
   // dependency. Closing over `messages` directly would hand every call site a
@@ -1354,6 +1749,58 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   // withdrawn, the second earns a "search stopped" turn in the transcript.
   const supersededRef = useRef(new Set<AbortController>());
   const [docked, setDocked] = useState(false);
+  // The docked bar is lifted out of the flow, so something has to stand in for
+  // it. That used to be a hardcoded 64 or 78 pixels, which was wrong the moment
+  // the box grew a line — a reader who had expanded the textarea to write a long
+  // question would lose the last citation behind their own composer. Measuring
+  // it is the whole fix.
+  const [dockMetrics, setDockMetrics] = useState({ height: 0, left: 0, width: 0 });
+
+  // Where the docked bar has to sit, measured off the transcript rather than
+  // guessed from the viewport.
+  //
+  // The obvious arithmetic — centre of the viewport, pushed right by half the
+  // rail — is only correct while the transcript is flush against the rail's
+  // inner edge. It is centred in whatever space is left over, so the moment
+  // there is a history column beside it too, the guess is off by however much
+  // `margin: auto` moved the column. That is exactly the class of bug nobody
+  // notices by eye, because the bar still looks plausible over a citation and
+  // is only measurably wrong. Measured, it cannot drift.
+  useEffect(() => {
+    const form = composerRef.current;
+    const main = mainRef.current;
+    if (!form || !main) return;
+
+    let last = "";
+    const measure = () => {
+      const height = form.getBoundingClientRect().height;
+      const padLeft = parseFloat(getComputedStyle(main).paddingLeft) || 0;
+      const padRight = parseFloat(getComputedStyle(main).paddingRight) || 0;
+      // Layout, not viewport: `offsetLeft` is unaffected by scrolling, so this
+      // does not need to re-run as the reader moves down the transcript. The
+      // content box rather than the border box, so the docked bar's edges line
+      // up with the text and the citation cards instead of hanging 24px into
+      // the gutters on each side.
+      const left = main.offsetLeft + padLeft;
+      const width = Math.max(0, main.offsetWidth - padLeft - padRight);
+      const next = `${Math.round(height)}:${Math.round(left)}:${Math.round(width)}`;
+      // Re-rendering a transcript on every scroll frame is not worth a
+      // sub-pixel difference.
+      if (next === last) return;
+      last = next;
+      setDockMetrics({ height, left, width });
+    };
+
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(form);
+    observer?.observe(main);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
   // Whether the reader is already at the end of the page. Only then is a new
   // turn worth pulling them to; scrolling someone out of a citation they were
   // mid-way through reading is the worst thing this page could do. Starts false
@@ -1481,33 +1928,54 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   );
 
   useEffect(() => {
-    // Reading localStorage must happen after mount: the server has no access to
-    // it, so doing this in a lazy initialiser would mismatch on hydration.
     const restored = loadHistory();
-    // Seed the transcript ref here rather than leaving it to the effect that
-    // keeps it in sync. This effect calls `ask` below, and effects run in
-    // declaration order, so that one has not happened yet — which would mean a
-    // question arriving from a shared link could not resolve against the
-    // conversation this reader already had open.
     messagesRef.current = restored;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages(restored);
     setHydrated(true);
 
-    // A shared link outranks a saved transcript: the URL is an explicit request
-    // for that question. Re-asking the turn already at the top of the history
-    // would only duplicate it.
     const pending = initialQuery?.trim();
     const lastAsked = [...restored].reverse().find(m => m.role === "user")?.content;
     if (pending && pending !== lastAsked) void ask(pending);
 
     bootedRef.current = true;
-    // `ask` is deliberately not a dependency: re-running this would re-ask the
-    // shared question on every turn.
+  }, []);
+
+  // Load chat history from separate storage
+  useEffect(() => {
+    const loaded = loadAllChats();
+    setChats(loaded);
+    if (loaded.length > 0) {
+      const active = loaded[0];
+      setActiveChatId(active.id);
+      const norm = active.messages.map(m => ({ ...m, result: normaliseResult(m.result) }));
+      setMessages(norm as ChatMsg[]);
+      messagesRef.current = norm as ChatMsg[];
+    } else {
+      const newChat = createNewChat();
+      setChats([newChat]);
+      setActiveChatId(newChat.id);
+      // A shared /ask?q=... starts its request in the history bootstrap effect.
+      // Do not clear that newly-added question when the separate chat-history
+      // effect creates the first local chat.
+      if (!initialQuery) {
+        setMessages([]);
+        messagesRef.current = [];
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    if (!hydrated || !activeChatId) return;
+    setChats(prev => {
+      const next = prev.map(c => (c.id === activeChatId ? { ...c, messages, updatedAt: Date.now() } : c));
+      saveAllChats(next);
+      return next;
+    });
+  }, [messages, hydrated, activeChatId]);
+
+  useEffect(() => {
+
     if (!hydrated) return;
     try {
       if (messages.length > 0) {
@@ -1570,6 +2038,16 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
+    // An empty field is sized by its `min-height`, never by a measurement.
+    // Measuring an empty textarea counts the placeholder, which wraps onto a
+    // second line on a phone — so the resting box was 74px tall and dropped to
+    // 48px the instant the first character landed, shrinking the composer under
+    // the reader's thumb halfway through writing the question.
+    if (!input) {
+      el.style.height = "";
+      el.style.overflowY = "hidden";
+      return;
+    }
     el.style.height = "auto";
     const next = Math.min(el.scrollHeight, COMPOSER_MAX_H);
     el.style.height = `${next}px`;
@@ -1642,6 +2120,63 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
     return () => controller.abort();
   }, []);
 
+  const showGuide = guide && !guideDismissed;
+  const presentationEnabled = showGuide;
+
+  /**
+   * The excerpt the guide may read: the strongest citation of the newest answer.
+   *
+   * Built by `buildSpeakText`, which has no access to `AskResult.reading`. That
+   * is the whole reason the guide cannot be made to say something generated: the
+   * text it is handed is assembled from a stored record and nothing else.
+   *
+   * Not memoised: this walks the transcript backwards and stops at the newest
+   * answer, which for a reader with a long session is a few dozen string
+   * identity checks — cheaper than the bookkeeping needed to remember them.
+   */
+  const speakLine = (() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.role !== "assistant" || !m.result) continue;
+      const citation = speakableForResult(m.result);
+      if (!citation) return null;
+      return {
+        text: buildSpeakText(m.result.citations[0]),
+        source: citation.source,
+        href: citation.href,
+      };
+    }
+    return null;
+  })();
+
+  const speakSource =
+    speakLine?.source ? { title: speakLine.source, href: speakLine.href } : null;
+  const poseResult = [...messages].reverse().find(m => m.role === "assistant")?.result;
+  const presenterHasSpeech =
+    presenter.phase === "intro" ||
+    presenter.phase === "limitations" ||
+    (presenter.phase === "presenting" &&
+      presenter.activeIndex !== null &&
+      Boolean(poseResult?.citations[presenter.activeIndex] && buildSpeakText(poseResult.citations[presenter.activeIndex])));
+
+  const guidePose = guideState({
+    composing: input.trim().length > 0,
+    searching: loading,
+    speaking: guideSpeaking || presenterHasSpeech,
+    searched: messages.some(m => m.role === "assistant"),
+    hasResult: messages.some(m => m.role === "assistant" && (m.result?.citations.length ?? 0) > 0),
+  });
+
+  /** Sends the guide away for this reader, remembering the choice. */
+  const dismissGuide = () => {
+    setGuideDismissed(true);
+    setGuideSpeaking(false);
+  };
+
+  const restoreGuide = () => {
+    setGuideDismissed(false);
+  };
+
   const reset = () => {
     abortRef.current?.abort();
     setMessages([]);
@@ -1697,6 +2232,93 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
   // The one line a screen reader hears for each completed turn. Reading the
   // full answer aloud is the alternative, and it is unusable.
   const lastResult = [...messages].reverse().find(m => m.role === "assistant")?.result;
+  const limitationLines = useMemo(() => {
+    if (!lastResult) return [];
+    const lines: string[] = [];
+    if (lastResult.collections && lastResult.collections.length > 0) {
+      lines.push(guideRestriction(describeCollections(lastResult.collections)));
+    }
+    if (lastResult.period) {
+      const label = lastResult.period.label || describeWindow(lastResult.period, [], "filtered").replace(/^[^.]+ /, "");
+      if (label) lines.push(guideDateRestriction(label));
+    }
+    if (lastResult.undated && lastResult.undated.length > 0) {
+      lines.push(guideExcludedCollections(lastResult.undated));
+    }
+    if (lastResult.unsearchable && lastResult.unsearchable.length > 0) {
+      lines.push(guideUnsearchableCollections(lastResult.unsearchable));
+    }
+    if ((lastResult.unmatched ?? []).length > 0) {
+      lines.push(guideUnmatchedTerms(lastResult.unmatched ?? []));
+    } else if (lastResult.match === "none") {
+      lines.push(GUIDE_LINES.noResult);
+    }
+    return lines;
+  }, [lastResult]);
+  const presenterInput = useMemo(
+    () => ({ cardCount: lastResult?.citations.length ?? 0, limitationCount: limitationLines.length }),
+    [lastResult?.citations.length, limitationLines.length],
+  );
+
+  useEffect(() => {
+    if (!presentationEnabled) {
+      presenterResultRef.current = undefined;
+      setPresenter(createPresenter());
+      return;
+    }
+    if (lastResult === presenterResultRef.current) return;
+    presenterResultRef.current = lastResult;
+    setPresenter(
+      lastResult
+        ? presenterReducer(presenterInput, createPresenter(), { type: "START" })
+        : createPresenter(),
+    );
+  }, [lastResult, presenterInput, presentationEnabled]);
+
+  const activePresentationCitation =
+    lastResult && presenter.phase === "presenting" && presenter.activeIndex !== null
+      ? lastResult.citations[presenter.activeIndex]
+      : null;
+  const presentationText = presentationEnabled && lastResult
+    ? presenter.phase === "done"
+      ? undefined
+      : presenter.phase === "intro"
+      ? GUIDE_LINES.introducing
+      : activePresentationCitation
+        ? buildSpeakText(activePresentationCitation)
+        : presenter.phase === "limitations" && presenter.limitationIndex !== null
+          ? limitationLines[presenter.limitationIndex] ?? null
+          : null
+    : undefined;
+  const presentationSpeaker = presenter.phase === "presenting" ? "speaker" : "guide";
+  const presentationSource = presentationEnabled && activePresentationCitation
+    ? { title: activePresentationCitation.title, href: activePresentationCitation.href }
+    : speakSource;
+  const issuePresentationAction = (type: "stop" | "pause" | "resume") => {
+    setPresentationAction(current => ({ type, token: current.token + 1 }));
+  };
+  const updatePresenter = (event: Parameters<typeof presenterReducer>[2]) => {
+    setPresenter(current => presenterReducer(presenterInput, current, event));
+  };
+
+  useEffect(() => {
+    if (!presentationEnabled || !lastResult) return;
+    if (reducedMotion) {
+      setPresenter(current => presenterReducer(presenterInput, current, { type: "SHOW_ALL" }));
+      issuePresentationAction("stop");
+    }
+  }, [lastResult, presenterInput, presentationEnabled, reducedMotion]);
+
+  useEffect(() => {
+    if (!captionOnly || presenter.phase === "done" || presenter.phase === "idle") return;
+    if (presenter.phase === "presenting" && activePresentationCitation && !buildSpeakText(activePresentationCitation)) {
+      const timer = window.setTimeout(() => updatePresenter({ type: "SKIP" }), 250);
+      return () => window.clearTimeout(timer);
+    }
+    const delay = presenter.phase === "intro" ? 450 : 850;
+    const timer = window.setTimeout(() => updatePresenter({ type: "SKIP" }), delay);
+    return () => window.clearTimeout(timer);
+  }, [captionOnly, presenter.phase, presenter.activeIndex, presenter.limitationIndex]);
   const lastAnswer = lastResult
     ? lastResult.match === "none"
       ? "No answer found."
@@ -1708,18 +2330,291 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
     ? lastResult.citations.length + lastResult.timeline.length + lastResult.testimonials.length
     : 0;
 
+  // The desktop side column shows the guide when it is on, and otherwise the
+  // sources for the latest answer, so a reader keeps the evidence in view.
+  const railCitations = lastResult && lastResult.citations.length > 0 ? lastResult.citations : [];
+  const showSide = showGuide || railCitations.length > 0;
+
+  const handleNewChat = () => {
+    const newChat = createNewChat();
+    setChats(prev => [newChat, ...prev]);
+    setActiveChatId(newChat.id);
+    abortRef.current?.abort();
+    setMessages([]);
+    setInput("");
+    setCopiedIndex(null);
+    setLinkCopied(false);
+    setLoading(false);
+    messagesRef.current = [];
+    writeQueryParam(null);
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    inputRef.current?.focus();
+  };
+
+  const handleSelectChat = (chatId: string) => {
+      const chat = chats.find(c => c.id === chatId);
+    if (!chat) return;
+    abortRef.current?.abort();
+    const norm = chat.messages.map(m => ({ ...m, result: normaliseResult(m.result) }));
+    setMessages(norm as ChatMsg[]);
+    messagesRef.current = norm as ChatMsg[];
+    setActiveChatId(chatId);
+    setLoading(false);
+    setInput("");
+    setCopiedIndex(null);
+    setLinkCopied(false);
+    writeQueryParam(null);
+    inputRef.current?.focus();
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    setChats(prev => {
+      const next = prev.filter(c => c.id !== chatId);
+      saveAllChats(next);
+      if (activeChatId === chatId) {
+        const nextActive = next[0] || createNewChat();
+        if (!next.find(c => c.id === nextActive.id)) {
+          const final = next.length === 0 ? [nextActive] : next;
+          setActiveChatId(nextActive.id);
+          const norm0 = nextActive.messages.map(m => ({ ...m, result: normaliseResult(m.result) }));
+          setMessages(norm0 as ChatMsg[]);
+          messagesRef.current = norm0 as ChatMsg[];
+          return final;
+        }
+        setActiveChatId(nextActive.id);
+        const norm = nextActive.messages.map(m => ({ ...m, result: normaliseResult(m.result) }));
+        setMessages(norm as ChatMsg[]);
+        messagesRef.current = norm as ChatMsg[];
+      }
+      return next;
+    });
+  };
+
   return (
-    <main
-      style={{
-        flex: 1,
-        maxWidth: 1000,
-        margin: "0 auto",
-        width: "100%",
-        padding: "1.25rem 1.5rem 2rem",
-        display: "flex",
-        flexDirection: "column",
-      }}
+    <div
+      className="ask-shell ask-console relative flex w-full min-w-0 flex-1 flex-col xl:flex-row"
+      // The shell's widths live in globals.css, keyed off these two flags. They
+      // are attributes rather than inline custom properties because whether the
+      // rail exists is a question about the viewport as well as about the
+      // reader's settings, and a media query cannot read an inline style.
+      data-guide={showSide ? "on" : "off"}
+      data-history={sidebarOpen ? "on" : "off"}
     >
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-60 bg-[color-mix(in_srgb,var(--p-bg)_60%,transparent)] backdrop-blur-[4px] xl:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      {sidebarOpen && (
+        <ChatHistorySidebar
+          chats={chats}
+          activeChatId={activeChatId}
+          onSelectChat={(id) => {
+            handleSelectChat(id);
+            if (isMobile) setSidebarOpen(false);
+          }}
+          onNewChat={() => {
+            handleNewChat();
+            if (isMobile) setSidebarOpen(false);
+          }}
+          onDeleteChat={handleDeleteChat}
+          className="w-full transition-transform duration-200 ease-out sm:max-w-[15rem] max-xl:fixed max-xl:inset-y-0 max-xl:left-0 max-xl:z-70 max-xl:max-w-[90vw] max-xl:shadow-xl"
+        />
+      )}
+      {/* The guide sits in its own column to the right of the transcript, not
+          above it and not inside an answer. Two reasons, and they are the same
+          reason: the answer and its citations are what the visitor came for, and
+          anything that shares space with them is competing for it. A rail stays
+          out of the reading path, survives a long transcript without being
+          scrolled away, and can be dismissed without touching anything a
+          citation depends on.
+
+          On a phone the rail is not a rail. The figure is skipped entirely —
+          see `showFigure` below — because a visitor on mobile data should not
+          download a mesh to read a caption. */}
+      {/* One guide, placed by CSS rather than by JavaScript. It is ordered
+          ahead of the transcript on a phone and into a sticky column beside it
+          on a wide screen, from a single instance — rendering it twice and
+          hiding one with CSS would mean two WebGL contexts and two voices, and
+          a reader paying for the bytes of the one they cannot see. */}
+      {/* On a phone the rail is a fixed-height bar. The caption genuinely
+          changes length — a one-line greeting before anything is asked, an
+          excerpt afterwards — and letting that happen above the transcript
+          moved the reader's whole page down by 160px the moment an answer
+          arrived, which was the single largest source of layout shift on the
+          route. A bar cannot grow, so nothing below it moves. */}
+      {showGuide && (
+        <aside
+          className="ask-presenter-guide ask-side order-first flex h-[15rem] w-full shrink-0 flex-col px-4 pb-0 mb-2 lg:order-none lg:sticky lg:top-5 lg:h-auto lg:w-[300px] lg:self-start lg:px-0 lg:pb-0 lg:mb-0 lg:pt-5"
+        >
+          <AvatarStage
+            className="ask-guide-stage"
+            state={guidePose}
+            figureClassName="ask-guide-figure"
+            showFigure={portrait}
+            text={speakLine?.text ?? ""}
+            source={presentationSource}
+            presentationText={presentationText}
+            presentationSpeaker={presentationSpeaker}
+            onSpeechBoundary={charIndex =>
+              setPresenter(current => presenterReducer(presenterInput, current, { type: "SPEECH_BOUNDARY", charIndex }))
+            }
+            onSpeechEnd={() =>
+              updatePresenter({ type: "SPEECH_END" })
+            }
+            onSpeechError={() => {
+              setCaptionOnly(true);
+              issuePresentationAction("stop");
+            }}
+            presentationAction={presentationAction}
+            onSpeakingChange={setGuideSpeaking}
+          />
+          <div className="ask-presenter-controls" aria-label="Presenter controls">
+            <button
+              type="button"
+              onClick={() => {
+                updatePresenter({ type: "SKIP" });
+                issuePresentationAction("stop");
+              }}
+              aria-label="Skip presentation"
+              title="Skip"
+            >
+              <SkipForward size={13} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextPaused = !presenter.paused;
+                updatePresenter({ type: nextPaused ? "PAUSE" : "RESUME" });
+                issuePresentationAction(nextPaused ? "pause" : "resume");
+              }}
+              aria-label={presenter.paused ? "Resume presentation" : "Pause presentation"}
+              title={presenter.paused ? "Resume" : "Pause"}
+            >
+              {presenter.paused ? <Play size={13} aria-hidden /> : <Pause size={13} aria-hidden />}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                updatePresenter({ type: "REPLAY" });
+                issuePresentationAction("stop");
+              }}
+              aria-label="Replay presentation"
+              title="Replay"
+            >
+              <RotateCcw size={13} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                updatePresenter({ type: "SHOW_ALL" });
+                issuePresentationAction("stop");
+              }}
+              aria-label="Show everything now"
+              title="Show everything"
+            >
+              <span aria-hidden>All</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                updatePresenter({ type: "SET_MUTED", muted: !presenter.muted });
+                if (!presenter.muted) issuePresentationAction("stop");
+              }}
+              aria-label={presenter.muted ? "Turn narration on" : "Mute narration"}
+              title={presenter.muted ? "Unmute" : "Mute"}
+            >
+              {presenter.muted ? <VolumeX size={13} aria-hidden /> : <Volume2 size={13} aria-hidden />}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={dismissGuide}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              marginTop: "0.5rem",
+              flexShrink: 0,
+              alignSelf: "flex-start",
+              minHeight: HIT,
+              padding: "0 0.6rem",
+              background: "none",
+              border: "1px solid var(--p-border-2)",
+              borderRadius: 999,
+              color: "var(--p-text-4)",
+              cursor: "pointer",
+              fontSize: "0.72rem",
+            }}
+          >
+            <UserRoundX size={12} aria-hidden />
+            <span>Hide the guide</span>
+          </button>
+          <SourceRail citations={railCitations} />
+        </aside>
+      )}
+      {!showGuide && railCitations.length > 0 && (
+        <aside
+          aria-label="Sources for the latest answer"
+          className="ask-side hidden xl:flex flex-col w-[16rem] shrink-0 pt-5 xl:sticky xl:top-5 xl:self-start xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto"
+        >
+          <SourceRail citations={railCitations} />
+        </aside>
+      )}
+      <main
+        ref={mainRef}
+        className="mx-auto flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] transition-[max-width] duration-200 ease-out sm:px-6 sm:pb-8 lg:max-w-[var(--ask-col)]"
+      >
+        {guide && guideDismissed && (
+          <button
+            type="button"
+            onClick={restoreGuide}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              alignSelf: "flex-start",
+              minHeight: HIT,
+              marginBottom: "0.65rem",
+              padding: "0 0.6rem",
+              background: "none",
+              border: "none",
+              color: "var(--p-text-4)",
+              cursor: "pointer",
+              fontSize: "0.75rem",
+            }}
+          >
+            <UserRound size={13} aria-hidden />
+            <span>Show the guide</span>
+          </button>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.65rem" }}>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              background: "none",
+              border: "none",
+              color: "var(--p-text-3)",
+              cursor: "pointer",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              minHeight: HIT,
+              padding: "0 0.6rem",
+            }}
+            aria-label={sidebarOpen ? "Hide history" : "Show history"}
+          >
+            <PanelLeft size={16} aria-hidden />
+            <span>{sidebarOpen ? "Hide history" : "Show history"}</span>
+          </button>
+        </div>
       {messages.length > 0 && (
         <div
           style={{
@@ -1803,32 +2698,29 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
           e.preventDefault();
           void ask(input);
         }}
+        className={
+          docked
+             ? // Pushed right by half the guide rail so the docked box stays over
+              // the transcript it belongs to — centring it on the viewport would
+              // park it half under the figure for the whole length of a long
+              // answer. Both numbers come from the container's custom
+              // properties, so this follows the rail instead of assuming it.
+               "ask-docked ask-composer fixed bottom-[max(0.7rem,env(safe-area-inset-bottom))] left-1/2 z-45 flex w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-2 rounded-3xl border border-[var(--p-border-3)] bg-[color-mix(in_srgb,var(--p-bg)_94%,transparent)] p-[0.4rem] shadow-[var(--p-shadow)] backdrop-blur-[16px] transition-[transform,box-shadow] duration-200 ease-out"
+            : // `w-full` is load-bearing, not decoration. `main` is a column flex
+              // container, and an `auto` margin on a flex item replaces the
+              // cross-axis stretch: the form shrink-to-fit to its contents and
+              // `max-width` capped it at 288px — a 234px field on a 1440px
+              // screen. A definite width plus auto margins centres it without
+              // giving up the stretch.
+               "ask-composer flex w-full items-end gap-2.5 transition-[box-shadow] duration-200 ease-out mx-auto"
+        }
         style={
           docked
-            ? {
-                position: "fixed",
-                left: "50%",
-                bottom: "max(0.7rem, env(safe-area-inset-bottom))",
-                transform: "translateX(-50%)",
-                width: "min(1000px, calc(100vw - 2rem))",
-                zIndex: 45,
-                display: "flex",
-                alignItems: "flex-end",
-                gap: "0.5rem",
-                padding: "0.4rem",
-                background: "color-mix(in srgb, var(--p-bg) 92%, transparent)",
-                backdropFilter: "blur(14px)",
-                WebkitBackdropFilter: "blur(14px)",
-                border: "1px solid var(--p-border-3)",
-                borderRadius: 24,
-                boxShadow: "var(--p-shadow)",
-              }
-            : {
-                display: "flex",
-                alignItems: "flex-end",
-                gap: "0.6rem",
-                transition: "box-shadow 0.2s ease",
-              }
+            ? ({
+                "--dock-left": `${dockMetrics.left}px`,
+                "--dock-width": `${dockMetrics.width}px`,
+              } as React.CSSProperties)
+            : { maxWidth: "min(48rem, 100%)" }
         }
       >
         <label htmlFor="ask-question" className="sr-only">
@@ -1866,17 +2758,32 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
             background: "var(--p-surface)",
             border: "1px solid var(--p-border-3)",
             borderRadius: 20,
-            padding: "0.7rem 1.1rem",
-            minHeight: 46,
+            padding: "0.7rem 1.05rem",
+            // 50, not 44. The old floor was the WCAG minimum, which is fine for
+            // a checkbox and mean for the one control on the page a reader has
+            // to aim a thumb at. It is also exactly one line of 16px/1.6 text
+            // plus padding and border, so the field does not jump by a couple of
+            // pixels the moment the first character arrives.
+            minHeight: 50,
             maxHeight: COMPOSER_MAX_H,
             color: "var(--p-text-1)",
-            fontSize: "0.95rem",
-            lineHeight: 1.5,
+            // 16px exactly, not 15.6. iOS Safari zooms the whole viewport on
+            // focus for anything under 16 and does not zoom back out when the
+            // field loses focus, which leaves the reader stranded mid-page on a
+            // question they have not sent yet.
+            fontSize: "1rem",
+            lineHeight: 1.6,
             fontFamily: "inherit",
             resize: "none",
             overflowY: "hidden",
+            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+            transition: "border-color 150ms ease-out, box-shadow 150ms ease-out",
           }}
+          aria-describedby="ask-composer-help"
         />
+        <span id="ask-composer-help" className="sr-only">
+          Press Enter to send, Shift+Enter for a new line.
+        </span>
         {loading ? (
           <button
             type="button"
@@ -1888,14 +2795,16 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
               border: "1px solid var(--p-border-3)",
               color: "var(--p-text-1)",
               borderRadius: 999,
-              width: 46,
-              height: 46,
+              width: 44,
+              height: 44,
               flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
+              transition: "transform 100ms ease-out",
             }}
+            onMouseDown={(e) => e.preventDefault()}
           >
             <span
               aria-hidden
@@ -1912,16 +2821,17 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
               border: "none",
               color: "var(--primary-fg)",
               borderRadius: 999,
-              width: 46,
-              height: 46,
+              width: 44,
+              height: 44,
               flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: input.trim() ? "pointer" : "not-allowed",
               opacity: input.trim() ? 1 : 0.5,
-              transition: "opacity 0.2s ease",
+              transition: "opacity 150ms ease-out, transform 100ms ease-out",
             }}
+            onMouseDown={(e) => e.preventDefault()}
           >
             <Send size={18} aria-hidden />
           </button>
@@ -1981,6 +2891,7 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
 
         {emptyChat && (
           <div
+            className="ask-empty-state"
             style={{
               textAlign: "center",
               padding: "2.5rem 1rem",
@@ -2005,51 +2916,58 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
 
         {messages.map((m, i) =>
           m.role === "user" ? (
-            <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div key={i} className="ask-message ask-message-user" style={{ display: "flex", justifyContent: "flex-end" }}>
               <div
-                style={{
-                  maxWidth: "min(82%, 32rem)",
+                 className="ask-user-bubble"
+                 style={{
+                  maxWidth: "min(85%, 38rem)",
                   background: "var(--primary)",
                   color: "var(--primary-fg)",
-                  borderRadius: 18,
-                  borderBottomRightRadius: 6,
-                  padding: "0.8rem 1.1rem",
-                  fontSize: "0.925rem",
-                  lineHeight: 1.65,
+                  borderRadius: 20,
+                  borderBottomRightRadius: 8,
+                  padding: "0.75rem 1rem",
+                  fontSize: "0.9375rem",
+                  lineHeight: 1.7,
                   whiteSpace: "pre-wrap",
                   overflowWrap: "anywhere",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+                  transition: "box-shadow 150ms ease-out",
                 }}
               >
                 {m.content}
               </div>
             </div>
           ) : (
-            <div key={i} style={{ display: "flex", gap: "0.6rem" }}>
+            <div key={i} className="ask-message ask-message-assistant" style={{ display: "flex", gap: "0.6rem" }}>
               <span style={AVATAR} aria-hidden>
                 <Sparkles size={15} />
               </span>
               <div
-                style={{
-                  maxWidth: "min(88%, 46rem)",
+                 className="ask-assistant-bubble"
+                 style={{
+                  maxWidth: "min(92%, 48rem)",
                   minWidth: 0,
                   background: "var(--p-surface)",
                   border: "1px solid var(--p-border)",
-                  borderRadius: 18,
-                  borderTopLeftRadius: 6,
-                  padding: "0.9rem 1.1rem",
-                  fontSize: "0.925rem",
-                  lineHeight: 1.65,
+                  borderRadius: 20,
+                  borderTopLeftRadius: 8,
+                  padding: "0.875rem 1.125rem",
+                  fontSize: "0.9375rem",
+                  lineHeight: 1.7,
                   color: "var(--p-text-1)",
+                  boxShadow: "var(--p-shadow)",
+                  transition: "border-color 150ms ease-out, box-shadow 150ms ease-out",
                 }}
               >
-                <AssistantReply
+                 <AssistantReply
                   result={m.result}
                   failed={m.failed}
                   stopped={m.stopped}
                   copied={copiedIndex === i}
                   onCopy={text => onCopy(text, i)}
                   onFollowUp={q => void ask(q)}
-                  busy={loading}
+                   busy={loading}
+                   presentation={presentationEnabled && m.result === lastResult ? presenter : undefined}
                   onRetry={
                     m.failed || m.stopped
                       ? turnQuestion[i]
@@ -2064,20 +2982,22 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
         )}
 
         {loading && (
-          <div style={{ display: "flex", gap: "0.6rem" }}>
+          <div className="ask-message ask-message-assistant" style={{ display: "flex", gap: "0.6rem" }}>
             <span style={AVATAR} aria-hidden>
               <Sparkles size={15} />
             </span>
             <div
-              style={{
+               className="ask-assistant-bubble"
+               style={{
                 flex: 1,
                 minWidth: 0,
-                maxWidth: "min(88%, 46rem)",
+                maxWidth: "min(92%, 48rem)",
                 background: "var(--p-surface)",
                 border: "1px solid var(--p-border)",
-                borderRadius: 18,
-                borderTopLeftRadius: 6,
-                padding: "0.9rem 1.1rem",
+                borderRadius: 20,
+                borderTopLeftRadius: 8,
+                padding: "0.875rem 1.125rem",
+                boxShadow: "var(--p-shadow)",
               }}
             >
               <ThinkingSkeleton />
@@ -2095,7 +3015,8 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
           answer from being left sitting underneath it. It belongs at the end of
           the column — clearance at the top would just open a gap where the
           composer used to be. */}
-      {docked && <div aria-hidden style={{ height: 78 }} />}
+      {/* Reserves the docked bar's own height, measured rather than guessed. */}
+      {docked && <div aria-hidden style={{ height: dockMetrics.height || undefined }} />}
 
       <div
         style={{
@@ -2111,12 +3032,13 @@ export default function AskConsole({ initialQuery = null }: { initialQuery?: str
         <MessageSquare size={12} aria-hidden style={{ marginTop: "0.15rem", flexShrink: 0 }} />
         <span>
           This is <strong style={{ color: "var(--p-text-2)" }}>not the Speaker himself</strong>. It
-          is a search of the published archive that answers in his voice: every passage in the
-          first person is quoted word for word from a speech, paper, letter or interview held in
-          this library, and links back to the record it came from. Nothing here is written by a
-          model and nothing is paraphrased — where the archive is silent, it says so.
+          is a search of the published archive. Where a record uses the first person, the passage
+          is quoted word for word from a speech, paper, letter or interview held in this library,
+          and links back to that record. Nothing here is written by a model and nothing is
+          paraphrased — where the archive is silent, it says so.
         </span>
       </div>
       </main>
+      </div>
   );
 }

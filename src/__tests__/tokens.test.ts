@@ -80,6 +80,11 @@ const RUNTIME_ONLY = new Set([
   '--focus-ring-width',
   '--focus-ring-style',
   '--focus-ring-offset',
+  // Measured off the live transcript column and written straight onto the
+  // composer element, so the docked bar lines up with the answer it belongs
+  // to at any viewport. The CSS supplies a fallback for each.
+  '--dock-left',
+  '--dock-width',
 ])
 
 /** Theme-independent layout metrics that intentionally live in :root only. */

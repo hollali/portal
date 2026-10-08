@@ -874,6 +874,155 @@ html[data-motion="js"] .hero-cta:hover {
   }
 }
 
+/* Complete Archive Research Desk direction. */
+.ask-research-header {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--p-navy-deep) 38%, transparent), transparent 58%),
+    var(--p-bg);
+}
+
+.ask-research-header-inner {
+  position: relative;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: clamp(1.35rem, 3vw, 2.25rem) 2rem 1.5rem;
+}
+
+.ask-research-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--primary);
+  font: 600 0.65rem var(--font-mono), monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ask-research-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 22rem);
+  gap: 3rem;
+  align-items: end;
+  margin-top: 0.7rem;
+}
+
+.ask-research-heading h1 {
+  margin: 0;
+  color: var(--p-text-1);
+  font: 500 clamp(2rem, 4vw, 3.35rem)/1 var(--font-display), sans-serif;
+  letter-spacing: -0.045em;
+}
+
+.ask-research-heading p {
+  max-width: 40rem;
+  margin: 0.8rem 0 0;
+  color: var(--p-text-2);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.ask-research-meta {
+  display: grid;
+  gap: 0.55rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid color-mix(in srgb, var(--primary) 45%, var(--p-border));
+  color: var(--p-text-3);
+  font: 0.68rem/1.4 var(--font-mono), monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ask-research-meta b {
+  display: inline-block;
+  width: 1.7rem;
+  color: var(--primary);
+}
+
+.ask-research-disclosure {
+  margin: 1rem 0 0;
+  color: var(--p-text-4);
+  font: 0.64rem/1.4 var(--font-mono), monospace;
+}
+
+.ask-console {
+  max-width: 1440px;
+  padding: 1.5rem 2rem 4rem;
+  background: var(--p-bg);
+}
+
+@media (min-width: 1280px) {
+  .ask-console[data-guide="on"][data-history="on"] {
+    grid-template-columns: 14rem minmax(0, 46rem) 18rem;
+    gap: clamp(1rem, 3vw, 3.5rem);
+  }
+
+  .ask-console[data-guide="on"][data-history="off"] {
+    grid-template-columns: minmax(0, 46rem) 18rem;
+  }
+
+  .ask-console[data-guide="off"][data-history="on"] {
+    grid-template-columns: 14rem minmax(0, 46rem);
+  }
+
+  .ask-console[data-guide="off"][data-history="off"] {
+    grid-template-columns: minmax(0, 46rem);
+  }
+
+  .ask-console[data-guide="on"][data-history="on"] > aside[aria-label="Chat history"] { grid-column: 1; }
+  .ask-console[data-guide="on"][data-history="on"] > main { grid-column: 2; }
+  .ask-console[data-guide="on"][data-history="on"] > aside.ask-side { grid-column: 3; }
+  .ask-console[data-guide="on"][data-history="off"] > main { grid-column: 1; }
+  .ask-console[data-guide="on"][data-history="off"] > aside.ask-side { grid-column: 2; }
+  .ask-console[data-guide="off"][data-history="on"] > aside[aria-label="Chat history"] { grid-column: 1; }
+  .ask-console[data-guide="off"][data-history="on"] > main { grid-column: 2; }
+  .ask-console[data-guide="off"][data-history="off"] > main { grid-column: 1; }
+
+  .ask-console > aside[aria-label="Chat history"] {
+    height: min(44rem, calc(100vh - 10rem));
+    border: 1px solid var(--p-border) !important;
+    border-radius: 12px;
+    background: var(--p-surface-2) !important;
+  }
+
+  .ask-presenter-guide {
+    padding-top: 0 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .ask-research-header-inner {
+    padding: 1.15rem 1rem 1.2rem;
+  }
+
+  .ask-research-heading {
+    display: block;
+  }
+
+  .ask-research-heading h1 {
+    font-size: 2rem;
+  }
+
+  .ask-research-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin-top: 1.1rem;
+    padding: 0.75rem 0 0;
+    border-top: 1px solid var(--p-border);
+    border-left: 0;
+    font-size: 0.58rem;
+  }
+
+  .ask-research-meta b {
+    width: auto;
+    margin-right: 0.25rem;
+  }
+
+  .ask-console {
+    padding-bottom: 2rem;
+  }
+}
+
 @media (max-width: 480px) {
   .p-admin-btn {
     padding: 0.45rem 0.8rem !important;
@@ -1716,5 +1865,558 @@ a:hover {
   }
   .ask-disclosure > .ask-disclosure-summary:hover {
     color: var(--p-text-2);
+  }
+}
+
+/* ─── /ask shell geometry ───
+ * The guide rail, the history column and the transcript are three things
+ * competing for width, and the two ways this goes wrong are the ones nobody
+ * measures: a docked composer that has drifted half under the figure, and a
+ * transcript squeezed to a couple of hundred pixels by two side panels that
+ * each looked reasonable on their own.
+ *
+ * So every number the shell depends on is declared here, once, and the console
+ * reads them. JavaScript cannot own this. A viewport branch in JS makes the
+ * server ship a layout it guessed at and the client rebuild it on arrival — and
+ * /ask is built for readers on mobile data, where that rebuild is a visible
+ * reflow of the entire console.
+ *
+ * The two breakpoints are deliberately not the same. A 300px rail beside a
+ * 320px history column leaves 214px of transcript at 834px: two clean columns,
+ * and unreadable in practice. So the rail waits until there is a readable
+ * column left (1024px) and the history waits longer still (1280px), because a
+ * transcript is worth more than either of them.
+ */
+.ask-shell {
+  --ask-rail: 0px;
+  /* 44rem is about 70 characters — past that a line of prose stops being read.
+     Without a cap, a 27-inch monitor gets a single column of text a thousand
+     pixels wide with the citation cards stranded at the far ends. */
+  --ask-col: 44rem;
+}
+
+@media (min-width: 1024px) {
+  .ask-shell[data-guide='on'] {
+    --ask-rail: 300px;
+    /* 760px, which is about 75 characters of transcript: past this a line of
+       prose stops being readable and starts being something to scroll past. */
+    --ask-col: 47.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ask-shell[data-guide='on'] {
+    --ask-col: 38.25rem;
+  }
+}
+
+/* The docked composer is placed against the transcript column, whose position
+ * and width AskConsole measures and publishes as `--dock-left` / `--dock-width`.
+ *
+ * It used to be centred on the viewport and pushed right by half the rail, which
+ * is right only while the transcript sits flush against the rail. It is centred
+ * in the leftover space instead, so as soon as the history column is open the
+ * guess is wrong by exactly the amount `margin: auto` moved things — and a
+ * composer parked 120px off its own column still looks plausible enough that
+ * nobody reports it.
+ *
+ * These rules are deliberately unlayered. Tailwind's utilities live in
+ * `@layer utilities`, and unlayered CSS wins over layered CSS whatever the
+ * specificity, which is how a measured width can override the `w-*` class the
+ * bar also carries for the first paint before anything has been measured. */
+.ask-docked {
+  left: calc(var(--dock-left, 50%) + var(--dock-width, 0px) / 2);
+  width: min(var(--dock-width, 100vw), calc(100vw - 1rem));
+}
+
+/* /ask is a research workspace, not a generic chat surface. The hero gives the
+ * reader a clear contract, while the console below stays quiet enough for the
+ * evidence to lead. */
+.ask-hero {
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent 42%),
+    var(--p-bg);
+}
+
+.ask-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 22rem);
+  gap: clamp(2rem, 7vw, 7rem);
+  align-items: end;
+}
+
+.ask-hero-note {
+  display: grid;
+  gap: 0.55rem;
+  align-self: stretch;
+  padding: 1.1rem 0 0.2rem 1.25rem;
+  border-left: 1px solid color-mix(in srgb, var(--primary) 48%, var(--p-border));
+  color: var(--p-text-3);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.ask-hero-note strong {
+  color: var(--p-text-1);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.ask-hero-note-label,
+.ask-hero-facts {
+  color: var(--primary);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ask-hero-facts {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: auto;
+  color: var(--p-text-4);
+  letter-spacing: 0.06em;
+}
+
+.ask-hero-facts b {
+  margin-right: 0.45rem;
+  color: var(--primary);
+}
+
+.ask-empty-state {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--primary) 13%, transparent), transparent 36%),
+    var(--p-surface-2);
+  border-style: solid !important;
+  border-color: var(--p-border-2) !important;
+  text-align: left !important;
+}
+
+.ask-composer textarea:focus-visible {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+.ask-console {
+  position: relative;
+  isolation: isolate;
+  padding-top: 0.5rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 3%, transparent), transparent 12rem),
+    var(--p-bg);
+}
+
+.ask-console > main {
+  padding-top: 1rem;
+}
+
+.ask-console [role="log"] {
+  position: relative;
+}
+
+.ask-console [role="log"]::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0.95rem;
+  width: 1px;
+  background: linear-gradient(var(--p-border), transparent 88%);
+  content: "";
+  pointer-events: none;
+}
+
+.ask-console [role="log"] > div {
+  position: relative;
+  z-index: 1;
+}
+
+.ask-console [role="log"] > div > div > div {
+  backdrop-filter: blur(8px);
+}
+
+.ask-console [role="log"] > div > div:last-child {
+  border-color: var(--p-border-2) !important;
+}
+
+.ask-console textarea {
+  background: color-mix(in srgb, var(--p-surface) 88%, var(--primary) 2%) !important;
+}
+
+.ask-console > aside[aria-label="Chat history"] {
+  border-color: var(--p-border) !important;
+  background: color-mix(in srgb, var(--p-surface) 84%, transparent) !important;
+}
+
+.ask-console > aside:not([aria-label="Chat history"]) {
+  filter: drop-shadow(0 20px 35px color-mix(in srgb, var(--p-bg) 35%, transparent));
+}
+
+.ask-presenter-guide {
+  position: relative;
+}
+
+.ask-presenter-guide::after {
+  position: absolute;
+  right: -0.55rem;
+  top: 8.5rem;
+  width: 1.1rem;
+  height: 1px;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+  content: "";
+}
+
+.ask-presenter-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.45rem;
+}
+
+.ask-presenter-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 0.45rem;
+  border: 1px solid var(--p-border-3);
+  border-radius: 999px;
+  background: var(--p-surface-2);
+  color: var(--p-text-3);
+  cursor: pointer;
+  font: 600 0.62rem var(--font-mono), monospace;
+}
+
+.ask-presenter-controls button:hover,
+.ask-presenter-controls button:focus-visible {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (min-width: 1280px) {
+  .ask-console {
+    gap: 1rem;
+    padding: 0 1rem 1rem;
+  }
+
+  .ask-console > aside[aria-label="Chat history"] {
+    margin: 1rem 0 0;
+    height: calc(100vh - 2rem);
+    max-height: 46rem;
+    border: 1px solid var(--p-border) !important;
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .ask-console > aside:not([aria-label="Chat history"]) {
+    margin-top: 1rem;
+  }
+
+  .ask-console > main {
+    padding-top: 1.5rem;
+  }
+}
+
+@media (max-width: 1279px) {
+  .ask-console > aside[aria-label="Chat history"] {
+    background: var(--p-surface) !important;
+  }
+
+  .ask-presenter-guide {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    column-gap: 0.7rem;
+    height: auto;
+    min-height: 7.25rem;
+    padding: 0.5rem 1rem 0.65rem;
+    align-items: stretch;
+  }
+
+  .ask-presenter-guide::after {
+    display: none;
+  }
+
+  .ask-guide-stage {
+    display: grid !important;
+    grid-template-columns: 3.8rem minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    gap: 0.35rem 0.65rem !important;
+    grid-column: 1 / -1;
+    padding: 0.45rem 0.6rem !important;
+    border-radius: 14px !important;
+  }
+
+  .ask-guide-figure {
+    display: block !important;
+    grid-row: 1 / -1;
+    width: 3.8rem;
+    height: 3.8rem;
+    aspect-ratio: 1;
+    border-radius: 50% !important;
+  }
+
+  .ask-guide-stage > p {
+    grid-column: 2;
+    align-self: end;
+  }
+
+  .ask-guide-stage > div[aria-live] {
+    grid-column: 2;
+    min-height: 0;
+    padding: 0.25rem 0.45rem !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .ask-guide-stage > div:last-child {
+    display: none !important;
+  }
+
+  .ask-presenter-controls {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .ask-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .ask-hero-note {
+    padding: 0.9rem 0 0 1rem;
+  }
+
+  .ask-hero-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.25rem;
+    font-size: 0.55rem;
+  }
+}
+
+/* Final /ask workspace pass: reduce ornament, strengthen hierarchy, and give the
+ * transcript one dependable reading measure. */
+.ask-hero {
+  background: var(--p-bg);
+}
+
+.ask-hero > div[style] {
+  max-width: 1120px !important;
+  padding: 1.4rem 1.5rem 1.25rem !important;
+}
+
+.ask-hero-grid {
+  display: block;
+}
+
+.ask-hero-grid > div:first-child {
+  max-width: 46rem;
+}
+
+.ask-hero h1 {
+  margin: 0.65rem 0 0.45rem !important;
+  font-size: clamp(1.7rem, 3vw, 2.25rem) !important;
+}
+
+.ask-hero p {
+  max-width: 42rem !important;
+}
+
+.ask-hero-note {
+  display: none;
+}
+
+.ask-console {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 1.25rem 2rem;
+  background: var(--p-bg);
+}
+
+.ask-console > main {
+  width: min(100%, 48rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ask-console .ask-message {
+  margin-inline: 0;
+}
+
+.ask-user-bubble {
+  max-width: min(78%, 34rem) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.ask-assistant-bubble {
+  max-width: 100% !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  background: var(--p-surface) !important;
+  border-color: var(--p-border-2) !important;
+}
+
+.ask-citation-card {
+  border-radius: 10px !important;
+  background: var(--p-surface-3) !important;
+  box-shadow: none !important;
+}
+
+.ask-citation-card[data-active="true"] {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent) !important;
+}
+
+.ask-citation-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 54%, var(--p-border)) !important;
+  transform: translateY(-1px);
+}
+
+@media (min-width: 1280px) {
+  .ask-console {
+    display: grid !important;
+    grid-template-columns: minmax(12rem, 15rem) minmax(0, 48rem) minmax(15rem, 18rem);
+    align-items: start;
+    justify-content: center;
+    gap: clamp(1rem, 2.5vw, 2.5rem);
+    padding: 1.25rem 2rem 3rem;
+  }
+
+  .ask-console > aside[aria-label="Chat history"] {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100% !important;
+    margin: 0 !important;
+    height: min(42rem, calc(100vh - 8rem));
+    border-radius: 14px;
+    box-shadow: none;
+  }
+
+  .ask-console > main {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    max-width: none !important;
+    margin: 0;
+    padding: 0.25rem 0 3rem;
+  }
+
+  .ask-console > aside.ask-side {
+    grid-column: 3;
+    grid-row: 1;
+    width: 100% !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+  }
+}
+
+@media (max-width: 1279px) {
+  .ask-console {
+    padding-inline: 0;
+  }
+
+  .ask-console > main {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .ask-hero > div[style] {
+    padding: 1.1rem 1rem 1rem !important;
+  }
+
+  .ask-hero h1 {
+    font-size: 1.65rem !important;
+  }
+
+  .ask-console > main {
+    padding-inline: 1rem;
+  }
+
+  .ask-user-bubble {
+    max-width: 88% !important;
+  }
+}
+
+/* Final desktop layout for /ask. This is the only rule set that decides the
+ * wide-screen grid, so it must stay last. The console and the hero share one
+ * 1280px container so their edges line up, and the transcript takes the space
+ * the side columns leave instead of sitting in a fixed, centred block.
+ *
+ * data-guide="on" means a side column exists: the presenter, the sources for
+ * the latest answer, or both. data-history="on" means the history rail is open. */
+@media (min-width: 1280px) {
+  .ask-console {
+    display: grid !important;
+    max-width: 1280px;
+    padding: 1.5rem 2rem 3rem;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  .ask-console[data-history="on"][data-guide="on"] {
+    grid-template-columns: 15rem minmax(0, 1fr) 18rem;
+  }
+
+  .ask-console[data-history="on"][data-guide="off"] {
+    grid-template-columns: 15rem minmax(0, 1fr);
+  }
+
+  .ask-console[data-history="off"][data-guide="on"] {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+  }
+
+  .ask-console[data-history="off"][data-guide="off"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ask-console > aside[aria-label="Chat history"] {
+    grid-column: 1;
+    grid-row: 1;
+    position: sticky;
+    top: 1.25rem;
+    width: 100% !important;
+    margin: 0 !important;
+    height: min(44rem, calc(100vh - 8rem));
+  }
+
+  .ask-console > main {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    max-width: 52rem !important;
+    margin: 0;
+    padding: 0.25rem 0 3rem;
+  }
+
+  .ask-console[data-history="off"] > main {
+    grid-column: 1;
+  }
+
+  .ask-console[data-history="off"][data-guide="off"] > main {
+    max-width: 56rem !important;
+    margin: 0 auto;
+  }
+
+  .ask-console > aside.ask-side {
+    grid-column: 3;
+    grid-row: 1;
+    width: 100% !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .ask-console[data-history="off"] > aside.ask-side {
+    grid-column: 2;
   }
 }

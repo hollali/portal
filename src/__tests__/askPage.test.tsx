@@ -514,13 +514,14 @@ describe('/ask with a transcript saved by an older version', () => {
   it('restores the transcript instead of throwing', async () => {
     window.localStorage.setItem('askbagbin-chat-v1', JSON.stringify(STALE))
     expect(() => render(<AskConsole />)).not.toThrow()
-    expect(await screen.findByText('On the youth')).toBeInTheDocument()
+    // The card and the source rail both name the record, so there are two.
+    expect((await screen.findAllByText('On the youth')).length).toBeGreaterThan(0)
   })
 
   it('still shows the terms the old shape did carry, without inventing the rest', async () => {
     window.localStorage.setItem('askbagbin-chat-v1', JSON.stringify(STALE))
     render(<AskConsole />)
-    expect(await screen.findByText('On the youth')).toBeInTheDocument()
+    expect((await screen.findAllByText('On the youth')).length).toBeGreaterThan(0)
 
     // `terms` existed in the old response, so the readout is honest to show it.
     expect(screen.getByText('searched for')).toBeInTheDocument()
