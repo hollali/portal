@@ -10,6 +10,7 @@ import {
   Suspense,
 } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import PublicHeader from "@/components/PublicHeader";
 import PublicFooter from "@/components/PublicFooter";
@@ -590,9 +591,12 @@ export function PhotoLightbox({
             }}
           >
             {photo.src && !imgFailed ? (
-              <img
+              <Image
                 src={photo.src}
                 alt={photo.caption || `Photograph #${photo.id}`}
+                width={1600}
+                height={1200}
+                unoptimized
                 onError={() => setImgStatusFor({ failed: true })}
                 onLoad={() => setImgStatusFor({ loaded: true })}
                 style={{
