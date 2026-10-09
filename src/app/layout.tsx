@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Inter, Inter_Tight, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import MotionInit from "@/components/MotionInit";
@@ -38,25 +37,14 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} ${interTight.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full">
-        <Script
-          id="motion-init"
-          strategy="beforeInteractive"
+        <script
           dangerouslySetInnerHTML={{
-            // Marks that scripting is available, which is what the hero
-            // keyframes in globals.css are gated on. The scroll reveals are
-            // CSS scroll-driven animations and no longer read this flag, so
-            // there is no ready-handshake (and no 2s timer) to keep in sync.
             __html:
               "(function(){try{document.documentElement.dataset.motion='js'}catch(e){}})();",
           }}
         />
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
+        <script
           dangerouslySetInnerHTML={{
-            // Resolves the theme before first paint so there is no flash, and
-            // guarantees exactly one of .dark / .light is set — which is what
-            // lets globals.css keep a single light-mode token block.
             __html:
               "(function(){try{var s=localStorage.getItem('theme');var d=s?s==='dark':!window.matchMedia('(prefers-color-scheme: light)').matches;var r=document.documentElement;r.classList.remove('light','dark');r.classList.add(d?'dark':'light')}catch(e){}})();",
           }}
