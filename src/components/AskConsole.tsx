@@ -26,18 +26,22 @@ import {
   AlertTriangle,
   CalendarRange,
   Check,
+  Clock,
   Copy,
   ExternalLink,
   FileText,
   Landmark,
   Layers,
   Link2,
+  LayoutPanelLeft,
   MessageSquare,
+  Mic,
   RefreshCw,
   RotateCcw,
   Search,
   Send,
   Sparkles,
+  X,
 } from "lucide-react";
 import { KIND_ICON } from "@/lib/kindIcon";
 import {
@@ -63,6 +67,7 @@ interface ChatMsg {
   failed?: boolean;
   /** The reader pressed stop, as opposed to the request failing. */
   stopped?: boolean;
+  ts?: number;
 }
 
 /** Smallest comfortable target. Chips here were 36px, under the 44px guideline. */
@@ -1378,10 +1383,15 @@ export default function AskConsole({
   const [chats, setChats] = useState<PersistedChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  // The rail starts open on desktop (chatbot reference) and closed on phones,
+  // where it is a drawer. Read on mount, not in the state initializer: the
+  // initializer also runs during server prerender, where `window` does not
+  // exist, and hydration keeps that first value.
+  useEffect(() => {
+    if (window.innerWidth >= 1100) setHistoryExpanded(true);
+  }, []);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const composerRef = useRef<HTMLFormElement>(null);
-  const mainRef = useRef<HTMLElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // The latest transcript, for `ask` to read without taking `messages` as a
   // dependency. Closing over `messages` directly would hand every call site a
@@ -1397,59 +1407,6 @@ export default function AskConsole({
   // "the reader moved on" from "the reader pressed stop": the first is silently
   // withdrawn, the second earns a "search stopped" turn in the transcript.
   const supersededRef = useRef(new Set<AbortController>());
-  const [docked, setDocked] = useState(false);
-  // The docked bar is lifted out of the flow, so something has to stand in for
-  // it. That used to be a hardcoded 64 or 78 pixels, which was wrong the moment
-  // the box grew a line — a reader who had expanded the textarea to write a long
-  // question would lose the last citation behind their own composer. Measuring
-  // it is the whole fix.
-  const [dockMetrics, setDockMetrics] = useState({ height: 0, left: 0, width: 0 });
-
-  // Where the docked bar has to sit, measured off the transcript rather than
-  // guessed from the viewport.
-  //
-  // The obvious arithmetic — centre of the viewport, pushed right by half the
-  // rail — is only correct while the transcript is flush against the rail's
-  // inner edge. It is centred in whatever space is left over, so the moment
-  // there is a history column beside it too, the guess is off by however much
-  // `margin: auto` moved the column. That is exactly the class of bug nobody
-  // notices by eye, because the bar still looks plausible over a citation and
-  // is only measurably wrong. Measured, it cannot drift.
-  useEffect(() => {
-    const form = composerRef.current;
-    const main = mainRef.current;
-    if (!form || !main) return;
-
-    let last = "";
-    const measure = () => {
-      const height = form.getBoundingClientRect().height;
-      const padLeft = parseFloat(getComputedStyle(main).paddingLeft) || 0;
-      const padRight = parseFloat(getComputedStyle(main).paddingRight) || 0;
-      // Layout, not viewport: `offsetLeft` is unaffected by scrolling, so this
-      // does not need to re-run as the reader moves down the transcript. The
-      // content box rather than the border box, so the docked bar's edges line
-      // up with the text and the citation cards instead of hanging 24px into
-      // the gutters on each side.
-      const left = main.getBoundingClientRect().left + padLeft;
-      const width = Math.max(0, main.offsetWidth - padLeft - padRight);
-      const next = `${Math.round(height)}:${Math.round(left)}:${Math.round(width)}`;
-      // Re-rendering a transcript on every scroll frame is not worth a
-      // sub-pixel difference.
-      if (next === last) return;
-      last = next;
-      setDockMetrics({ height, left, width });
-    };
-
-    measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(form);
-    observer?.observe(main);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
   // Whether the reader is already at the end of the page. Only then is a new
   // turn worth pulling them to; scrolling someone out of a citation they were
   // mid-way through reading is the worst thing this page could do. Starts false
@@ -1678,71 +1635,7 @@ export default function AskConsole({
     const next = Math.min(el.scrollHeight, COMPOSER_MAX_H);
     el.style.height = `${next}px`;
     el.style.overflowY = el.scrollHeight > COMPOSER_MAX_H ? "auto" : "hidden";
-  }, [input, docked]);
-
-  /**
-   * Dock the composer once it has scrolled out of view.
-   *
-   * The composer stays at the top of the page on purpose — a reader should not
-   * have to scroll past a wall of citations to find the box that produced
-   * them. But after a few turns the top of the page is a long way up, and the
-   * only way to ask again would be to scroll all the way back. Docking solves
-   * both: the composer is still above the transcript, and it is still reachable
-   * once the reader is deep inside one.
-   *
-   * The bar is a view follower, not a layout sibling — it is measured on every
-   * scroll rather than placed by the document flow, so docking never reflows
-   * the transcript and never costs the reader their scroll position.
-   */
-  useEffect(() => {
-    // The composer's position in the document, captured while it is still in the
-    // flow. Docking lifts the form out of the flow entirely, so once it is
-    // docked its own rect describes the docked bar rather than the anchor point
-    // — measuring it then would flip the state straight back and the bar would
-    // strobe on every scroll event. This anchor is compared against instead.
-    let anchor: number | null = null;
-    let isDocked = false;
-
-    const measure = () => {
-      // Hand the viewport back to the page footer before the fixed composer can
-      // cover it. Scope this to the site footer: answer quotes can also render
-      // their own <footer> elements.
-      const footer = document.querySelector<HTMLElement>(".ask-page-root > footer");
-      const footerVisible = footer && footer.getBoundingClientRect().top < window.innerHeight;
-      if (footerVisible) {
-        if (isDocked) {
-          isDocked = false;
-          setDocked(false);
-        }
-        return;
-      }
-
-      if (isDocked) {
-        // Back near the top? The in-flow composer is on screen again, so hand
-        // the page back to it.
-        if (anchor !== null && window.scrollY <= anchor + 8) {
-          isDocked = false;
-          setDocked(false);
-        }
-        return;
-      }
-      const el = composerRef.current;
-      if (!el) return;
-      anchor = el.getBoundingClientRect().top + window.scrollY;
-      if (window.scrollY > anchor + 8) {
-        isDocked = true;
-        setDocked(true);
-      }
-    };
-
-    measure();
-    window.addEventListener("scroll", measure, { passive: true });
-    window.addEventListener("resize", measure);
-    return () => {
-      window.removeEventListener("scroll", measure);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
+  }, [input]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1775,6 +1668,7 @@ export default function AskConsole({
 
   const handleNewChat = () => {
     abortRef.current?.abort();
+    setHistoryExpanded(false);
     const nextChat = createNewChat();
     const nextChats = [nextChat, ...chats];
     setChats(nextChats);
@@ -1798,6 +1692,7 @@ export default function AskConsole({
     setMessages(restored);
     messagesRef.current = restored;
     setActiveChatId(chatId);
+    setHistoryExpanded(false);
     setLoading(false);
     setInput("");
     setCopiedIndex(null);
@@ -1828,6 +1723,16 @@ export default function AskConsole({
     setCopiedIndex(null);
     setLinkCopied(false);
     writeQueryParam(null);
+  };
+
+  const handleRenameChat = (chatId: string, title: string) => {
+    const next = title.trim().slice(0, 60);
+    if (!next) return;
+    const nextChats = chats.map(chat =>
+      chat.id === chatId ? { ...chat, title: next, updatedAt: Date.now() } : chat,
+    );
+    setChats(nextChats);
+    saveAllChats(nextChats);
   };
 
   const onCopy = (text: string, index: number) => {
@@ -1872,420 +1777,337 @@ export default function AskConsole({
 
   return (
     <div
-      className={`ask-shell ask-console relative flex w-full min-w-0 flex-1 flex-col${messages.length === 0 ? " ask-console-empty" : ""}`}
+      className={`ask-console relative flex w-full min-w-0 flex-1 flex-col${messages.length === 0 ? " ask-console-empty" : ""}`}
       data-has-conversation={messages.length > 0 ? "on" : "off"}
       data-has-history={hasHistory ? "on" : "off"}
+      data-history-expanded={historyExpanded ? "true" : "false"}
     >
       <div className="ask-history" data-open={historyExpanded ? "on" : "off"}>
         <button
           className="ask-history-toggle"
           type="button"
           aria-expanded={historyExpanded}
+          aria-controls="ask-history-content"
           onClick={() => setHistoryExpanded(open => !open)}
         >
           Conversation history ({previousChats.length})
         </button>
-        <div className="ask-history-content">
+        <div id="ask-history-content" className="ask-history-content">
           <ChatHistorySidebar
             chats={previousChats}
             activeChatId={activeChatId}
             onSelectChat={handleSelectChat}
             onNewChat={handleNewChat}
             onDeleteChat={handleDeleteChat}
+            onRenameChat={handleRenameChat}
             className="ask-history-panel"
           />
         </div>
       </div>
 
-      <main
-        ref={mainRef}
-        className="mx-auto flex w-full min-w-0 max-w-full flex-1 flex-col px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] transition-[max-width] duration-200 ease-out sm:px-6 sm:pb-8 lg:max-w-[var(--ask-col)]"
-      >
-      {messages.length > 0 && (
-      <div
-        style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "0.25rem 0.75rem",
-            marginBottom: "0.65rem",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "0.72rem",
-              color: "var(--p-text-4)",
-              fontFamily: "var(--font-mono), monospace",
-            }}
+      <main className="ask-main flex-1 flex flex-col min-w-0">
+      <div className="ask-topbar">
+        <div className="ask-topbar-context">
+          <button
+            type="button"
+            className="ask-topbar-toggle"
+            aria-label={historyExpanded ? "Hide conversation history" : "Show conversation history"}
+            aria-expanded={historyExpanded}
+            disabled={!hasHistory}
+            title={hasHistory ? undefined : "No saved conversations yet"}
+            onClick={() => setHistoryExpanded(open => !open)}
           >
-            {lastAnswerCount} source{lastAnswerCount === 1 ? "" : "s"} in the last answer
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: "0.15rem" }}>
+            <LayoutPanelLeft size={17} aria-hidden />
+          </button>
+          <nav className="ask-breadcrumbs" aria-label="Location">
+            <span>Workspace</span>
+          </nav>
+        </div>
+        {messages.length > 0 && (
+          <div className="ask-topbar-actions">
+            <span className="ask-source-count">
+              {lastAnswerCount} source{lastAnswerCount === 1 ? "" : "s"} in the last answer
+            </span>
             <button
               type="button"
               onClick={onCopyLink}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                background: "none",
-                border: "none",
-                color: "var(--p-text-3)",
-                cursor: "pointer",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                minHeight: HIT,
-                padding: "0 0.6rem",
-              }}
+              className="ask-icon-btn"
+              aria-label={linkCopied ? "Link copied" : "Copy link"}
             >
               {linkCopied ? <Check size={13} aria-hidden /> : <Link2 size={13} aria-hidden />}
-              <span aria-live="polite">{linkCopied ? "Link copied" : "Copy link"}</span>
+              <span className="sr-only" aria-live="polite">{linkCopied ? "Link copied" : "Copy link"}</span>
             </button>
             <button
               type="button"
               onClick={handleNewChat}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                background: "none",
-                border: "none",
-                color: "var(--p-text-3)",
-                cursor: "pointer",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                minHeight: HIT,
-                padding: "0 0.6rem",
-              }}
+              className="ask-icon-btn"
+              aria-label="New conversation"
             >
-              <RotateCcw size={13} aria-hidden /> New conversation
+              <RotateCcw size={13} aria-hidden />
+              <span className="sr-only">New conversation</span>
             </button>
-          </span>
-        </div>
-      )}
-
-      {/* The composer sits directly under the hero, not at the foot of a
-          viewport-height shell. A reader who has to scroll past a wall of
-          citations to find the box that produced them is a reader who asks one
-          question and leaves. The follow-up chips inside each answer are the
-          fast path to the next question, and once the reader scrolls past this
-          box it follows them down as a docked bar.
-
-          It stays enabled while a search is in flight: someone who has just
-          watched a slow answer arrive can be drafting the follow-up before the
-          first one lands, and there is no reason to make them wait for a
-           round trip to start typing. Sending it then replaces the search in
-           flight — see `ask` — so a follow-up typed early can be fired without
-           waiting for the answer it was a follow-up to. */}
-      <p className="ask-source-note">
-        <MessageSquare size={14} aria-hidden style={{ marginTop: "0.05rem", flexShrink: 0 }} />
-        <span>
-          <strong>Archive search:</strong> the Speaker isn’t answering directly; results come from
-          published records.
-        </span>
-      </p>
-      <form
-        ref={composerRef}
-        onSubmit={e => {
-          e.preventDefault();
-          void ask(input);
-        }}
-        className={
-          docked
-             ? // Pushed right by half the guide rail so the docked box stays over
-              // the transcript it belongs to — centring it on the viewport would
-              // park it half under the figure for the whole length of a long
-              // answer. Both numbers come from the container's custom
-              // properties, so this follows the rail instead of assuming it.
-               "ask-docked ask-composer fixed bottom-[max(0.7rem,env(safe-area-inset-bottom))] left-1/2 z-45 flex w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-2 rounded-3xl border border-[var(--p-border-3)] bg-[color-mix(in_srgb,var(--p-bg)_94%,transparent)] p-[0.4rem] shadow-[var(--p-shadow)] backdrop-blur-[16px] transition-[transform,box-shadow] duration-200 ease-out"
-            : // `w-full` is load-bearing, not decoration. `main` is a column flex
-              // container, and an `auto` margin on a flex item replaces the
-              // cross-axis stretch: the form shrink-to-fit to its contents and
-              // `max-width` capped it at 288px — a 234px field on a 1440px
-              // screen. A definite width plus auto margins centres it without
-              // giving up the stretch.
-               "ask-composer flex w-full items-end gap-2.5 transition-[box-shadow] duration-200 ease-out mx-auto"
-        }
-        style={
-          docked
-            ? ({
-                "--dock-left": `${dockMetrics.left}px`,
-                "--dock-width": `${dockMetrics.width}px`,
-              } as React.CSSProperties)
-            : { maxWidth: "min(48rem, 100%)" }
-        }
-      >
-        <label htmlFor="ask-question" className="sr-only">
-          Ask a question about the archive
-        </label>
-        {/* No `outline: none` here. The site sets a focus ring on `*:focus-visible`
-            (globals.css), and an inline `outline` outranks it — which left the one
-            control every visitor has to use with no visible keyboard focus at all.
-            A text field always matches `:focus-visible` when focused, so the ring
-            shows for pointer focus too, which is what a reader expects from a box
-            they have just tapped. */}
-        <textarea
-          id="ask-question"
-          ref={inputRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => {
-            // Enter asks; Shift+Enter is a newline. A question is prose, so the
-            // reader needs a way to write more than one line of it before
-            // sending, and the mobile keyboard is told which key does what.
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void ask(input);
-            }
-          }}
-          rows={1}
-          placeholder="Ask about a speech, letter, theme or period…"
-          maxLength={MAX_QUESTION}
-          enterKeyHint="send"
-          autoComplete="off"
-          spellCheck
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: "var(--p-surface)",
-            border: "1px solid var(--p-border-3)",
-            borderRadius: 20,
-            padding: "0.7rem 1.05rem",
-            // 50, not 44. The old floor was the WCAG minimum, which is fine for
-            // a checkbox and mean for the one control on the page a reader has
-            // to aim a thumb at. It is also exactly one line of 16px/1.6 text
-            // plus padding and border, so the field does not jump by a couple of
-            // pixels the moment the first character arrives.
-            minHeight: 50,
-            maxHeight: COMPOSER_MAX_H,
-            color: "var(--p-text-1)",
-            // 16px exactly, not 15.6. iOS Safari zooms the whole viewport on
-            // focus for anything under 16 and does not zoom back out when the
-            // field loses focus, which leaves the reader stranded mid-page on a
-            // question they have not sent yet.
-            fontSize: "1rem",
-            lineHeight: 1.6,
-            fontFamily: "inherit",
-            resize: "none",
-            overflowY: "hidden",
-            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-            transition: "border-color 150ms ease-out, box-shadow 150ms ease-out",
-          }}
-          aria-describedby="ask-composer-help"
-        />
-        <span id="ask-composer-help" className="sr-only">
-          Press Enter to send, Shift+Enter for a new line.
-        </span>
-        {loading ? (
-          <button
-            type="button"
-            onClick={() => stopRef.current?.()}
-            aria-label="Stop searching"
-            title="Stop searching"
-            style={{
-              background: "var(--p-surface-2)",
-              border: "1px solid var(--p-border-3)",
-              color: "var(--p-text-1)",
-              borderRadius: 999,
-              width: 44,
-              height: 44,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "transform 100ms ease-out",
-            }}
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            <span
-              aria-hidden
-              style={{ width: 13, height: 13, borderRadius: 3, background: "currentColor" }}
-            />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!input.trim()}
-            aria-label="Send question"
-            style={{
-              background: "var(--primary)",
-              border: "none",
-              color: "var(--primary-fg)",
-              borderRadius: 999,
-              width: 44,
-              height: 44,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: input.trim() ? "pointer" : "not-allowed",
-              opacity: input.trim() ? 1 : 0.5,
-              transition: "opacity 150ms ease-out, transform 100ms ease-out",
-            }}
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            <Send size={18} aria-hidden />
-          </button>
-        )}
-      </form>
-
-      {emptyChat && (
-        <div
-          className="ask-suggestions"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-            margin: "0.85rem 0 0",
-          }}
-        >
-          {suggestions.map(s => (
-            <AskChip key={s} label={s} onClick={q => void ask(q)} disabled={loading} />
-          ))}
-        </div>
-      )}
-
-      {/*
-        A polite live region on the transcript itself re-reads the whole
-        answer — summary, every citation, every testimonial — on each turn,
-        which is unusable with a screen reader. Announcing only the one-line
-        status below keeps the reader informed without the noise; the log keeps
-        the landmark so the transcript is still reachable, just not
-        re-announced.
-      */}
-      <p className="sr-only" role="status" aria-live="polite">
-        {loading
-          ? "Searching the archive"
-          : lastAnswer
-            ? `${lastAnswer} ${lastAnswerCount} source${
-                lastAnswerCount === 1 ? "" : "s"
-              } found.`
-            : ""}
-      </p>
-
-      <div
-        role="log"
-        aria-live="off"
-        aria-busy={loading}
-        aria-label="Conversation with the archive"
-        style={{
-          display: "grid",
-          gap: "0.9rem",
-          marginTop: "1.25rem",
-          alignContent: "start",
-        }}
-      >
-        {!hydrated && messages.length === 0 && (
-          <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--p-text-4)" }}>
-            Restoring your last conversation…
-          </div>
-        )}
-
-        {messages.map((m, i) =>
-          m.role === "user" ? (
-            <div key={i} className="ask-message ask-message-user" style={{ display: "flex", justifyContent: "flex-end" }}>
-              <div
-                 className="ask-user-bubble"
-                 style={{
-                  maxWidth: "min(85%, 38rem)",
-                  background: "var(--primary)",
-                  color: "var(--primary-fg)",
-                  borderRadius: 20,
-                  borderBottomRightRadius: 8,
-                  padding: "0.75rem 1rem",
-                  fontSize: "0.9375rem",
-                  lineHeight: 1.7,
-                  whiteSpace: "pre-wrap",
-                  overflowWrap: "anywhere",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-                  transition: "box-shadow 150ms ease-out",
-                }}
-              >
-                {m.content}
-              </div>
-            </div>
-          ) : (
-            <div key={i} className="ask-message ask-message-assistant" style={{ display: "flex", gap: "0.6rem" }}>
-              <span style={AVATAR} aria-hidden>
-                <Sparkles size={15} />
-              </span>
-              <div
-                 className="ask-assistant-bubble"
-                 style={{
-                  maxWidth: "min(92%, 48rem)",
-                  minWidth: 0,
-                  background: "var(--p-surface)",
-                  border: "1px solid var(--p-border)",
-                  borderRadius: 20,
-                  borderTopLeftRadius: 8,
-                  padding: "0.875rem 1.125rem",
-                  fontSize: "0.9375rem",
-                  lineHeight: 1.7,
-                  color: "var(--p-text-1)",
-                  boxShadow: "var(--p-shadow)",
-                  transition: "border-color 150ms ease-out, box-shadow 150ms ease-out",
-                }}
-              >
-                 <AssistantReply
-                  result={m.result}
-                  failed={m.failed}
-                  stopped={m.stopped}
-                  copied={copiedIndex === i}
-                  onCopy={text => onCopy(text, i)}
-                  onFollowUp={q => void ask(q)}
-                   busy={loading}
-                   onRetry={
-                    m.failed || m.stopped
-                      ? turnQuestion[i]
-                        ? () => void ask(turnQuestion[i]!)
-                        : undefined
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
-          ),
-        )}
-
-        {loading && (
-          <div className="ask-message ask-message-assistant" style={{ display: "flex", gap: "0.6rem" }}>
-            <span style={AVATAR} aria-hidden>
-              <Sparkles size={15} />
-            </span>
-            <div
-               className="ask-assistant-bubble"
-               style={{
-                flex: 1,
-                minWidth: 0,
-                maxWidth: "min(92%, 48rem)",
-                background: "var(--p-surface)",
-                border: "1px solid var(--p-border)",
-                borderRadius: 20,
-                borderTopLeftRadius: 8,
-                padding: "0.875rem 1.125rem",
-                boxShadow: "var(--p-shadow)",
-              }}
-            >
-              <ThinkingSkeleton />
-            </div>
           </div>
         )}
       </div>
 
-      {/* The scroll anchor. The transcript is part of the page, not a scroller
-          of its own, so this is what the page follows when a new turn lands. */}
-      <div ref={endRef} aria-hidden style={{ height: 1 }} />
+        <div
+          role="log"
+          aria-live="off"
+          aria-busy={loading}
+          aria-label="Conversation with the archive"
+          className="ask-message-list"
+        >
+          {!hydrated && messages.length === 0 && (
+            <div className="ask-restoring" style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--p-text-4)" }}>
+              Restoring your last conversation…
+            </div>
+          )}
 
-      {/* The composer is fixed while docked, so it stops contributing height to
-          the page. This is the room that keeps the last citation in a long
-          answer from being left sitting underneath it. It belongs at the end of
-          the column — clearance at the top would just open a gap where the
-          composer used to be. */}
-      {/* Reserves the docked bar's own height, measured rather than guessed. */}
-      {docked && <div aria-hidden style={{ height: dockMetrics.height || undefined }} />}
-      </main>
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            const avatarStyle: React.CSSProperties = {
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: isUser ? "0.75rem" : "0.875rem",
+              fontWeight: 650,
+              marginTop: 2,
+            };
+            if (isUser) {
+              avatarStyle.background = "color-mix(in srgb, var(--primary) 14%, transparent)";
+              avatarStyle.border = "1px solid color-mix(in srgb, var(--primary) 35%, transparent)";
+              avatarStyle.color = "var(--primary)";
+            } else {
+              avatarStyle.background = "color-mix(in srgb, var(--primary) 12%, transparent)";
+              avatarStyle.border = "1px solid color-mix(in srgb, var(--primary) 30%, transparent)";
+              avatarStyle.color = "var(--primary)";
+            }
+
+            return (
+              <article key={i} className={`ask-message-row ${isUser ? "ask-message-user" : "ask-message-assistant"}`}>
+                <div style={avatarStyle} aria-hidden>
+                  {isUser ? "Y" : <Sparkles size={16} />}
+                </div>
+                <div className="ask-message-body" style={{ minWidth: 0, flex: 1 }}>
+                  <header className="ask-message-meta" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", color: "var(--p-text-4)", fontSize: "0.7rem" }}>
+                    <strong style={{ color: "var(--p-text-1)", fontSize: "0.8rem", fontWeight: 600 }}>
+                      {isUser ? "You" : "Archive"}
+                    </strong>
+                    {m.ts && (
+                      <time dateTime={new Date(m.ts).toISOString()} style={{ color: "var(--p-text-4)" }}>
+                        {new Date(m.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                      </time>
+                    )}
+                    {loading && i === messages.length - 1 && !isUser && (
+                      <span className="ask-streaming" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: "var(--primary)" }}>
+                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--primary)", animation: "ask-dot-pulse 1s ease-in-out infinite" }} />
+                        <span>Searching…</span>
+                      </span>
+                    )}
+                  </header>
+                  <div className={isUser ? "ask-user-content" : "ask-assistant-content"}>
+                    {isUser ? (
+                      <p className="ask-user-text" style={{ margin: 0, color: "var(--p-text-1)", fontSize: "0.9375rem", lineHeight: 1.7, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                        {m.content}
+                      </p>
+                    ) : (
+                      <AssistantReply
+                        result={m.result}
+                        failed={m.failed}
+                        stopped={m.stopped}
+                        copied={copiedIndex === i}
+                        onCopy={text => onCopy(text, i)}
+                        onFollowUp={q => void ask(q)}
+                        busy={loading}
+                        onRetry={
+                          m.failed || m.stopped
+                            ? turnQuestion[i]
+                              ? () => void ask(turnQuestion[i]!)
+                              : undefined
+                            : undefined
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+
+          {loading && (
+            <article className="ask-message-row ask-message-assistant">
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.875rem",
+                  fontWeight: 650,
+                  marginTop: 2,
+                  background: "color-mix(in srgb, var(--primary) 12%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--primary) 30%, transparent)",
+                  color: "var(--primary)",
+                }}
+                aria-hidden
+              >
+                <Sparkles size={16} />
+              </div>
+              <div className="ask-message-body" style={{ minWidth: 0, flex: 1 }}>
+                <header className="ask-message-meta" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", color: "var(--p-text-4)", fontSize: "0.7rem" }}>
+                  <strong style={{ color: "var(--p-text-1)", fontSize: "0.8rem", fontWeight: 600 }}>Archive</strong>
+                  <span className="ask-streaming" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: "var(--primary)" }}>
+                    <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--primary)", animation: "ask-dot-pulse 1s ease-in-out infinite" }} />
+                    <span>Searching…</span>
+                  </span>
+                </header>
+                <div className="ask-assistant-content">
+                  <ThinkingSkeleton />
+                </div>
+              </div>
+            </article>
+          )}
+        </div>
+
+        {emptyChat && (
+          <section className="ask-welcome" aria-label="Welcome">
+            <div className="ask-welcome-orb" aria-hidden>
+              <Sparkles size={22} />
+            </div>
+            <p className="ask-eyebrow">Archive research</p>
+            <h1 className="ask-welcome-title">Ask the archive</h1>
+            <p className="ask-welcome-subtitle">Search in plain language. Every answer links back to published records.</p>
+            <div className="ask-suggestions" role="list" aria-label="Example questions">
+              {suggestions.map((s, idx) => (
+                <button
+                  key={s}
+                  role="listitem"
+                  onClick={() => void ask(s)}
+                  disabled={loading}
+                  className="ask-suggestion-card"
+                  style={{ minHeight: 44 }}
+                >
+                  <span className="ask-suggestion-icon" aria-hidden style={{
+                    background: idx === 0 ? "color-mix(in srgb, var(--primary) 18%, var(--surface))" : idx === 1 ? "color-mix(in srgb, #b6a1d6 18%, var(--surface))" : "color-mix(in srgb, #d5b67a 18%, var(--surface))",
+                    color: idx === 0 ? "var(--primary)" : idx === 1 ? "#b6a1d6" : "#d5b67a",
+                  }}>
+                    {idx === 0 && <Sparkles size={16} />}
+                    {idx === 1 && <MessageSquare size={16} />}
+                    {idx === 2 && <Layers size={16} />}
+                  </span>
+                  <span className="ask-suggestion-text">
+                    <strong>{s}</strong>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div ref={endRef} aria-hidden style={{ height: 1 }} />
+
+        <div className="ask-composer-wrap">
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            void ask(input);
+          }}
+          className="ask-composer"
+        >
+          <label className="ask-composer-label" htmlFor="ask-question">
+            Ask a question
+          </label>
+          <div className="ask-composer-field">
+            <textarea
+              id="ask-question"
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void ask(input);
+                }
+              }}
+              rows={1}
+              placeholder="Ask about a speech, letter, theme or period — e.g. “parliamentary independence” …"
+              maxLength={MAX_QUESTION}
+              enterKeyHint="send"
+              autoComplete="off"
+              spellCheck
+              aria-describedby="ask-source-disclaimer ask-composer-help"
+            />
+            <span id="ask-composer-help" className="sr-only">
+              Press Enter to send, Shift+Enter for a new line.
+            </span>
+          </div>
+          <div className="ask-composer-actions">
+            <div className="ask-composer-hint">
+              <span className="ask-hint-dot" aria-hidden />
+              <span>Archive search · Published records only</span>
+            </div>
+            <div className="ask-composer-buttons">
+              {loading ? (
+                <button
+                  type="button"
+                  onClick={() => stopRef.current?.()}
+                  aria-label="Stop searching"
+                  className="ask-composer-stop"
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Voice mode"
+                    className="ask-composer-voice"
+                  >
+                    <Mic size={17} aria-hidden />
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!input.trim()}
+                    aria-label="Send question"
+                    className="ask-composer-send"
+                  >
+                    <Send size={17} aria-hidden />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </form>
+        {input.length >= MAX_QUESTION - 100 && (
+          <p className="ask-composer-counter" role="status" aria-live="polite">
+            {input.length} / {MAX_QUESTION}
+          </p>
+        )}
+        <p className="ask-composer-footnote">
+          Archive search runs on this server. Results come from published records.
+        </p>
+        <p id="ask-source-disclaimer" className="ask-source-note">
+          <MessageSquare size={14} aria-hidden style={{ marginTop: "0.05rem", flexShrink: 0 }} />
+          Archive search: Speaker isn’t answering directly; results come from published records.
+        </p>
+
+        {/* Polite live region for search status announcements */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {loading
+            ? "Searching the archive"
+            : lastAnswer
+              ? `${lastAnswer} ${lastAnswerCount} source${lastAnswerCount === 1 ? "" : "s"} found.`
+              : ""}
+        </p>
+      </div>
+    </main>
 
       <aside className="ask-research-sidebar" aria-label="Research guidance">
         <div className="ask-research-desktop"><ResearchGuidance /></div>

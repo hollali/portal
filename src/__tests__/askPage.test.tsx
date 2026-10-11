@@ -183,6 +183,69 @@ function deferredPosts(result: AskResult = FULL) {
   return { all: () => pending.forEach(release => release()) }
 }
 
+describe('/ask research workspace', () => {
+  it('makes the first question clear and provides tappable examples', async () => {
+    const { container } = render(<AskConsole />)
+    await screen.findByPlaceholderText(/Ask about a speech/i)
+
+    expect(screen.getByText('Ask a question', { selector: 'label' })).toBeInTheDocument()
+    expect(screen.getByText(/Speaker isn’t answering directly/)).toBeInTheDocument()
+    const composer = container.querySelector('.ask-composer')
+    expect(composer).not.toHaveClass('fixed', 'sticky')
+    expect(container.querySelector('#ask-question')).toHaveAttribute(
+      'aria-describedby',
+      'ask-source-disclaimer ask-composer-help',
+    )
+    const examples = container.querySelectorAll('.ask-suggestions button')
+    expect(examples).toHaveLength(3)
+    examples.forEach(example => expect(example).toHaveStyle({ minHeight: '44px' }))
+
+    const firstQuestion = examples[0].textContent ?? ''
+    fireEvent.click(examples[0])
+    await screen.findByText('searched for')
+    expect(postedQuestions()).toEqual([firstQuestion])
+    expect(container.querySelector('.ask-console')).not.toHaveClass('ask-console-empty')
+  })
+
+  it('keeps prior conversations in an accessible, collapsible history panel', async () => {
+    const olderChat = {
+      id: 'older-chat',
+      title: 'Earlier parliament question',
+      createdAt: 1,
+      updatedAt: 1,
+      messages: [
+        { role: 'user', content: 'OLDER CONVERSATION QUESTION' },
+        { role: 'assistant', content: FULL.summary, result: FULL },
+      ],
+    }
+    const currentChat = {
+      id: 'current-chat',
+      title: 'New conversation',
+      createdAt: 2,
+      updatedAt: 2,
+      messages: [],
+    }
+    window.localStorage.setItem(
+      'askbagbin-chat-history-v1',
+      JSON.stringify([currentChat, olderChat]),
+    )
+    render(<AskConsole />)
+
+    const toggle = await screen.findByRole('button', { name: 'Conversation history (1)' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveAttribute('aria-controls', 'ask-history-content')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: /Earlier parliament question/ }))
+    expect(await screen.findByText('OLDER CONVERSATION QUESTION')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Conversation history (0)' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+  })
+})
+
 describe('/ask answer transparency', () => {
   it('shows which terms were searched for', async () => {
     await ask('digitalisation youth')
