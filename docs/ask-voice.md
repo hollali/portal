@@ -23,7 +23,8 @@ chat, changing workspace pages, or leaving `/ask` stops active recognition.
 The Voice page provides a separate hands-free flow and browser speech
 synthesis/read-aloud controls. It can submit a completed recognized question
 when capture ends; this differs from composer dictation, which waits for the
-reader to press Send.
+reader to press Send. Recognition errors explain whether the browser service,
+microphone, permission, or selected language needs attention, and offer a retry.
 
 ## Browser and microphone requirements
 

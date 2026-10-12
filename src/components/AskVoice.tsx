@@ -210,6 +210,8 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
     const session = ++sessionRef.current;
     stoppedRef.current = false;
     resetTranscript();
+    statusRef.current = "idle";
+    setStatus("idle");
 
     const rec = new SR();
     rec.lang = prefsRef.current.sttLang;
@@ -219,6 +221,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
 
     rec.onstart = () => {
       if (session !== sessionRef.current) return;
+      statusRef.current = "listening";
       setStatus("listening");
     };
     rec.onresult = event => {
@@ -237,26 +240,45 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
       if (session !== sessionRef.current) return;
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         setError("Microphone access is blocked. Allow the mic in the browser bar, or use the text box below.");
+        statusRef.current = "error";
         setStatus("error");
       } else if (event.error === "no-speech") {
         setError("No speech was heard. Tap start and try again.");
+        statusRef.current = "idle";
         setStatus("idle");
       } else if (event.error === "aborted") {
         // The reader ended the session — stay idle rather than reporting an error.
+        statusRef.current = "idle";
         setStatus("idle");
+      } else if (event.error === "network") {
+        setError("The browser speech-recognition service could not be reached. Check your connection, or return to chat and type the question.");
+        statusRef.current = "error";
+        setStatus("error");
+      } else if (event.error === "audio-capture") {
+        setError("No microphone is available. Check your device connection and browser permissions.");
+        statusRef.current = "error";
+        setStatus("error");
+      } else if (event.error === "language-not-supported") {
+        setError(`This browser does not support ${prefsRef.current.sttLang || "the selected language"}. Change it in Settings or type the question.`);
+        statusRef.current = "error";
+        setStatus("error");
       } else {
-        setError("The mic had a problem — try again.");
+        setError(`Voice recognition failed (${event.error}). Try again or use the text box.`);
+        statusRef.current = "error";
         setStatus("error");
       }
     };
     rec.onend = () => {
       if (session !== sessionRef.current) return;
+      if (recognitionRef.current === rec) recognitionRef.current = null;
+      if (statusRef.current === "error") return;
       // Natural end with a finished question: submit it automatically. A stop
       // the reader asked for falls through to the `stoppedRef` guard below.
       if (!stoppedRef.current && transcriptRef.current.trim()) {
         void submit(transcriptRef.current);
         return;
       }
+      statusRef.current = "idle";
       setStatus("idle");
     };
 
@@ -264,7 +286,10 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
     try {
       rec.start();
     } catch {
-      setStatus("idle");
+      recognitionRef.current = null;
+      setError("Could not start browser voice recognition. Check microphone permission and use HTTPS or localhost.");
+      statusRef.current = "error";
+      setStatus("error");
     }
   }, [resetTranscript, submit]);
 
@@ -368,6 +393,15 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
               onClick={start}
             >
               <Mic size={17} aria-hidden /> Start listening
+            </button>
+          )}
+          {view === "error" && (
+            <button
+              type="button"
+              className="ask-voice-btn ask-voice-primary"
+              onClick={start}
+            >
+              <Mic size={17} aria-hidden /> Try again
             </button>
           )}
           {view === "listening" && (
