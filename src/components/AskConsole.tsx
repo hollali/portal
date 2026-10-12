@@ -20,27 +20,33 @@
  * localStorage.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  AudioLines,
   CalendarRange,
   Check,
-  Clock,
+  Command,
   Copy,
   ExternalLink,
   FileText,
+  Info,
   Landmark,
   Layers,
   Link2,
   LayoutPanelLeft,
   MessageSquare,
   Mic,
+  Pencil,
+  Plus,
   RefreshCw,
   RotateCcw,
   Search,
   Send,
+  Settings2,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { KIND_ICON } from "@/lib/kindIcon";
@@ -52,12 +58,12 @@ import {
   type AskResult,
 } from "@/lib/askQuery";
 import { highlightTerms } from "@/lib/askHighlight";
-import ChatHistorySidebar, {
-  createNewChat,
-  loadAllChats,
-  saveAllChats,
-  type PersistedChat,
-} from "./ChatHistorySidebar";
+import { Button } from "./ui/Button";
+import { ToastProvider, useToast } from "@/components/ui/Toast";
+import { DEFAULT_PREFS, applyTheme, loadPrefs, savePrefs, type AskPrefs } from "@/lib/askPrefs";
+import AskVoice from "@/components/AskVoice";
+import AskSettings from "@/components/AskSettings";
+import AskIntegrations from "@/components/AskIntegrations";
 
 
 interface ChatMsg {
@@ -69,6 +75,9 @@ interface ChatMsg {
   stopped?: boolean;
   ts?: number;
 }
+
+/** Which workspace page is open — mirrors the reference app's sidebar. */
+type Page = "chat" | "voice" | "settings" | "integrations";
 
 /** Smallest comfortable target. Chips here were 36px, under the 44px guideline. */
 const HIT = 44;
@@ -311,19 +320,6 @@ function restoreMessages(chat: PersistedChat): ChatMsg[] {
     }];
   });
 }
-
-const AVATAR: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: "50%",
-  flexShrink: 0,
-  background: "color-mix(in srgb, var(--primary) 14%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--primary) 35%, transparent)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: "var(--primary)",
-};
 
 /**
  * Renders text with the reader's own terms marked up. The archive matches by
@@ -781,11 +777,15 @@ function CitationCard({
 function ResearchGuidance() {
   return (
     <div className="ask-guidance-panel">
-      <h2>About this search</h2>
       <p>Search the published speeches, letters, papers, milestones and testimonials in the archive.</p>
       <p>Answers show the strongest matches and link back to each record, so you can check the source.</p>
       <p className="ask-guidance-disclaimer">
-        <strong>This is not the Speaker himself.</strong> It is a search of the published archive. First-person passages are quoted from their linked records.
+        <span className="ask-guidance-disclaimer-icon" aria-hidden="true">
+          <Info size={15} />
+        </span>
+        <span>
+          <strong>This is not the Speaker himself.</strong> It is a search of the published archive. First-person passages are quoted from their linked records.
+        </span>
       </p>
     </div>
   );
@@ -1368,11 +1368,388 @@ function AssistantReply({
   );
 }
 
+/* ---------------------------------------------------------------------------
+   Conversation history (previously its own ChatHistorySidebar.tsx module).
+   Lives here, in the /ask console, so the history rail is styled and versioned
+   alongside every other part of the page it belongs to.
+   --------------------------------------------------------------------------- */
+
+export type PersistedMessage = {
+  role: "user" | "assistant";
+  content: string;
+  ts?: number;
+  result?: unknown;
+  failed?: boolean;
+  stopped?: boolean;
+};
+
+export type PersistedChat = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: PersistedMessage[];
+};
+
+const STORAGE_KEY = "askbagbin-chat-history-v1";
+const LEGACY_KEY = "askbagbin-chat-v1";
+
+function generateId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
+}
+
+function deriveTitle(messages: PersistedMessage[]): string {
+  const firstUser = messages.find((m) => m.role === "user");
+  const text = (firstUser?.content || "").trim().replace(/\s+/g, " ");
+  if (text.length === 0) return "New conversation";
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+}
+
+function safeParse<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  return `${Math.floor(days / 365)}y`;
+}
+
+function groupChats(chats: PersistedChat[]): Record<string, PersistedChat[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  return chats.reduce<Record<string, PersistedChat[]>>((groups, item) => {
+    const day = new Date(item.updatedAt).toISOString().slice(0, 10);
+    const group = day === today ? "Today" : day === yesterday ? "Yesterday" : "Earlier";
+    (groups[group] ||= []).push(item);
+    return groups;
+  }, {});
+}
+
+export function loadAllChats(): PersistedChat[] {
+  const migrated = migrateLegacy();
+  if (migrated) return migrated;
+  const parsed = safeParse<PersistedChat[]>(localStorage.getItem(STORAGE_KEY));
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((c) => c && Array.isArray(c.messages))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function migrateLegacy(): PersistedChat[] | null {
+  const legacy = safeParse<PersistedMessage[]>(localStorage.getItem(LEGACY_KEY));
+  if (!Array.isArray(legacy) || legacy.length === 0) return null;
+  const now = Date.now();
+  const chat: PersistedChat = {
+    id: generateId(),
+    title: deriveTitle(legacy),
+    createdAt: now,
+    updatedAt: now,
+    messages: legacy,
+  };
+  const chats = [chat];
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {}
+  return chats;
+}
+
+export function saveAllChats(chats: PersistedChat[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chats.slice(0, 50)));
+  } catch {}
+}
+
+/** Wipe every stored conversation. Used by the Settings page's privacy reset. */
+export function clearAllChats() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {}
+}
+
+export function createNewChat(): PersistedChat {
+  const now = Date.now();
+  return {
+    id: generateId(),
+    title: "New conversation",
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+}
+
+type ChatHistorySidebarProps = {
+  chats: PersistedChat[];
+  activeChatId: string | null;
+  onSelectChat: (chatId: string) => void;
+  onNewChat: () => void;
+  onDeleteChat: (chatId: string) => void;
+  onRenameChat?: (chatId: string, title: string) => void;
+  className?: string;
+  mobile?: boolean;
+  onCloseMobile?: () => void;
+  showNewChat?: boolean;
+};
+
+function ChatHistorySidebar({
+  chats,
+  activeChatId,
+  onSelectChat,
+  onNewChat,
+  onDeleteChat,
+  onRenameChat,
+  className = "",
+  mobile = false,
+  onCloseMobile,
+  showNewChat = true,
+}: ChatHistorySidebarProps) {
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+
+  const sortedChats = useMemo(
+    () => [...chats].sort((a, b) => b.updatedAt - a.updatedAt),
+    [chats]
+  );
+
+  const visibleChats = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return sortedChats;
+    return sortedChats.filter((chat) => {
+      const lastUser = [...chat.messages].reverse().find((m) => m.role === "user");
+      const haystack = `${chat.title} ${lastUser?.content ?? ""}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [sortedChats, search]);
+
+  const groupedChats = useMemo(() => groupChats(visibleChats), [visibleChats]);
+
+  const handleSelect = (id: string) => {
+    onSelectChat(id);
+    if (mobile) onCloseMobile?.();
+  };
+  const handleNew = () => {
+    onNewChat();
+    if (mobile) onCloseMobile?.();
+  };
+
+  const startRename = (chat: PersistedChat) => {
+    setEditingId(chat.id);
+    setDraftTitle(chat.title);
+  };
+
+  const commitRename = () => {
+    if (!editingId) return;
+    const next = draftTitle.trim().slice(0, 60);
+    if (next && next !== chats.find((c) => c.id === editingId)?.title) {
+      onRenameChat?.(editingId, next);
+    }
+    setEditingId(null);
+    setDraftTitle("");
+  };
+
+  const cancelRename = () => {
+    setEditingId(null);
+    setDraftTitle("");
+  };
+
+  const groupOrder = ["Today", "Yesterday", "Earlier"];
+
+  return (
+    <aside
+      className={`ask-history-sidebar ${className}`}
+      aria-label="Chat history"
+      style={{ width: mobile ? "min(85vw, 320px)" : undefined }}
+    >
+      {showNewChat && (
+        <div className="ask-history-head">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="ask-history-new"
+            onClick={handleNew}
+          >
+            <Plus size={16} aria-hidden="true" />
+            <span>New chat</span>
+          </Button>
+        </div>
+      )}
+
+      <div className="ask-history-body">
+        <label className="ask-history-search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search conversations"
+            aria-label="Search conversations"
+          />
+        </label>
+
+        <ul className="ask-history-list">
+          {groupOrder.map((group) => {
+            const items = groupedChats[group];
+            if (!items || items.length === 0) return null;
+            return (
+              <li key={group} className="ask-history-group">
+                <span className="ask-history-date">{group}</span>
+                <ul className="ask-history-group-list">
+                  {items.map((chat) => {
+                    const active = chat.id === activeChatId;
+                    const lastUser = [...chat.messages].reverse().find((m) => m.role === "user");
+                    const preview = (lastUser?.content || chat.title || "New conversation").replace(/\s+/g, " ");
+                    const editing = editingId === chat.id;
+                    return (
+                      <li key={chat.id} className="ask-history-item" data-active={active ? "on" : "off"}>
+                        {editing ? (
+                          <form
+                            className="ask-history-rename"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              commitRename();
+                            }}
+                          >
+                            <MessageSquare size={14} className="ask-history-rename-icon" aria-hidden="true" />
+                            <input
+                              autoFocus
+                              value={draftTitle}
+                              maxLength={60}
+                              aria-label="Conversation name"
+                              onChange={(event) => setDraftTitle(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  cancelRename();
+                                }
+                              }}
+                              onBlur={commitRename}
+                            />
+                            <button type="submit" className="ask-history-rename-btn" aria-label="Save name">
+                              <Check size={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              className="ask-history-rename-btn"
+                              aria-label="Cancel rename"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={cancelRename}
+                            >
+                              <X size={14} aria-hidden="true" />
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSelect(chat.id)}
+                            className="ask-history-entry"
+                            aria-current={active ? "true" : undefined}
+                          >
+                            <span className="ask-history-entry-top">
+                              <MessageSquare size={14} className="ask-history-entry-icon" aria-hidden="true" />
+                              <span className="ask-history-entry-title">
+                                {chat.title || "New conversation"}
+                              </span>
+                              <span className="ask-history-entry-time">{timeAgo(chat.updatedAt)}</span>
+                            </span>
+                            {preview && (
+                              <span className="ask-history-entry-preview">
+                                {preview.length > 68 ? `${preview.slice(0, 68)}…` : preview}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        {!editing && (
+                          <div className="ask-history-item-actions">
+                            {onRenameChat && (
+                              <button
+                                type="button"
+                                onClick={() => startRename(chat)}
+                                className="ask-history-action"
+                                aria-label="Rename conversation"
+                                title="Rename conversation"
+                              >
+                                <Pencil size={14} aria-hidden="true" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onDeleteChat(chat.id)}
+                              className="ask-history-action ask-history-action-danger"
+                              aria-label="Delete conversation"
+                              title="Delete conversation"
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            );
+          })}
+
+          {sortedChats.length === 0 && (
+            <li className="ask-history-empty">
+              <MessageSquare size={20} aria-hidden="true" />
+              <span>No conversations yet</span>
+              <span className="ask-history-empty-hint">Start a new chat to begin</span>
+            </li>
+          )}
+          {sortedChats.length > 0 && visibleChats.length === 0 && (
+            <li className="ask-history-empty">
+              <Search size={20} aria-hidden="true" />
+              <span>No conversations match your search</span>
+            </li>
+          )}
+        </ul>
+      </div>
+    </aside>
+  );
+}
+
 export default function AskConsole({
   initialQuery = null,
 }: {
   initialQuery?: string | null;
 }) {
+  return (
+    <ToastProvider>
+      <AskShell initialQuery={initialQuery} />
+    </ToastProvider>
+  );
+}
+
+function AskShell({
+  initialQuery = null,
+}: {
+  initialQuery?: string | null;
+}) {
+  const { toast } = useToast();
+  const [page, setPage] = useState<Page>("chat");
+  const [prefs, setPrefs] = useState<AskPrefs>(DEFAULT_PREFS);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState("");
@@ -1383,6 +1760,7 @@ export default function AskConsole({
   const [chats, setChats] = useState<PersistedChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [aboutExpanded, setAboutExpanded] = useState(false);
   // The rail starts open on desktop (chatbot reference) and closed on phones,
   // where it is a drawer. Read on mount, not in the state initializer: the
   // initializer also runs during server prerender, where `window` does not
@@ -1418,7 +1796,7 @@ export default function AskConsole({
   const bootedRef = useRef(false);
 
   const ask = useCallback(
-    async (question: string) => {
+    async (question: string, options?: { onResult?: (result: unknown) => void; onError?: () => void }) => {
       const text = question.trim();
       if (!text) return;
 
@@ -1480,6 +1858,7 @@ export default function AskConsole({
             ...prev,
             { role: "assistant", content: "", failed: true },
           ]);
+          options?.onError?.();
           return;
         }
 
@@ -1492,15 +1871,18 @@ export default function AskConsole({
             ...prev,
             { role: "assistant", content: "", failed: true },
           ]);
+          options?.onError?.();
           return;
         }
         setMessages(prev => [
           ...prev,
           { role: "assistant", content: result.summary, result },
         ]);
+        options?.onResult?.(result);
       } catch (err) {
         if ((err as Error)?.name === "AbortError") return;
         setMessages(prev => [...prev, { role: "assistant", content: "", failed: true }]);
+        options?.onError?.();
       } finally {
         // `delete` reports whether it was there, so this both reads and clears
         // the flag.
@@ -1532,6 +1914,10 @@ export default function AskConsole({
     },
     [],
   );
+
+  useEffect(() => {
+    setPrefs(loadPrefs());
+  }, []);
 
   useEffect(() => {
     let loadedChats: PersistedChat[] = [];
@@ -1702,10 +2088,20 @@ export default function AskConsole({
   };
 
   const handleDeleteChat = (chatId: string) => {
+    const before = chats;
     const remaining = chats.filter(chat => chat.id !== chatId);
     if (chatId !== activeChatId) {
       setChats(remaining);
       saveAllChats(remaining);
+      toast("Conversation deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            setChats(before);
+            saveAllChats(before);
+          },
+        },
+      });
       return;
     }
 
@@ -1723,6 +2119,15 @@ export default function AskConsole({
     setCopiedIndex(null);
     setLinkCopied(false);
     writeQueryParam(null);
+    toast("Conversation deleted", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          setChats(before);
+          saveAllChats(before);
+        },
+      },
+    });
   };
 
   const handleRenameChat = (chatId: string, title: string) => {
@@ -1735,9 +2140,55 @@ export default function AskConsole({
     saveAllChats(nextChats);
   };
 
+  // Shortcuts mirror the reference app: ⌘K focuses the composer, ⌘B toggles the
+  // history rail, ⌘N starts a conversation, Esc closes the drawer on a phone.
+  const pageRef = useRef<Page>("chat");
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+  const historyExpandedRef = useRef(historyExpanded);
+  useEffect(() => {
+    historyExpandedRef.current = historyExpanded;
+  }, [historyExpanded]);
+  const newChatRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    newChatRef.current = handleNewChat;
+  });
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const mod = event.ctrlKey || event.metaKey;
+      if (!event.altKey && mod) {
+        const key = event.key.toLowerCase();
+        if (key === "k") {
+          event.preventDefault();
+          setPage("chat");
+          inputRef.current?.focus();
+          return;
+        }
+        if (key === "b") {
+          event.preventDefault();
+          setHistoryExpanded(open => !open);
+          return;
+        }
+        if (key === "n" && !event.shiftKey) {
+          event.preventDefault();
+          newChatRef.current();
+          return;
+        }
+      }
+      if (event.key === "Escape" && historyExpandedRef.current && window.innerWidth < 1100) {
+        setHistoryExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const onCopy = (text: string, index: number) => {
     void navigator.clipboard?.writeText(text).then(() => {
       setCopiedIndex(index);
+      toast("Copied to clipboard");
       window.setTimeout(() => setCopiedIndex(null), 1600);
     });
   };
@@ -1745,8 +2196,34 @@ export default function AskConsole({
   const onCopyLink = () => {
     void navigator.clipboard?.writeText(window.location.href).then(() => {
       setLinkCopied(true);
+      toast("Link copied to clipboard");
       window.setTimeout(() => setLinkCopied(false), 1600);
     });
+  };
+
+  const handlePrefsChange = (next: AskPrefs) => {
+    setPrefs(next);
+    savePrefs(next);
+    if (next.theme !== prefs.theme) applyTheme(next.theme);
+    toast("Preferences saved");
+  };
+
+  const handleClearHistory = () => {
+    abortRef.current?.abort();
+    clearAllChats();
+    const fresh = createNewChat();
+    setChats([fresh]);
+    setActiveChatId(fresh.id);
+    setMessages([]);
+    messagesRef.current = [];
+    setInput("");
+    setLoading(false);
+    setCopiedIndex(null);
+    setLinkCopied(false);
+    writeQueryParam(null);
+    setPage("chat");
+    inputRef.current?.focus();
+    toast("Conversation history cleared");
   };
 
   const emptyChat = hydrated && messages.length === 0;
@@ -1754,6 +2231,15 @@ export default function AskConsole({
     chat.id !== activeChatId && chat.messages.some(message => message.role === "user"),
   );
   const hasHistory = previousChats.length > 0;
+
+  const pageLabel =
+    page === "voice"
+      ? "Voice"
+      : page === "settings"
+        ? "Settings"
+        : page === "integrations"
+          ? "Integrations"
+          : "Workspace";
 
   /**
    * The question each turn belongs to, by index.
@@ -1781,29 +2267,134 @@ export default function AskConsole({
       data-has-conversation={messages.length > 0 ? "on" : "off"}
       data-has-history={hasHistory ? "on" : "off"}
       data-history-expanded={historyExpanded ? "true" : "false"}
+      data-page={page}
     >
-      <div className="ask-history" data-open={historyExpanded ? "on" : "off"}>
-        <button
-          className="ask-history-toggle"
-          type="button"
-          aria-expanded={historyExpanded}
-          aria-controls="ask-history-content"
-          onClick={() => setHistoryExpanded(open => !open)}
-        >
-          Conversation history ({previousChats.length})
-        </button>
-        <div id="ask-history-content" className="ask-history-content">
-          <ChatHistorySidebar
-            chats={previousChats}
-            activeChatId={activeChatId}
-            onSelectChat={handleSelectChat}
-            onNewChat={handleNewChat}
-            onDeleteChat={handleDeleteChat}
-            onRenameChat={handleRenameChat}
-            className="ask-history-panel"
-          />
+      <aside
+        id="ask-sidebar"
+        className="ask-sidebar"
+        data-open={historyExpanded ? "on" : "off"}
+        aria-label="Workspace"
+      >
+        <div className="ask-sidebar-top">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="ask-new-chat"
+            onClick={() => {
+              handleNewChat();
+              setPage("chat");
+            }}
+          >
+            <Plus size={16} aria-hidden />
+            <span>New chat</span>
+          </Button>
+          <button
+            type="button"
+            className="ask-sidebar-close"
+            aria-label="Close menu"
+            onClick={() => setHistoryExpanded(false)}
+          >
+            <X size={18} aria-hidden />
+          </button>
         </div>
-      </div>
+
+        <nav className="ask-sidebar-nav" aria-label="Workspace pages">
+          <button
+            type="button"
+            className={page === "chat" ? "active" : ""}
+            aria-current={page === "chat" ? "page" : undefined}
+            onClick={() => {
+              setPage("chat");
+              setHistoryExpanded(false);
+            }}
+          >
+            <LayoutPanelLeft size={16} aria-hidden />
+            <span>Chat</span>
+          </button>
+          <button
+            type="button"
+            className={page === "voice" ? "active" : ""}
+            aria-current={page === "voice" ? "page" : undefined}
+            onClick={() => {
+              setPage("voice");
+              setHistoryExpanded(false);
+            }}
+          >
+            <AudioLines size={16} aria-hidden />
+            <span>Voice</span>
+          </button>
+          <button
+            type="button"
+            className={page === "integrations" ? "active" : ""}
+            aria-current={page === "integrations" ? "page" : undefined}
+            onClick={() => {
+              setPage("integrations");
+              setHistoryExpanded(false);
+            }}
+          >
+            <Command size={16} aria-hidden />
+            <span>Integrations</span>
+          </button>
+          <button
+            type="button"
+            className={page === "settings" ? "active" : ""}
+            aria-current={page === "settings" ? "page" : undefined}
+            onClick={() => {
+              setPage("settings");
+              setHistoryExpanded(false);
+            }}
+          >
+            <Settings2 size={16} aria-hidden />
+            <span>Settings</span>
+          </button>
+        </nav>
+
+        <div className="ask-sidebar-history" data-open={historyExpanded ? "on" : "off"}>
+          <span className="ask-sidebar-history-label" aria-hidden>
+            History ({previousChats.length})
+          </span>
+          <button
+            className="ask-history-toggle"
+            type="button"
+            aria-expanded={historyExpanded}
+            aria-controls="ask-history-content"
+            onClick={() => setHistoryExpanded(open => !open)}
+          >
+            Conversation history ({previousChats.length})
+          </button>
+          <div id="ask-history-content" className="ask-history-content">
+            <ChatHistorySidebar
+              chats={previousChats}
+              activeChatId={activeChatId}
+              onSelectChat={(id) => {
+                setPage("chat");
+                handleSelectChat(id);
+              }}
+              onNewChat={handleNewChat}
+              onDeleteChat={handleDeleteChat}
+              onRenameChat={handleRenameChat}
+              showNewChat={false}
+            />
+          </div>
+        </div>
+
+        <div className="ask-sidebar-about" data-open={aboutExpanded ? "on" : "off"}>
+          <button
+            type="button"
+            className="ask-sidebar-about-toggle"
+            aria-expanded={aboutExpanded}
+            aria-controls="ask-about-content"
+            onClick={() => setAboutExpanded(open => !open)}
+          >
+            <Info size={15} aria-hidden />
+            <span>About this search</span>
+          </button>
+          <div id="ask-about-content" className="ask-sidebar-about-content">
+            <ResearchGuidance />
+          </div>
+        </div>
+      </aside>
 
       <main className="ask-main flex-1 flex flex-col min-w-0">
       <div className="ask-topbar">
@@ -1811,19 +2402,18 @@ export default function AskConsole({
           <button
             type="button"
             className="ask-topbar-toggle"
-            aria-label={historyExpanded ? "Hide conversation history" : "Show conversation history"}
+            aria-label={historyExpanded ? "Hide menu" : "Show menu"}
             aria-expanded={historyExpanded}
-            disabled={!hasHistory}
-            title={hasHistory ? undefined : "No saved conversations yet"}
+            aria-controls="ask-sidebar"
             onClick={() => setHistoryExpanded(open => !open)}
           >
             <LayoutPanelLeft size={17} aria-hidden />
           </button>
           <nav className="ask-breadcrumbs" aria-label="Location">
-            <span>Workspace</span>
+            <span>{pageLabel}</span>
           </nav>
         </div>
-        {messages.length > 0 && (
+        {page === "chat" && messages.length > 0 && (
           <div className="ask-topbar-actions">
             <span className="ask-source-count">
               {lastAnswerCount} source{lastAnswerCount === 1 ? "" : "s"} in the last answer
@@ -1842,6 +2432,7 @@ export default function AskConsole({
               onClick={handleNewChat}
               className="ask-icon-btn"
               aria-label="New conversation"
+              title="New conversation (⌘N)"
             >
               <RotateCcw size={13} aria-hidden />
               <span className="sr-only">New conversation</span>
@@ -1850,6 +2441,8 @@ export default function AskConsole({
         )}
       </div>
 
+        {page === "chat" && (
+          <>
         <div
           role="log"
           aria-live="off"
@@ -2067,8 +2660,10 @@ export default function AskConsole({
                 <>
                   <button
                     type="button"
-                    aria-label="Voice mode"
+                    aria-label="Open voice mode"
+                    title="Voice mode"
                     className="ask-composer-voice"
+                    onClick={() => setPage("voice")}
                   >
                     <Mic size={17} aria-hidden />
                   </button>
@@ -2107,15 +2702,35 @@ export default function AskConsole({
               : ""}
         </p>
       </div>
-    </main>
+          </>
+        )}
 
-      <aside className="ask-research-sidebar" aria-label="Research guidance">
-        <div className="ask-research-desktop"><ResearchGuidance /></div>
-        <details className="ask-research-mobile">
-          <summary>About archive answers</summary>
-          <ResearchGuidance />
-        </details>
-      </aside>
+        {page === "voice" && (
+          <div className="ask-page-panel">
+            <AskVoice
+              ask={ask}
+              onBackToChat={() => setPage("chat")}
+              notify={toast}
+              prefs={prefs}
+            />
+          </div>
+        )}
+        {page === "settings" && (
+          <div className="ask-page-panel">
+            <AskSettings
+              prefs={prefs}
+              onPrefsChange={handlePrefsChange}
+              onClearHistory={handleClearHistory}
+              notify={toast}
+            />
+          </div>
+        )}
+        {page === "integrations" && (
+          <div className="ask-page-panel">
+            <AskIntegrations />
+          </div>
+        )}
+    </main>
     </div>
   );
 }

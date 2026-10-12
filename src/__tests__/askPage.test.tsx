@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, act } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, act, within } from '@testing-library/react'
 import AskConsole from '@/components/AskConsole'
 import type { AskResult } from '@/lib/askQuery'
 
@@ -326,14 +326,16 @@ describe('/ask answer transparency', () => {
   it('announces a short status rather than re-reading the whole answer', async () => {
     answer = PARTIAL
     await ask('cryptocurrency mining')
-    const status = await screen.findByRole('status')
+    // The toast system adds its own polite live region, so pin the search
+    // status to the conversation's own landmark.
+    const status = await within(screen.getByRole('main')).findByRole('status')
     await waitFor(() => expect(status).toHaveTextContent(/Partial answer/))
     expect(status).toHaveTextContent(/Nothing in the archive covers cryptocurrency/)
   })
 
   it('announces a successful search as found, not as a wall of prose', async () => {
     await ask('digitalisation youth')
-    const status = await screen.findByRole('status')
+    const status = await within(screen.getByRole('main')).findByRole('status')
     await waitFor(() => expect(status).toHaveTextContent('Answer found. 1 source found.'))
   })
 })
