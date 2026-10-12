@@ -244,6 +244,60 @@ describe('/ask research workspace', () => {
       'false',
     )
   })
+
+  it('opens the mobile drawer and collapses the desktop sidebar with the same toggle', async () => {
+    const originalMatchMedia = window.matchMedia
+    const setViewport = (matches: boolean) => {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: vi.fn((media: string) => ({
+          matches,
+          media,
+          onchange: null,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        }) as unknown as MediaQueryList),
+      })
+    }
+
+    try {
+      setViewport(true)
+      const mobile = render(<AskConsole />)
+      const mobileToggle = await screen.findByRole('button', { name: 'Open workspace sidebar' })
+      expect(mobileToggle).toHaveAttribute('aria-expanded', 'false')
+      fireEvent.click(mobileToggle)
+      expect(screen.getByRole('button', { name: 'Close workspace sidebar' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      expect(screen.getByRole('button', { name: 'Close workspace menu' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Close workspace menu' }))
+      expect(screen.getByRole('button', { name: 'Open workspace sidebar' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+      mobile.unmount()
+
+      setViewport(false)
+      render(<AskConsole />)
+      const desktopToggle = await screen.findByRole('button', { name: 'Collapse workspace sidebar' })
+      expect(desktopToggle).toHaveAttribute('aria-expanded', 'true')
+      fireEvent.click(desktopToggle)
+      expect(screen.getByRole('button', { name: 'Expand workspace sidebar' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+      expect(document.querySelector('.ask-console')).toHaveAttribute('data-sidebar-collapsed', 'true')
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      })
+    }
+  })
 })
 
 describe('/ask answer transparency', () => {

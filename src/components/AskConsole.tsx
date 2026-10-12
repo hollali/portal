@@ -1600,10 +1600,12 @@ function ChatHistorySidebar({
         <label className="ask-history-search">
           <Search size={14} aria-hidden="true" />
           <input
+            type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search conversations"
             aria-label="Search conversations"
+            autoComplete="off"
           />
         </label>
 
@@ -1761,12 +1763,18 @@ function AskShell({
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [aboutExpanded, setAboutExpanded] = useState(false);
-  // The rail starts open on desktop (chatbot reference) and closed on phones,
-  // where it is a drawer. Read on mount, not in the state initializer: the
-  // initializer also runs during server prerender, where `window` does not
-  // exist, and hydration keeps that first value.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isCompactLayout, setIsCompactLayout] = useState(false);
   useEffect(() => {
-    if (window.innerWidth >= 1100) setHistoryExpanded(true);
+    const media = window.matchMedia("(max-width: 1099px)");
+    const update = () => {
+      setIsCompactLayout(media.matches);
+      if (!media.matches) setMobileSidebarOpen(false);
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -2055,6 +2063,7 @@ function AskShell({
   const handleNewChat = () => {
     abortRef.current?.abort();
     setHistoryExpanded(false);
+    setMobileSidebarOpen(false);
     const nextChat = createNewChat();
     const nextChats = [nextChat, ...chats];
     setChats(nextChats);
@@ -2079,6 +2088,7 @@ function AskShell({
     messagesRef.current = restored;
     setActiveChatId(chatId);
     setHistoryExpanded(false);
+    setMobileSidebarOpen(false);
     setLoading(false);
     setInput("");
     setCopiedIndex(null);
@@ -2140,16 +2150,24 @@ function AskShell({
     saveAllChats(nextChats);
   };
 
-  // Shortcuts mirror the reference app: ⌘K focuses the composer, ⌘B toggles the
-  // history rail, ⌘N starts a conversation, Esc closes the drawer on a phone.
+  // Shortcuts: ⌘K focuses the composer, ⌘B toggles the workspace sidebar,
+  // ⌘N starts a conversation, and Esc closes the mobile drawer.
+  const toggleSidebar = useCallback(() => {
+    if (window.matchMedia("(max-width: 1099px)").matches) {
+      setMobileSidebarOpen(open => !open);
+      setHistoryExpanded(true);
+    } else {
+      setSidebarCollapsed(collapsed => !collapsed);
+    }
+  }, []);
   const pageRef = useRef<Page>("chat");
   useEffect(() => {
     pageRef.current = page;
   }, [page]);
-  const historyExpandedRef = useRef(historyExpanded);
+  const mobileSidebarOpenRef = useRef(mobileSidebarOpen);
   useEffect(() => {
-    historyExpandedRef.current = historyExpanded;
-  }, [historyExpanded]);
+    mobileSidebarOpenRef.current = mobileSidebarOpen;
+  }, [mobileSidebarOpen]);
   const newChatRef = useRef<() => void>(() => {});
   useEffect(() => {
     newChatRef.current = handleNewChat;
@@ -2168,7 +2186,7 @@ function AskShell({
         }
         if (key === "b") {
           event.preventDefault();
-          setHistoryExpanded(open => !open);
+          toggleSidebar();
           return;
         }
         if (key === "n" && !event.shiftKey) {
@@ -2177,13 +2195,17 @@ function AskShell({
           return;
         }
       }
-      if (event.key === "Escape" && historyExpandedRef.current && window.innerWidth < 1100) {
-        setHistoryExpanded(false);
+      if (
+        event.key === "Escape" &&
+        mobileSidebarOpenRef.current &&
+        window.matchMedia("(max-width: 1099px)").matches
+      ) {
+        setMobileSidebarOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [toggleSidebar]);
 
   const onCopy = (text: string, index: number) => {
     void navigator.clipboard?.writeText(text).then(() => {
@@ -2237,9 +2259,10 @@ function AskShell({
       ? "Voice"
       : page === "settings"
         ? "Settings"
-        : page === "integrations"
-          ? "Integrations"
-          : "Workspace";
+          : page === "integrations"
+            ? "Integrations"
+            : "Workspace";
+  const compactSidebar = sidebarCollapsed && !isCompactLayout;
 
   /**
    * The question each turn belongs to, by index.
@@ -2267,46 +2290,72 @@ function AskShell({
       data-has-conversation={messages.length > 0 ? "on" : "off"}
       data-has-history={hasHistory ? "on" : "off"}
       data-history-expanded={historyExpanded ? "true" : "false"}
+      data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}
+      data-mobile-sidebar-open={mobileSidebarOpen ? "true" : "false"}
       data-page={page}
     >
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          className="ask-sidebar-backdrop"
+          aria-label="Close workspace menu"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
       <aside
         id="ask-sidebar"
         className="ask-sidebar"
-        data-open={historyExpanded ? "on" : "off"}
+        data-collapsed={sidebarCollapsed ? "true" : "false"}
+        data-open={mobileSidebarOpen ? "on" : "off"}
         aria-label="Workspace"
       >
         <div className="ask-sidebar-top">
+          <span className="ask-sidebar-brand">Ask the archive</span>
+          <button
+            type="button"
+            className="ask-sidebar-close"
+            aria-label="Close menu"
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            <X size={18} aria-hidden />
+          </button>
           <Button
             type="button"
             variant="primary"
-            size="sm"
+            size={compactSidebar ? "lg" : "md"}
+            iconOnly={compactSidebar}
             className="ask-new-chat"
+            aria-label="New chat"
+            aria-keyshortcuts="Control+N Meta+N"
+            style={{
+              height: 46,
+              minWidth: compactSidebar ? 44 : undefined,
+              padding: compactSidebar ? 0 : "0 0.875rem",
+              fontSize: "0.875rem",
+              gap: "0.45rem",
+              borderRadius: 11,
+            }}
             onClick={() => {
               handleNewChat();
               setPage("chat");
             }}
           >
             <Plus size={16} aria-hidden />
-            <span>New chat</span>
+            {!compactSidebar && <span>New chat</span>}
           </Button>
-          <button
-            type="button"
-            className="ask-sidebar-close"
-            aria-label="Close menu"
-            onClick={() => setHistoryExpanded(false)}
-          >
-            <X size={18} aria-hidden />
-          </button>
         </div>
 
         <nav className="ask-sidebar-nav" aria-label="Workspace pages">
+          <span className="ask-sidebar-nav-label">Workspace</span>
           <button
             type="button"
             className={page === "chat" ? "active" : ""}
+            title="Chat"
             aria-current={page === "chat" ? "page" : undefined}
             onClick={() => {
               setPage("chat");
               setHistoryExpanded(false);
+              setMobileSidebarOpen(false);
             }}
           >
             <LayoutPanelLeft size={16} aria-hidden />
@@ -2315,10 +2364,12 @@ function AskShell({
           <button
             type="button"
             className={page === "voice" ? "active" : ""}
+            title="Voice"
             aria-current={page === "voice" ? "page" : undefined}
             onClick={() => {
               setPage("voice");
               setHistoryExpanded(false);
+              setMobileSidebarOpen(false);
             }}
           >
             <AudioLines size={16} aria-hidden />
@@ -2327,10 +2378,12 @@ function AskShell({
           <button
             type="button"
             className={page === "integrations" ? "active" : ""}
+            title="Integrations"
             aria-current={page === "integrations" ? "page" : undefined}
             onClick={() => {
               setPage("integrations");
               setHistoryExpanded(false);
+              setMobileSidebarOpen(false);
             }}
           >
             <Command size={16} aria-hidden />
@@ -2339,10 +2392,12 @@ function AskShell({
           <button
             type="button"
             className={page === "settings" ? "active" : ""}
+            title="Settings"
             aria-current={page === "settings" ? "page" : undefined}
             onClick={() => {
               setPage("settings");
               setHistoryExpanded(false);
+              setMobileSidebarOpen(false);
             }}
           >
             <Settings2 size={16} aria-hidden />
@@ -2402,10 +2457,13 @@ function AskShell({
           <button
             type="button"
             className="ask-topbar-toggle"
-            aria-label={historyExpanded ? "Hide menu" : "Show menu"}
-            aria-expanded={historyExpanded}
+            aria-label={isCompactLayout
+              ? mobileSidebarOpen ? "Close workspace sidebar" : "Open workspace sidebar"
+              : sidebarCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
+            aria-expanded={isCompactLayout ? mobileSidebarOpen : !sidebarCollapsed}
             aria-controls="ask-sidebar"
-            onClick={() => setHistoryExpanded(open => !open)}
+            onClick={toggleSidebar}
+            title={isCompactLayout ? "Open workspace sidebar" : sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <LayoutPanelLeft size={17} aria-hidden />
           </button>

@@ -1,8 +1,13 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { ArrowUpRight } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
+
+// CMS image URLs may come from arbitrary editor-configured hosts, so use a
+// native image element rather than Next's host-restricted image optimizer.
+/* eslint-disable @next/next/no-img-element */
 
 export const dynamic = 'force-dynamic'
 
@@ -19,63 +24,142 @@ const CATEGORY_LABEL: Record<string, string> = {
   national: 'National Service',
 }
 
+// Temporary local illustrations for key entries until editors add milestone-
+// specific images in the CMS. CMS values always take precedence.
+const TIMELINE_IMAGE_FALLBACKS: Record<string, { src: string; alt: string }> = {
+  'University of Ghana, Legon': {
+    src: '/media/alumni-spotlight/alban-bagbin-spotlight.jpeg',
+    alt: 'Alban Bagbin at a University of Ghana Alumni Association event; illustrative image.',
+  },
+  'Elected to Parliament': {
+    src: '/images/bagbin-speaker.jpg',
+    alt: 'Portrait of Alban Bagbin; illustrative image for his first election to Parliament.',
+  },
+  'Speaker of the 8th Parliament': {
+    src: '/images/bagbin-speaker.jpg',
+    alt: 'Portrait of Alban Bagbin; illustrative image for his election as Speaker.',
+  },
+}
+
 export default async function TimelinePage() {
   const rows = await prisma.milestone.findMany({
     where: { status: 'published' },
     orderBy: [{ year: 'asc' }, { order: 'asc' }],
   })
 
-  const entries = rows.map((r: any) => ({
-    ...r,
-    period: r.period || r.year,
-    label: CATEGORY_LABEL[r.category || 'career'] || 'Career',
-    imageUrl: r.imageUrl ?? r.image_url,
-    imageAlt: r.imageAlt ?? r.image_alt,
-  }))
+  const entries = rows.map(r => {
+    const fallback = TIMELINE_IMAGE_FALLBACKS[r.title]
+    return {
+      ...r,
+      period: r.period || r.year,
+      label: CATEGORY_LABEL[r.category || 'career'] || 'Career',
+      imageUrl: r.imageUrl || fallback?.src,
+      imageAlt: r.imageAlt || fallback?.alt || r.title,
+    }
+  })
+
+  const firstYear = entries[0]?.year || '1957'
+  const lastYear = entries[entries.length - 1]?.year || '2025'
 
   return (
-    <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
+    <div className="timeline-page">
       <PublicHeader />
 
-      <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
-        <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
-          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Timeline</span>
-          <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0', color: 'var(--p-text-1)' }}>A life in <span className="p-serif">chronological order</span></h1>
-          <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '38rem', margin: 0 }}>
-            From 1957 to the Speaker&apos;s chair — the full arc. Corresponding documents live in the <Link href="/archives" style={{ color: 'var(--primary)' }}>archives</Link>.
-          </p>
-        </div>
-      </section>
-
-      <section className="p-section" data-motion-entry style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
-        {entries.length === 0 && (
-          <p style={{ color: 'var(--p-text-3)' }}>The timeline is being compiled. Check back soon.</p>
-        )}
-        <div style={{ position: 'relative', paddingLeft: '2.25rem' }}>
-          <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'var(--p-border)' }} />
-          {entries.map(e => (
-            <div key={e.id} className="stagger-item" style={{ position: 'relative', marginBottom: '2.25rem' }}>
-              <span style={{ position: 'absolute', left: '-2.25rem', top: 4, width: 16, height: 16, borderRadius: '50%', background: 'var(--primary)', border: '3px solid var(--p-bg)', boxShadow: '0 0 0 2px var(--p-border-3)' }} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.4rem' }}>
-                <span style={{ fontFamily: 'var(--font-mono), monospace', fontWeight: 800, fontSize: '1.05rem', color: 'var(--primary)' }}>{e.year}</span>
-                <span style={{ fontSize: '0.66rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--p-text-4)' }}>{e.label}</span>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)', marginBottom: '0.35rem' }}>{e.title}</div>
-              {e.imageUrl && (
-                <div style={{ marginBottom: '0.75rem', maxWidth: '36rem' }}>
-                  <img
-                    src={e.imageUrl}
-                    alt={e.imageAlt || e.title}
-                    style={{ width: '100%', height: 'auto', borderRadius: 12, border: '1px solid var(--p-border)', display: 'block' }}
-                  />
+      <main id="content">
+        <section className="timeline-hero">
+          <div className="timeline-hero-grid" aria-hidden="true" />
+          <div className="timeline-hero-inner">
+            <div className="timeline-hero-copy">
+              <span className="timeline-eyebrow">The public life</span>
+              <h1>A life in <span className="p-serif">service</span></h1>
+              <p>
+                Follow Rt. Hon. Alban Bagbin&apos;s journey from the Upper West Region to the Speaker&apos;s chair, through the moments that shaped a life in public service.
+              </p>
+              <div className="timeline-hero-meta" aria-label={`${entries.length} milestones from ${firstYear} to ${lastYear}`}>
+                <div className="timeline-hero-stat">
+                  <strong>{entries.length}</strong>
+                  <span>milestones</span>
                 </div>
-              )}
-              {e.description && <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--p-text-2)', lineHeight: 1.7, maxWidth: '36rem' }}>{e.description}</p>}
+                <span className="timeline-hero-divider" aria-hidden="true" />
+                <div className="timeline-hero-stat">
+                  <strong>{firstYear}—{lastYear}</strong>
+                  <span>in public life</span>
+                </div>
+              </div>
+              <Link className="timeline-hero-link" href="/archives/milestones">
+                Explore the milestones archive <ArrowUpRight size={16} aria-hidden="true" />
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
+
+            <figure className="timeline-hero-portrait">
+              <img
+                src="/images/bagbin-speaker.jpg"
+                alt="Portrait of Rt. Hon. Alban Bagbin"
+                fetchPriority="high"
+                decoding="async"
+              />
+              <figcaption>
+                <span className="timeline-portrait-mark" aria-hidden="true" />
+                <span><strong>Rt. Hon. Alban S. K. Bagbin</strong><small>Speaker of the Parliament of Ghana</small></span>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section className="timeline-section" aria-labelledby="timeline-heading">
+          <header className="timeline-section-heading">
+            <div>
+              <span className="timeline-eyebrow">The journey</span>
+              <h2 id="timeline-heading">Milestones through the years</h2>
+            </div>
+            <p>Each chapter is part of a larger story of service, leadership and parliamentary life.</p>
+          </header>
+
+          {entries.length === 0 ? (
+            <div className="timeline-empty">
+              <span className="timeline-empty-year">1957—</span>
+              <h3>The timeline is taking shape</h3>
+              <p>Published milestones will appear here as they are added to the archive.</p>
+              <Link href="/archives/milestones">Visit the milestones archive <ArrowUpRight size={15} aria-hidden="true" /></Link>
+            </div>
+          ) : (
+            <ol className="timeline-list">
+              {entries.map(e => (
+                <li key={e.id} className="timeline-item">
+                  <div className="timeline-marker" aria-hidden="true" />
+                  <article className={`timeline-card${e.imageUrl ? ' has-image' : ''}`}>
+                    <div className="timeline-card-copy">
+                      <div className="timeline-card-meta">
+                        <time className="timeline-year">{e.period}</time>
+                        <span className="timeline-category">{e.label}</span>
+                      </div>
+                      <h3>{e.title}</h3>
+                      {e.description && <p>{e.description}</p>}
+                    </div>
+                    {e.imageUrl && (
+                      <figure className="timeline-card-image">
+                        <img
+                          src={e.imageUrl}
+                          alt={e.imageAlt || e.title}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </figure>
+                    )}
+                  </article>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {entries.length > 0 && (
+            <footer className="timeline-section-footer">
+              <span>Explore the records behind these milestones</span>
+              <Link href="/archives/milestones">Browse all milestones <ArrowUpRight size={15} aria-hidden="true" /></Link>
+            </footer>
+          )}
+        </section>
+      </main>
 
       <PublicFooter />
     </div>
