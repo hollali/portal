@@ -8,6 +8,12 @@
    that it is listening.
 3. Select the mic again to stop, review or edit the transcript, then press Send.
 
+Some browser speech services end an individual recognition session after a short
+pause. Composer dictation automatically starts a fresh session while the mic is
+still active, and only an explicit stop ends the listening session. Transient
+browser speech-service network errors are retried up to three times with a
+backoff; persistent service errors are surfaced, and typing remains available.
+
 Composer dictation never sends a request on its own. The question is posted to
 `/api/ask` only after Send (or the normal Enter-to-send action). Starting a new
 chat, changing workspace pages, or leaving `/ask` stops active recognition.

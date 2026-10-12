@@ -346,7 +346,7 @@ Read as a subject, "what are the milestones from the 1990s?" searched every reco
 
 ## Ask voice input
 
-The `/ask` composer uses the browser Web Speech recognition API when available. Select the microphone, grant browser microphone permission, dictate, and stop; the recognized text remains in the composer so it can be reviewed or edited before pressing Send. The separate Voice page is also available and submits a completed spoken question automatically. Voice features depend on browser support and a secure context (`localhost` is considered secure by modern browsers).
+The `/ask` composer uses the browser Web Speech recognition API when available. Select the microphone, grant browser microphone permission, dictate, and stop; the recognized text remains in the composer so it can be reviewed or edited before pressing Send. The composer restarts after browser session pauses and retries transient speech-service network errors. The separate Voice page is also available and submits a completed spoken question automatically. Voice features depend on browser support and a secure context (`localhost` is considered secure by modern browsers).
 
 Speech recognition is handled by the browser and may use its own speech service. Composer dictation is not sent to `/api/ask` until the reader presses Send; Voice mode sends the recognized question when capture completes. See [`docs/ask-voice.md`](docs/ask-voice.md) for the interaction and privacy details.
 

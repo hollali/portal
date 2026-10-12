@@ -104,6 +104,10 @@ const COMPOSER_MAX_H = 148;
  */
 const MAX_QUESTION = 500;
 
+function joinVoiceText(...parts: string[]) {
+  return parts.map(part => part.trim()).filter(Boolean).join(" ").slice(0, MAX_QUESTION);
+}
+
 /**
  * Mirror the question into the address bar without navigating.
  *
@@ -1795,6 +1799,13 @@ function AskShell({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const voiceRecognitionRef = useRef<SpeechRecognition | null>(null);
   const voiceBaseRef = useRef("");
+  const voiceCommittedRef = useRef("");
+  const voiceSessionTextRef = useRef("");
+  const dictationActiveRef = useRef(false);
+  const voiceGenerationRef = useRef(0);
+  const voiceRestartTimerRef = useRef<number | null>(null);
+  const voiceNetworkErrorsRef = useRef(0);
+  const startVoiceRecognitionRef = useRef<(generation: number) => void>(() => {});
   const abortRef = useRef<AbortController | null>(null);
   // The latest transcript, for `ask` to read without taking `messages` as a
   // dependency. Closing over `messages` directly would hand every call site a
@@ -1820,20 +1831,132 @@ function AskShell({
   const forceScrollRef = useRef(false);
   const bootedRef = useRef(false);
 
-  const stopDictation = useCallback((abort = true) => {
-    const recognition = voiceRecognitionRef.current;
-    if (!recognition) {
+  const flushVoiceSession = useCallback(() => {
+    const sessionText = voiceSessionTextRef.current.trim();
+    if (sessionText) {
+      voiceCommittedRef.current = joinVoiceText(voiceCommittedRef.current, sessionText);
+    }
+    voiceSessionTextRef.current = "";
+    setInput(joinVoiceText(voiceBaseRef.current, voiceCommittedRef.current));
+  }, []);
+
+  const startVoiceRecognition = useCallback((generation: number) => {
+    if (!dictationActiveRef.current || generation !== voiceGenerationRef.current) return;
+    const Constructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Constructor) {
+      dictationActiveRef.current = false;
       setDictating(false);
+      toast("Voice dictation is not supported in this browser.", { tone: "info" });
       return;
     }
-    if (abort) {
+
+    const recognition = new Constructor();
+    recognition.lang = prefs.sttLang || "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      if (generation === voiceGenerationRef.current) setDictating(true);
+    };
+    recognition.onresult = event => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      voiceSessionTextRef.current = Array.from({ length: event.results.length }, (_, index) =>
+        event.results[index][0]?.transcript ?? "",
+      ).join("").trim();
+      if (voiceSessionTextRef.current) voiceNetworkErrorsRef.current = 0;
+      setInput(joinVoiceText(
+        voiceBaseRef.current,
+        voiceCommittedRef.current,
+        voiceSessionTextRef.current,
+      ));
+    };
+    recognition.onerror = event => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      // Browsers can report no-speech before their end event. Keep the session
+      // alive; onend below starts a fresh recognition session after a short gap.
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      if (event.error === "network" && ++voiceNetworkErrorsRef.current <= 3) return;
+
+      flushVoiceSession();
       voiceRecognitionRef.current = null;
+      dictationActiveRef.current = false;
+      voiceGenerationRef.current += 1;
+      setDictating(false);
+      if (voiceRestartTimerRef.current !== null) {
+        window.clearTimeout(voiceRestartTimerRef.current);
+        voiceRestartTimerRef.current = null;
+      }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        toast("Microphone access is blocked. Allow it in your browser, or type your question.", { tone: "error" });
+      } else if (event.error === "audio-capture") {
+        toast("No microphone is available. Check your device's microphone connection and permissions.", { tone: "error" });
+      } else if (event.error === "network") {
+        toast("Your browser's speech service is unreachable. Check your connection or continue typing.", { tone: "error" });
+      } else if (event.error === "language-not-supported") {
+        toast("Your browser does not support the selected speech language. Change it in Settings or type your question.", { tone: "error" });
+      } else {
+        toast(`Voice recognition error (${event.error}). Try again or type your question.`, { tone: "error" });
+      }
+    };
+    recognition.onend = () => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      voiceRecognitionRef.current = null;
+      flushVoiceSession();
+      if (!dictationActiveRef.current || generation !== voiceGenerationRef.current) {
+        setDictating(false);
+        return;
+      }
+
+      // Mobile and desktop speech engines commonly end a recognition session
+      // after a short silence. Keep the user's explicit listening session alive
+      // by opening a fresh one; the mic button remains available to stop it.
+      const delay = voiceNetworkErrorsRef.current
+        ? Math.min(300 * 2 ** (voiceNetworkErrorsRef.current - 1), 2000)
+        : 250;
+      voiceRestartTimerRef.current = window.setTimeout(() => {
+        voiceRestartTimerRef.current = null;
+        startVoiceRecognitionRef.current(generation);
+      }, delay);
+    };
+
+    voiceRecognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch {
+      voiceRecognitionRef.current = null;
+      dictationActiveRef.current = false;
+      voiceGenerationRef.current += 1;
+      setDictating(false);
+      toast("Could not start voice dictation. Check your microphone permission and try again.", { tone: "error" });
+    }
+  }, [flushVoiceSession, prefs.sttLang, toast]);
+
+  useEffect(() => {
+    startVoiceRecognitionRef.current = startVoiceRecognition;
+  }, [startVoiceRecognition]);
+
+  const stopDictation = useCallback((abort = true) => {
+    dictationActiveRef.current = false;
+    voiceGenerationRef.current += 1;
+    if (voiceRestartTimerRef.current !== null) {
+      window.clearTimeout(voiceRestartTimerRef.current);
+      voiceRestartTimerRef.current = null;
+    }
+    const recognition = voiceRecognitionRef.current;
+    if (abort) {
+      flushVoiceSession();
+      voiceRecognitionRef.current = null;
+      voiceNetworkErrorsRef.current = 0;
       setDictating(false);
       try {
-        recognition.abort();
+        recognition?.abort();
       } catch {
         /* recognition may have ended already */
       }
+      return;
+    }
+    if (!recognition) {
+      setDictating(false);
       return;
     }
     try {
@@ -1842,10 +1965,10 @@ function AskShell({
       voiceRecognitionRef.current = null;
       setDictating(false);
     }
-  }, []);
+  }, [flushVoiceSession]);
 
   const toggleDictation = useCallback(() => {
-    if (voiceRecognitionRef.current) {
+    if (dictationActiveRef.current) {
       stopDictation(false);
       return;
     }
@@ -1854,57 +1977,23 @@ function AskShell({
       return;
     }
 
-    const Constructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Constructor) {
-      toast("Voice dictation is not supported in this browser.", { tone: "info" });
-      return;
-    }
-
-    const recognition = new Constructor();
-    const initialText = input.trimEnd();
-    voiceBaseRef.current = initialText;
-    recognition.lang = prefs.sttLang || "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = event => {
-      if (voiceRecognitionRef.current !== recognition) return;
-      const transcript = Array.from({ length: event.results.length }, (_, index) =>
-        event.results[index][0]?.transcript ?? "",
-      ).join("").trim();
-      const nextText = [voiceBaseRef.current, transcript].filter(Boolean).join(" ");
-      setInput(nextText.slice(0, MAX_QUESTION));
-    };
-    recognition.onerror = event => {
-      if (voiceRecognitionRef.current !== recognition) return;
-      voiceRecognitionRef.current = null;
-      setDictating(false);
-      if (event.error === "aborted") return;
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        toast("Microphone access is blocked. Allow it in your browser, or type your question.", { tone: "error" });
-      } else if (event.error === "no-speech") {
-        toast("No speech was heard. Tap the microphone and try again.", { tone: "info" });
-      } else {
-        toast("Voice dictation stopped. You can continue typing your question.", { tone: "error" });
-      }
-    };
-    recognition.onend = () => {
-      if (voiceRecognitionRef.current !== recognition) return;
-      voiceRecognitionRef.current = null;
-      setDictating(false);
-    };
-    voiceRecognitionRef.current = recognition;
+    voiceBaseRef.current = input.trimEnd();
+    voiceCommittedRef.current = "";
+    voiceSessionTextRef.current = "";
+    voiceNetworkErrorsRef.current = 0;
+    dictationActiveRef.current = true;
+    const generation = ++voiceGenerationRef.current;
     setDictating(true);
-    try {
-      recognition.start();
-    } catch {
-      voiceRecognitionRef.current = null;
-      setDictating(false);
-      toast("Could not start voice dictation. Check your microphone permission and try again.", { tone: "error" });
-    }
-  }, [input, prefs.sttLang, stopDictation, toast, voiceInputSupported]);
+    startVoiceRecognition(generation);
+  }, [input, startVoiceRecognition, stopDictation, toast, voiceInputSupported]);
 
   useEffect(() => () => {
+    dictationActiveRef.current = false;
+    voiceGenerationRef.current += 1;
+    if (voiceRestartTimerRef.current !== null) {
+      window.clearTimeout(voiceRestartTimerRef.current);
+      voiceRestartTimerRef.current = null;
+    }
     const recognition = voiceRecognitionRef.current;
     voiceRecognitionRef.current = null;
     try {

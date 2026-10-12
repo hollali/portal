@@ -299,7 +299,7 @@ describe('/ask research workspace', () => {
     }
   })
 
-  it('dictates into the composer for review before the reader sends it', async () => {
+  it('keeps dictating across browser session timeouts and lets the reader review before sending', async () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(window, 'SpeechRecognition')
     const recognitions: FakeRecognition[] = []
 
@@ -323,6 +323,18 @@ describe('/ask research workspace', () => {
       }
 
       stop() {
+        this.onend?.call(this as unknown as SpeechRecognition, new Event('end'))
+      }
+
+      endSession() {
+        this.onend?.call(this as unknown as SpeechRecognition, new Event('end'))
+      }
+
+      fail(code: string) {
+        this.onerror?.call(this as unknown as SpeechRecognition, {
+          error: code,
+          message: code,
+        } as SpeechRecognitionErrorEvent)
         this.onend?.call(this as unknown as SpeechRecognition, new Event('end'))
       }
 
@@ -354,6 +366,15 @@ describe('/ask research workspace', () => {
       expect(composer).toHaveValue('What was said about Parliament?')
       expect(composer).toHaveAttribute('readonly')
       expect(screen.getByText('Listening… tap the microphone to stop')).toBeInTheDocument()
+
+      act(() => recognitions[0]?.fail('network'))
+      await waitFor(() => expect(recognitions).toHaveLength(2))
+      expect(screen.getByRole('button', { name: 'Stop voice dictation' })).toHaveAttribute('aria-pressed', 'true')
+      act(() => recognitions[1]?.emit('in the House'))
+      expect(composer).toHaveValue('What was said about Parliament? in the House')
+      act(() => recognitions[1]?.endSession())
+      await waitFor(() => expect(recognitions).toHaveLength(3))
+      expect(screen.getByRole('button', { name: 'Stop voice dictation' })).toHaveAttribute('aria-pressed', 'true')
 
       fireEvent.click(screen.getByRole('button', { name: 'Stop voice dictation' }))
       expect(screen.getByRole('button', { name: 'Start voice dictation' })).toHaveAttribute('aria-pressed', 'false')
