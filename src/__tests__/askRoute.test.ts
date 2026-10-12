@@ -252,6 +252,7 @@ describe('POST /api/ask, with a collection named in the question', () => {
     expect(searchArchive.mock.calls[0][3]).toEqual(['milestones'])
     expect(body.collections).toEqual(['milestones'])
     expect(body.terms).toEqual([])
+    expect(body.reading).toBeUndefined()
   })
 
   it('searches the milestones and the window, not the word', async () => {

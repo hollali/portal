@@ -18,6 +18,7 @@ Built with **Next.js (App Router)** and **React 19**, backed by **Prisma + Neon 
 - [Seeding](#seeding)
 - [Authentication & Roles](#authentication--roles)
 - [Scripts](#scripts)
+- [Ask local-model readiness](#ask-local-model-readiness)
 - [Database Schema](#database-schema)
 - [Project Structure](#project-structure)
 - [API Routes](#api-routes)
@@ -42,7 +43,7 @@ Media files are stored on local disk and served through a secured, path-traversa
 - Faceted archives — speeches, public papers, interviews, notes/letters/memos, milestones, testimonials and curated photos — filterable by `year`, `event`, `location`, `person`, `institution`, `parliament` and `theme`.
 - Media library for **photos**, **videos**, **audio** and **news clippings**, including YouTube embeds.
 - Full-text **search** across the archive.
-- **Ask** assistant: returns cited answers drawn from the live archive (no external LLM dependency).
+- **Ask** assistant: deterministic, cited answers from the live archive, with a disabled-by-default provider seam for a future server-hosted local model.
 - CMS-authored pages rendered from sanitised Markdown.
 
 **Admin CMS**
@@ -248,7 +249,7 @@ Prisma schema: `prisma/schema.prisma`.
 - `/api/search` — archive full-text search
 - `/api/stats` — public archive statistics
 - `/api/content` — published content sections
-- `/api/ask` — Ask assistant (returns cited archive answers)
+- `/api/ask` — Ask assistant (retrieves and returns cited archive answers; optional generated reading is disabled by default)
 - `/api/images`, `/api/videos`, `/api/news`, `/api/audio` (+ `/api/photos`) — paginated public media listings and single-item routes
 - `/api/news/[id]/original` — a clipping as the scraper captured it, served sandboxed; `?download=1` for the file
 - `/api/dl` — digital-library listing
@@ -340,8 +341,13 @@ Read as a subject, "what are the milestones from the 1990s?" searched every reco
 
 ### Known gaps
 
-- `AskResult.reading` exists as a typed boundary for a future generated interpretation and is always absent. Nothing sends it; when something does, the client renders it labelled *Generated reading — not his words*, outside the persona paragraph, because every other word on that page is read verbatim from a stored record.
 - A window or a collection on its own returns as many records as the card cap allows — two milestones, three clippings — and says how many matched. A reader who wants all of them has to visit the collection's own page, which is where the full list lives.
+
+### Ask local-model readiness
+
+The `/ask` route now has an `AskReadingProvider` extension point in `src/lib/askReading.ts`. A future server-hosted model can receive the current question, resolved search terms and a bounded set of retrieved excerpts, then return an optional interpretation labelled *Generated reading — not his words*. The provider output is checked against the archive references supplied to it.
+
+The default provider is a no-op: no model request is made, and deterministic summaries, quotations, counts and source cards remain unchanged. No model host, credentials, weights, runtime dependency or training pipeline is configured. The browser continues to call only `/api/ask`; a future model connection must stay server-side. See [`docs/ask-local-llm.md`](docs/ask-local-llm.md) for the contract and integration checklist.
 
 
 ## Deployment

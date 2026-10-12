@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getLibraryCounts } from '@/lib/libraryQueries'
 import { bestPassage, searchArchive, type ScoredCandidate } from '@/lib/askSearch'
+import { generateAskReading } from '@/lib/askReading'
 import {
   buildVoice,
   resolveQuestion,
@@ -526,6 +527,26 @@ export async function POST(request: NextRequest) {
   // rather than a next step. The theme list stays as the fallback for turns that
   // never reached a search.
   const resultSuggestions = suggestionsFromResult(results, matchedTerms, raw)
+  // The optional interpretation is a separate, explicitly-labelled layer over
+  // the exact same results. The default provider is disabled, so today's
+  // summary, quotes and cards remain wholly deterministic. A future server-side
+  // local provider receives only bounded passages from records shown below.
+  const reading = await generateAskReading(
+    {
+      question: raw.slice(0, 500),
+      searchTerms,
+      contextTerms: resolved.context.slice(0, 6),
+      evidence: results.map(({ candidate, matched }) => ({
+        ref: candidate.href,
+        collection: candidate.collectionLabel,
+        title: candidate.title,
+        year: candidate.year,
+        passage: bestPassage(candidate, [...matched], 560),
+      })),
+    },
+    undefined,
+    { signal: request.signal },
+  )
 
   return NextResponse.json({
     summary,
@@ -543,6 +564,7 @@ export async function POST(request: NextRequest) {
     ...(undated?.length ? { undated } : {}),
     ...(collections.length ? { collections } : {}),
     ...(unsearchable.length ? { unsearchable } : {}),
+    ...(reading ? { reading } : {}),
     suggested: resultSuggestions.length > 0 ? resultSuggestions : suggestions,
     conversation: {
       kind: resolved.kind,

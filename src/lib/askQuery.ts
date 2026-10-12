@@ -732,7 +732,7 @@ export interface AskReading {
   text: string
   /** Always true. Present so it can be asserted on, not inferred from the field. */
   generated: true
-  /** Ids of the records this reading was drawn from, so it can be checked. */
+  /** Internal archive hrefs of the records this reading was drawn from. */
   basedOn: string[]
 }
 
