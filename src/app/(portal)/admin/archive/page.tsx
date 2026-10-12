@@ -16,7 +16,7 @@ import { KIND_CONFIG, DOCUMENT_KINDS, FACET_LABELS, type ArchiveKind } from '@/l
 type Tab = 'archive' | 'milestones' | 'testimonials'
 
 interface ArchiveRow { id: number; kind: string; title: string; slug: string; date: string | null; year: number | null; event: string | null; location: string | null; person: string | null; institution: string | null; parliament: string | null; theme: string | null; venue: string | null; occasion: string | null; excerpt: string | null; body: string | null; filePath: string | null; fileName: string | null; source: string | null; sourceUrl: string | null; videoUrl: string | null; audioUrl: string | null; photoUrl: string | null; featured: boolean; status: string; updatedAt: string }
-interface MilestoneRow { id: number; year: string; period: string | null; title: string; description: string | null; category: string; order: number; status: string }
+interface MilestoneRow { id: number; year: string; period: string | null; title: string; description: string | null; category: string; order: number; status: string; imageUrl: string | null; imageAlt: string | null }
 interface TestimonialRow { id: number; author: string; role: string | null; quote: string; source: string | null; year: number | null; photoUrl: string | null; sortOrder: number; status: string }
 
 function PaginationBar({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
@@ -195,7 +195,7 @@ export default function ArchiveAdminPage() {
   /* ── Milestones ── */
   const openMileModal = (mode: 'create' | 'edit', row?: MilestoneRow) => {
     setMileModal({ mode, row })
-    setMileForm({ year: row?.year || '', period: row?.period || '', title: row?.title || '', description: row?.description || '', category: row?.category || 'career', order: String(row?.order ?? 0), status: row?.status || 'draft' })
+    setMileForm({ year: row?.year || '', period: row?.period || '', title: row?.title || '', description: row?.description || '', category: row?.category || 'career', order: String(row?.order ?? 0), status: row?.status || 'draft', imageUrl: row?.imageUrl || '', imageAlt: row?.imageAlt || '' })
   }
   const closeMileModal = () => { setMileModal(null) }
 
@@ -575,6 +575,12 @@ export default function ArchiveAdminPage() {
               </Field>
               <Field label="Order"><Input value={mileForm.order} onChange={e => setMileForm(f => ({ ...f, order: e.target.value }))} /></Field>
             </div>
+            <Field label="Image URL (optional)">
+              <Input value={mileForm.imageUrl} onChange={e => setMileForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://..." />
+            </Field>
+            <Field label="Image Alt (optional)">
+              <Input value={mileForm.imageAlt} onChange={e => setMileForm(f => ({ ...f, imageAlt: e.target.value }))} placeholder="Description for accessibility" />
+            </Field>
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button variant="secondary" onClick={closeMileModal} disabled={saving}>Cancel</Button>

@@ -60,6 +60,15 @@ export default async function TimelinePage() {
                 <span style={{ fontSize: '0.66rem', fontFamily: 'var(--font-mono), monospace', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--p-text-4)' }}>{e.label}</span>
               </div>
               <div style={{ fontWeight: 700, fontSize: '1.05rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)', marginBottom: '0.35rem' }}>{e.title}</div>
+              {e.imageUrl && (
+                <div style={{ marginBottom: '0.75rem', maxWidth: '36rem' }}>
+                  <img
+                    src={e.imageUrl}
+                    alt={e.imageAlt || e.title}
+                    style={{ width: '100%', height: 'auto', borderRadius: 12, border: '1px solid var(--p-border)', display: 'block' }}
+                  />
+                </div>
+              )}
               {e.description && <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--p-text-2)', lineHeight: 1.7, maxWidth: '36rem' }}>{e.description}</p>}
             </div>
           ))}

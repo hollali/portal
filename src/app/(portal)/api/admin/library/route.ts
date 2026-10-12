@@ -10,7 +10,7 @@ const VALID_STATUSES = ['draft', 'published', 'archived']
 
 const ALLOWED_FIELDS: Record<string, string[]> = {
   archive: ['kind', 'title', 'slug', 'date', 'year', 'event', 'location', 'person', 'institution', 'parliament', 'theme', 'venue', 'occasion', 'source', 'sourceUrl', 'sourceType', 'excerpt', 'body', 'filePath', 'fileName', 'coverUrl', 'videoUrl', 'audioUrl', 'photoUrl', 'featured', 'status'],
-  milestones: ['year', 'period', 'title', 'description', 'category', 'order', 'status'],
+  milestones: ['year', 'period', 'title', 'description', 'category', 'order', 'status', 'imageUrl', 'imageAlt'],
   testimonials: ['author', 'role', 'quote', 'source', 'year', 'photoUrl', 'sortOrder', 'status'],
 }
 

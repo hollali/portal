@@ -119,6 +119,8 @@ model Milestone {
   category    String   @default("career")
   order       Int      @default(0)
   status      String   @default("published")
+  imageUrl    String?  @map("image_url")
+  imageAlt    String?  @map("image_alt")
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([category])
