@@ -18,6 +18,7 @@ Built with **Next.js (App Router)** and **React 19**, backed by **Prisma + Neon 
 - [Seeding](#seeding)
 - [Authentication & Roles](#authentication--roles)
 - [Scripts](#scripts)
+- [Ask voice input](#ask-voice-input)
 - [Ask local-model readiness](#ask-local-model-readiness)
 - [Database Schema](#database-schema)
 - [Project Structure](#project-structure)
@@ -43,7 +44,7 @@ Media files are stored on local disk and served through a secured, path-traversa
 - Faceted archives — speeches, public papers, interviews, notes/letters/memos, milestones, testimonials and curated photos — filterable by `year`, `event`, `location`, `person`, `institution`, `parliament` and `theme`.
 - Media library for **photos**, **videos**, **audio** and **news clippings**, including YouTube embeds.
 - Full-text **search** across the archive.
-- **Ask** assistant: deterministic, cited answers from the live archive, with a disabled-by-default provider seam for a future server-hosted local model.
+- **Ask** assistant: deterministic, cited answers from the live archive; browser voice dictation; and a disabled-by-default provider seam for a future server-hosted local model.
 - CMS-authored pages rendered from sanitised Markdown.
 
 **Admin CMS**
@@ -342,6 +343,12 @@ Read as a subject, "what are the milestones from the 1990s?" searched every reco
 ### Known gaps
 
 - A window or a collection on its own returns as many records as the card cap allows — two milestones, three clippings — and says how many matched. A reader who wants all of them has to visit the collection's own page, which is where the full list lives.
+
+## Ask voice input
+
+The `/ask` composer uses the browser Web Speech recognition API when available. Select the microphone, grant browser microphone permission, dictate, and stop; the recognized text remains in the composer so it can be reviewed or edited before pressing Send. The separate Voice page is also available and submits a completed spoken question automatically. Voice features depend on browser support and a secure context (`localhost` is considered secure by modern browsers).
+
+Speech recognition is handled by the browser and may use its own speech service. Composer dictation is not sent to `/api/ask` until the reader presses Send; Voice mode sends the recognized question when capture completes. See [`docs/ask-voice.md`](docs/ask-voice.md) for the interaction and privacy details.
 
 ### Ask local-model readiness
 

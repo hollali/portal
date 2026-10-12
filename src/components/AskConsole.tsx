@@ -20,7 +20,7 @@
  * localStorage.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -38,6 +38,7 @@ import {
   LayoutPanelLeft,
   MessageSquare,
   Mic,
+  MicOff,
   Pencil,
   Plus,
   RefreshCw,
@@ -81,6 +82,14 @@ type Page = "chat" | "voice" | "settings" | "integrations";
 
 /** Smallest comfortable target. Chips here were 36px, under the 44px guideline. */
 const HIT = 44;
+
+function subscribeNoop() {
+  return () => {};
+}
+
+function browserSpeechRecognitionSupported() {
+  return typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
 
 /** The composer stops growing here and scrolls; past this it is a reading pane. */
 const COMPOSER_MAX_H = 148;
@@ -1755,6 +1764,12 @@ function AskShell({
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState("");
+  const [dictating, setDictating] = useState(false);
+  const voiceInputSupported = useSyncExternalStore(
+    subscribeNoop,
+    browserSpeechRecognitionSupported,
+    () => false,
+  );
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -1778,6 +1793,8 @@ function AskShell({
   }, []);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const voiceRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const voiceBaseRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
   // The latest transcript, for `ask` to read without taking `messages` as a
   // dependency. Closing over `messages` directly would hand every call site a
@@ -1803,10 +1820,105 @@ function AskShell({
   const forceScrollRef = useRef(false);
   const bootedRef = useRef(false);
 
+  const stopDictation = useCallback((abort = true) => {
+    const recognition = voiceRecognitionRef.current;
+    if (!recognition) {
+      setDictating(false);
+      return;
+    }
+    if (abort) {
+      voiceRecognitionRef.current = null;
+      setDictating(false);
+      try {
+        recognition.abort();
+      } catch {
+        /* recognition may have ended already */
+      }
+      return;
+    }
+    try {
+      recognition.stop();
+    } catch {
+      voiceRecognitionRef.current = null;
+      setDictating(false);
+    }
+  }, []);
+
+  const toggleDictation = useCallback(() => {
+    if (voiceRecognitionRef.current) {
+      stopDictation(false);
+      return;
+    }
+    if (!voiceInputSupported) {
+      toast("Voice dictation is not supported in this browser.", { tone: "info" });
+      return;
+    }
+
+    const Constructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Constructor) {
+      toast("Voice dictation is not supported in this browser.", { tone: "info" });
+      return;
+    }
+
+    const recognition = new Constructor();
+    const initialText = input.trimEnd();
+    voiceBaseRef.current = initialText;
+    recognition.lang = prefs.sttLang || "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = event => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      const transcript = Array.from({ length: event.results.length }, (_, index) =>
+        event.results[index][0]?.transcript ?? "",
+      ).join("").trim();
+      const nextText = [voiceBaseRef.current, transcript].filter(Boolean).join(" ");
+      setInput(nextText.slice(0, MAX_QUESTION));
+    };
+    recognition.onerror = event => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      voiceRecognitionRef.current = null;
+      setDictating(false);
+      if (event.error === "aborted") return;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        toast("Microphone access is blocked. Allow it in your browser, or type your question.", { tone: "error" });
+      } else if (event.error === "no-speech") {
+        toast("No speech was heard. Tap the microphone and try again.", { tone: "info" });
+      } else {
+        toast("Voice dictation stopped. You can continue typing your question.", { tone: "error" });
+      }
+    };
+    recognition.onend = () => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      voiceRecognitionRef.current = null;
+      setDictating(false);
+    };
+    voiceRecognitionRef.current = recognition;
+    setDictating(true);
+    try {
+      recognition.start();
+    } catch {
+      voiceRecognitionRef.current = null;
+      setDictating(false);
+      toast("Could not start voice dictation. Check your microphone permission and try again.", { tone: "error" });
+    }
+  }, [input, prefs.sttLang, stopDictation, toast, voiceInputSupported]);
+
+  useEffect(() => () => {
+    const recognition = voiceRecognitionRef.current;
+    voiceRecognitionRef.current = null;
+    try {
+      recognition?.abort();
+    } catch {
+      /* recognition may have ended already */
+    }
+  }, []);
+
   const ask = useCallback(
     async (question: string, options?: { onResult?: (result: unknown) => void; onError?: () => void }) => {
       const text = question.trim();
       if (!text) return;
+      stopDictation();
 
       // A question asked while a search is in flight replaces it rather than
       // being dropped. The composer is deliberately left enabled mid-search, so a
@@ -1920,7 +2032,7 @@ function AskShell({
         }
       }
     },
-    [],
+    [stopDictation],
   );
 
   useEffect(() => {
@@ -2062,6 +2174,7 @@ function AskShell({
 
   const handleNewChat = () => {
     abortRef.current?.abort();
+    stopDictation();
     setHistoryExpanded(false);
     setMobileSidebarOpen(false);
     const nextChat = createNewChat();
@@ -2083,6 +2196,7 @@ function AskShell({
     const chat = chats.find(candidate => candidate.id === chatId);
     if (!chat) return;
     abortRef.current?.abort();
+    stopDictation();
     const restored = restoreMessages(chat);
     setMessages(restored);
     messagesRef.current = restored;
@@ -2353,6 +2467,7 @@ function AskShell({
             title="Chat"
             aria-current={page === "chat" ? "page" : undefined}
             onClick={() => {
+              stopDictation();
               setPage("chat");
               setHistoryExpanded(false);
               setMobileSidebarOpen(false);
@@ -2367,6 +2482,7 @@ function AskShell({
             title="Voice"
             aria-current={page === "voice" ? "page" : undefined}
             onClick={() => {
+              stopDictation();
               setPage("voice");
               setHistoryExpanded(false);
               setMobileSidebarOpen(false);
@@ -2381,6 +2497,7 @@ function AskShell({
             title="Integrations"
             aria-current={page === "integrations" ? "page" : undefined}
             onClick={() => {
+              stopDictation();
               setPage("integrations");
               setHistoryExpanded(false);
               setMobileSidebarOpen(false);
@@ -2395,6 +2512,7 @@ function AskShell({
             title="Settings"
             aria-current={page === "settings" ? "page" : undefined}
             onClick={() => {
+              stopDictation();
               setPage("settings");
               setHistoryExpanded(false);
               setMobileSidebarOpen(false);
@@ -2682,6 +2800,7 @@ function AskShell({
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => {
+                if (dictating) return;
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   void ask(input);
@@ -2693,16 +2812,19 @@ function AskShell({
               enterKeyHint="send"
               autoComplete="off"
               spellCheck
+              readOnly={dictating}
               aria-describedby="ask-source-disclaimer ask-composer-help"
             />
             <span id="ask-composer-help" className="sr-only">
-              Press Enter to send, Shift+Enter for a new line.
+              Press Enter to send, Shift+Enter for a new line. Use the microphone to dictate; tap it again to stop.
             </span>
           </div>
           <div className="ask-composer-actions">
             <div className="ask-composer-hint">
-              <span className="ask-hint-dot" aria-hidden />
-              <span>Archive search · Published records only</span>
+              <span className="ask-hint-dot" data-listening={dictating ? "true" : undefined} aria-hidden />
+              <span aria-live="polite">
+                {dictating ? "Listening… tap the microphone to stop" : "Archive search · Published records only"}
+              </span>
             </div>
             <div className="ask-composer-buttons">
               {loading ? (
@@ -2718,16 +2840,20 @@ function AskShell({
                 <>
                   <button
                     type="button"
-                    aria-label="Open voice mode"
-                    title="Voice mode"
+                    aria-label={dictating
+                      ? "Stop voice dictation"
+                      : voiceInputSupported ? "Start voice dictation" : "Voice input unavailable"}
+                    aria-pressed={dictating}
+                    title={dictating ? "Stop dictation" : voiceInputSupported ? "Dictate a question" : "Voice dictation is not supported in this browser"}
+                    data-listening={dictating ? "true" : undefined}
                     className="ask-composer-voice"
-                    onClick={() => setPage("voice")}
+                    onClick={toggleDictation}
                   >
-                    <Mic size={17} aria-hidden />
+                    {dictating ? <MicOff size={17} aria-hidden /> : <Mic size={17} aria-hidden />}
                   </button>
                   <button
                     type="submit"
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || dictating}
                     aria-label="Send question"
                     className="ask-composer-send"
                   >
@@ -2744,7 +2870,7 @@ function AskShell({
           </p>
         )}
         <p className="ask-composer-footnote">
-          Archive search runs on this server. Results come from published records.
+          Speech recognition is handled by your browser. Dictated text is sent to the archive only when submitted.
         </p>
         <p id="ask-source-disclaimer" className="ask-source-note">
           <MessageSquare size={14} aria-hidden style={{ marginTop: "0.05rem", flexShrink: 0 }} />

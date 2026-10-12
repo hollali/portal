@@ -426,8 +426,8 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
         </div>
 
         <p className="ask-voice-privacy">
-          Audio stays in your browser&rsquo;s speech engine. Nothing is sent until the
-          question goes to the archive.
+          Speech recognition is handled by your browser. Voice mode sends a completed
+          question to the archive automatically; composer dictation waits for Send.
         </p>
 
         {view === "unsupported" && (

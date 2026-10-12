@@ -298,6 +298,74 @@ describe('/ask research workspace', () => {
       })
     }
   })
+
+  it('dictates into the composer for review before the reader sends it', async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(window, 'SpeechRecognition')
+    const recognitions: FakeRecognition[] = []
+
+    class FakeRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      maxAlternatives = 1
+      onstart: SpeechRecognition['onstart'] = null
+      onend: SpeechRecognition['onend'] = null
+      onresult: SpeechRecognition['onresult'] = null
+      onerror: SpeechRecognition['onerror'] = null
+      onnomatch: SpeechRecognition['onnomatch'] = null
+
+      constructor() {
+        recognitions.push(this)
+      }
+
+      start() {
+        this.onstart?.call(this as unknown as SpeechRecognition, new Event('start'))
+      }
+
+      stop() {
+        this.onend?.call(this as unknown as SpeechRecognition, new Event('end'))
+      }
+
+      abort() {
+        this.onend?.call(this as unknown as SpeechRecognition, new Event('end'))
+      }
+
+      emit(text: string) {
+        const alternative = { transcript: text, confidence: 1 } as SpeechRecognitionAlternative
+        const result = Object.assign([alternative], { isFinal: true }) as unknown as SpeechRecognitionResult
+        const event = { resultIndex: 0, results: [result] } as unknown as SpeechRecognitionEvent
+        this.onresult?.call(this as unknown as SpeechRecognition, event)
+      }
+    }
+
+    Object.defineProperty(window, 'SpeechRecognition', {
+      configurable: true,
+      value: FakeRecognition as unknown as SpeechRecognitionConstructor,
+    })
+
+    try {
+      render(<AskConsole />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Start voice dictation' }))
+      expect(recognitions).toHaveLength(1)
+      expect(screen.getByRole('button', { name: 'Stop voice dictation' })).toHaveAttribute('aria-pressed', 'true')
+
+      act(() => recognitions[0]?.emit('What was said about Parliament?'))
+      const composer = screen.getByRole('textbox', { name: 'Ask a question' })
+      expect(composer).toHaveValue('What was said about Parliament?')
+      expect(composer).toHaveAttribute('readonly')
+      expect(screen.getByText('Listening… tap the microphone to stop')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Stop voice dictation' }))
+      expect(screen.getByRole('button', { name: 'Start voice dictation' })).toHaveAttribute('aria-pressed', 'false')
+      expect(composer).not.toHaveAttribute('readonly')
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(window, 'SpeechRecognition', originalDescriptor)
+      } else {
+        Reflect.deleteProperty(window, 'SpeechRecognition')
+      }
+    }
+  })
 })
 
 describe('/ask answer transparency', () => {

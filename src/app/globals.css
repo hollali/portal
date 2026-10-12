@@ -5186,3 +5186,16 @@ a:hover {
     display: none;
   }
 }
+
+.ask-composer-voice[data-listening="true"] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--p-surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.ask-hint-dot[data-listening="true"] {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.ask-composer-field textarea:read-only {
+  cursor: default;
+}
