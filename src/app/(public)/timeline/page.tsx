@@ -25,10 +25,12 @@ export default async function TimelinePage() {
     orderBy: [{ year: 'asc' }, { order: 'asc' }],
   })
 
-  const entries = rows.map(r => ({
+  const entries = rows.map((r: any) => ({
     ...r,
     period: r.period || r.year,
     label: CATEGORY_LABEL[r.category || 'career'] || 'Career',
+    imageUrl: r.imageUrl ?? r.image_url,
+    imageAlt: r.imageAlt ?? r.image_alt,
   }))
 
   return (
