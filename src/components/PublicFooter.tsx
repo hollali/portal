@@ -1,41 +1,7 @@
 import Link from 'next/link'
 import { Landmark } from 'lucide-react'
-import { SOCIAL_LINKS } from '@/lib/man'
-
-const FOOTER_COLS: { title: string; links: [string, string][] }[] = [
-  {
-    title: 'The Man',
-    links: [
-      ['/the-man#early-life', 'Early Life'],
-      ['/the-man#education', 'Education'],
-      ['/the-man#professional-life', 'Professional Life'],
-      ['/the-man#values', 'Personal Values'],
-    ],
-  },
-  {
-    title: 'Archives',
-    links: [
-      ['/archives/speeches', 'Speeches'],
-      ['/archives/papers', 'Public Papers'],
-      ['/archives/interviews', 'Interviews'],
-      ['/archives/notes', 'Notes & Correspondence'],
-      ['/archives/milestones', 'Milestones'],
-      ['/archives/testimonials', 'Testimonials'],
-      ['/archives/photos', 'Photo Library'],
-    ],
-  },
-  {
-    title: 'Explore',
-    links: [
-      ['/timeline', 'Timeline'],
-      ['/speaker-record', 'Speaker record & sources'],
-      ['/videos', 'Videos'],
-      ['/audio', 'Audio'],
-      ['/news', 'News Clippings'],
-      ['/search', 'Search'],
-    ],
-  },
-]
+import { getSectionData } from '@/lib/libraryQueries'
+import type { FooterData } from '@/lib/content'
 
 function FacebookIcon() {
   return (
@@ -71,7 +37,10 @@ function YoutubeIcon() {
   )
 }
 
-export default function PublicFooter() {
+export default async function PublicFooter() {
+  const footer = await getSectionData<FooterData>('site_footer')
+  const FOOTER_COLS = footer.columns
+  const SOCIAL_LINKS = footer.social
   const icon = (label: string) => {
     switch (label) {
       case 'Facebook': return <FacebookIcon />
@@ -95,7 +64,7 @@ export default function PublicFooter() {
               <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.02em', color: 'var(--p-text-1)' }}>AlbanBagbin</span>
             </div>
             <p style={{ color: 'var(--p-text-3)', fontSize: '0.85rem', lineHeight: 1.6, maxWidth: 320, margin: '0 0 1.25rem' }}>
-              The digital library of Rt. Hon. Alban Sumana Kingsford Bagbin — Speaker of the Parliament of Ghana. Speeches, papers, correspondence, photographs and milestones from a thirty-year public career.
+              {footer.tagline}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {social.map(s => (
@@ -111,7 +80,7 @@ export default function PublicFooter() {
             <div key={col.title}>
               <div style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.9rem' }}>{col.title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                {col.links.map(([href, label]) => (
+                {col.links.map(({ href, label }) => (
                   <Link key={href} href={href} className="p-link-strong" style={{ color: 'var(--p-text-2)', textDecoration: 'none', fontSize: '0.875rem' }}>
                     {label}
                   </Link>

@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ArrowUpRight } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { PageHeroData } from '@/lib/content'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 
@@ -60,6 +62,7 @@ export default async function TimelinePage() {
 
   const firstYear = entries[0]?.year || '1957'
   const lastYear = entries[entries.length - 1]?.year || '2025'
+  const hero = await getSectionData<PageHeroData>('hero_timeline')
 
   return (
     <div className="timeline-page">
@@ -70,10 +73,10 @@ export default async function TimelinePage() {
           <div className="timeline-hero-grid" aria-hidden="true" />
           <div className="timeline-hero-inner">
             <div className="timeline-hero-copy">
-              <span className="timeline-eyebrow">The public life</span>
-              <h1>A life in <span className="p-serif">service</span></h1>
+              <span className="timeline-eyebrow">{hero.eyebrow}</span>
+              <h1>{hero.titleA} <span className="p-serif">{hero.titleAccent}</span></h1>
               <p>
-                Follow Rt. Hon. Alban Bagbin&apos;s journey from the Upper West Region to the Speaker&apos;s chair, through the moments that shaped a life in public service.
+                {hero.lede}
               </p>
               <div className="timeline-hero-meta" aria-label={`${entries.length} milestones from ${firstYear} to ${lastYear}`}>
                 <div className="timeline-hero-stat">

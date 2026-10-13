@@ -19,8 +19,16 @@ import PublicFooter from '@/components/PublicFooter'
 import HeroSection from '@/components/HeroSection'
 import LatestToArchive from '@/components/LatestToArchive'
 import TestimonialCarousel from '@/components/TestimonialCarousel'
-import { MAN_SECTIONS, ARCHIVE_LINKS } from '@/lib/man'
-import { getLibraryCounts, getLatestArchiveItems, getHeroContent } from '@/lib/libraryQueries'
+import { getLibraryCounts, getLatestArchiveItems, getHeroContent, getSectionData } from '@/lib/libraryQueries'
+import type {
+  BiographyData,
+  CollectionsData,
+  InstitutionsData,
+  ManPageData,
+  QuotesData,
+  SchoolsData,
+  TimelineData,
+} from '@/lib/content'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,26 +53,29 @@ const NUM_ICONS: Record<string, LucideIcon> = {
   Milestones: Milestone,
   Testimonials: Award,
   Photos: ImageIcon,
+  'Photo Library': ImageIcon,
   'News Clippings': Newspaper,
   Videos: Video,
   Audio: Headphones,
 }
 
-const EDUCATION_CAPS: Record<string, string> = {
-  'Wa Secondary School': 'Senior secondary',
-  'Tamale Secondary School': 'Senior secondary',
-  'University of Ghana': 'BA Law & English · 1980',
-  'Ghana School of Law': 'Called to the Bar · 1982',
-  GIMPA: 'Executive Master’s · Governance & Leadership',
-}
-
-const SCHOOLS = (MAN_SECTIONS.find(s => s.id === 'education')?.items ?? [])
-  .map(s => ({ name: s.title, cap: EDUCATION_CAPS[s.title] ?? null }))
-
 export default async function LibraryHome() {
   const counts = await getLibraryCounts()
   const latest = await getLatestArchiveItems(8)
   const heroContent = await getHeroContent()
+  const [schools, collections, manPage, quotes, biography, timeline, institutions] = await Promise.all([
+    getSectionData<SchoolsData>('home_schools'),
+    getSectionData<CollectionsData>('archive_collections'),
+    getSectionData<ManPageData>('the_man'),
+    getSectionData<QuotesData>('home_quotes'),
+    getSectionData<BiographyData>('home_biography'),
+    getSectionData<TimelineData>('home_timeline'),
+    getSectionData<InstitutionsData>('home_institutions'),
+  ])
+
+  const MAN_SECTIONS = manPage.sections
+  const ARCHIVE_LINKS = collections.items
+  const SCHOOLS = schools.items
 
   const quickStats = [
     { value: counts.speeches, label: 'Speeches' },
@@ -103,9 +114,9 @@ export default async function LibraryHome() {
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '1rem' }}>
           {ARCHIVE_LINKS.map(link => {
-            const [countKey, label] = COUNT_KEYS[link.count]!
-            const Icon = NUM_ICONS[label] || BookOpen
-            const n = counts[countKey]
+            const entry = COUNT_KEYS[link.count]
+            const Icon = NUM_ICONS[link.label] || BookOpen
+            const n = entry ? counts[entry[0]] : null
             return (
               <Link key={link.href} href={link.href} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="p-card-lift" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.4rem', height: '100%' }}>
@@ -113,7 +124,9 @@ export default async function LibraryHome() {
                     <span style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--p-border)', background: 'var(--p-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
                       <Icon size={19} />
                     </span>
-                    <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.875rem', fontWeight: 700, color: 'var(--p-text-2)' }}>{n.toLocaleString()}</span>
+                    {n !== null && (
+                      <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.875rem', fontWeight: 700, color: 'var(--p-text-2)' }}>{n.toLocaleString()}</span>
+                    )}
                   </div>
                   <div style={{ fontWeight: 700, fontSize: '1.0625rem', color: 'var(--p-text-1)', fontFamily: 'var(--font-display), sans-serif', marginBottom: '0.35rem' }}>{link.label}</div>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--p-text-3)', lineHeight: 1.55 }}>{link.description}</p>
@@ -154,6 +167,59 @@ export default async function LibraryHome() {
         </div>
       </section>
 
+      {/* ── Profile (CMS: home_biography + home_institutions) ── */}
+      <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
+        <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Profile</span>
+        <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 0.75rem', color: 'var(--p-text-1)', whiteSpace: 'pre-line' }}>
+          {biography.heading}
+        </h2>
+        <p style={{ color: 'var(--p-text-2)', maxWidth: '46rem', margin: '0 0 2rem', lineHeight: 1.7 }}>{biography.intro}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '1rem' }}>
+          {biography.cards.map(c => (
+            <div key={c.tag} className="p-card" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.5rem' }}>
+              <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--primary)' }}>{c.tag}</span>
+              <p style={{ margin: '0.6rem 0 0', fontSize: '0.88rem', color: 'var(--p-text-2)', lineHeight: 1.65 }}>{c.text}</p>
+            </div>
+          ))}
+        </div>
+        {institutions.items.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1.5rem' }}>
+            {institutions.items.map(name => (
+              <span key={name} style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--p-text-3)', border: '1px solid var(--p-border)', borderRadius: 999, padding: '0.4rem 0.9rem', background: 'var(--p-surface)' }}>
+                {name}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Career timeline strip (CMS: home_timeline) ───── */}
+      <section style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-3)' }}>
+        <div className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
+            <div>
+              <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Career timeline</span>
+              <h2 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 0', color: 'var(--p-text-1)', whiteSpace: 'pre-line' }}>
+                {timeline.heading}
+              </h2>
+              <p style={{ color: 'var(--p-text-3)', maxWidth: '42rem', margin: '0.75rem 0 0' }}>{timeline.subheading}</p>
+            </div>
+            <Link href="/timeline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderBottom: '1px solid var(--primary)', paddingBottom: '0.25rem' }}>
+              Full timeline <ArrowUpRight size={15} style={{ color: 'var(--primary)' }} />
+            </Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 220px), 1fr))', gap: '1rem' }}>
+            {timeline.entries.slice(0, 8).map(e => (
+              <div key={`${e.year}-${e.title}`} className="p-card" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.25rem' }}>
+                <div style={{ fontFamily: 'var(--font-mono), monospace', fontWeight: 800, fontSize: '1rem', color: 'var(--primary)' }}>{e.year}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)', margin: '0.35rem 0' }}>{e.title}</div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--p-text-3)', lineHeight: 1.6 }}>{e.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Latest additions ───────────────────────────── */}
       <LatestToArchive items={latest} />
 
@@ -164,11 +230,7 @@ export default async function LibraryHome() {
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
             <div style={{ maxWidth: 680 }}>
               <TestimonialCarousel
-                quotes={[
-                  { quote: 'In Rt. Hon. Alban Bagbin, Ghana has a Speaker whose commitment to parliamentary independence and the rule of law speaks to the highest traditions of legislative service.' },
-                  { quote: 'Three decades in public life, and he has never stopped showing up — for the people of the Upper West first, and for Parliament as an institution always.' },
-                  { quote: 'His is a career built on the conviction that the chamber belongs to the people it serves — and the records are kept so the people can see it.' },
-                ]}
+                quotes={quotes.items.map(quote => ({ quote }))}
               />
               <Link href="/archives/testimonials" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-1)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 600, borderBottom: '1px solid var(--primary)', paddingBottom: '0.25rem', marginTop: '1.25rem' }}>
                 Read more testimonials <ArrowUpRight size={15} style={{ color: 'var(--primary)' }} />

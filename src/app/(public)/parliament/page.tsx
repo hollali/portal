@@ -5,6 +5,8 @@ import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { prisma } from '@/lib/prisma'
 import { getLibraryCounts } from '@/lib/libraryQueries'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { PageHeroData, RulingsData } from '@/lib/content'
 import { archiveRouteForKind } from '@/lib/library'
 
 export const dynamic = 'force-dynamic'
@@ -13,13 +15,6 @@ export const metadata: Metadata = {
   title: 'Parliamentary Legacy',
   description: 'The constitutional battles, landmark rulings and institutional reforms of Rt. Hon. Alban Bagbin as the Speaker of the 8th Parliament.',
 }
-
-const RULINGS = [
-  { title: 'A Speaker for the whole House', tag: 'Independence', note: 'As the 8th Parliament opened with an evenly-balanced House, the Speaker declared himself the servant of the entire membership — not any single caucus — and rebuilt the legitimacy of the Chair around that neutrality.' },
-  { title: 'Funding without subservience', tag: 'Separation of powers', note: 'The push for an independently-funded legislature — one that can oversee the Executive without depending on it for its own budget — became a defining constitutional project of the Speakership.' },
-  { title: 'Recalling the House', tag: 'Constitutional power', note: 'Recalled an adjourned Parliament under the provisions of Article 112(3) of the Constitution, a rarely-used power asserted to bring the House back for urgent national business.' },
-  { title: 'The two-party floor', tag: 'Even balance', note: 'Steered an unprecedented statistical tie in the House — 137 to 137 — through rules and improvisation that safeguarded the authority of the Chamber while keeping government business moving.' },
-]
 
 export default async function ParliamentPage() {
   const [items, milestones] = await Promise.all([
@@ -35,6 +30,12 @@ export default async function ParliamentPage() {
 
   const counts = await getLibraryCounts()
 
+  const [hero, rulings] = await Promise.all([
+    getSectionData<PageHeroData>('hero_parliament'),
+    getSectionData<RulingsData>('parliament_rulings'),
+  ])
+  const RULINGS = rulings.items
+
   const legacyDocs = items.filter(i => /parliament/i.test(i.institution || '') || /parliament/i.test(i.parliament || '') || /Speaker/i.test(i.title || '')).slice(0, 8)
 
   return (
@@ -45,12 +46,12 @@ export default async function ParliamentPage() {
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
-          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Parliament · The 8th House</span>
+          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{hero.eyebrow}</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 1rem', color: 'var(--p-text-1)' }}>
-            A Parliament that <span className="p-serif">stands its ground</span>
+            {hero.titleA} <span className="p-serif">{hero.titleAccent}</span>
           </h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.65, color: 'var(--p-text-2)', maxWidth: '38rem', margin: 0 }}>
-            From an evenly-balanced House to landmark rulings on the independence of the legislature — the parliamentary record of a Speaker who believed the House belongs to the people it serves.
+            {hero.lede}
           </p>
         </div>
       </section>

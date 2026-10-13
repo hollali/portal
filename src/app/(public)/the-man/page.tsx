@@ -5,12 +5,14 @@ import { ArrowDown, Landmark, Quote } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import ChapterNav from '@/components/ChapterNav'
-import { MAN_SECTIONS } from '@/lib/man'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { ManPageData } from '@/lib/content'
 
-// No `force-dynamic`: the whole page is MAN_SECTIONS, a static constant, with
-// no Prisma / cookies / headers / searchParams anywhere in the tree. It is
-// therefore prerendered at build time and served from the full-route cache,
-// which is what `Cache-Control: no-cache, must-revalidate` was preventing.
+// `force-dynamic`: chapter copy, hero and quote are CMS-driven
+// (`the_man` section), so the page must render from the database on each
+// request rather than baking the copy in at build time.
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'The Man · AlbanBagbin Archives',
@@ -18,7 +20,9 @@ export const metadata: Metadata = {
     'Born in the fields of Sombo, schooled by dedication, called to the Bar, and returned to the people — the life of Rt. Hon. Alban S. K. Bagbin in four chapters.',
 }
 
-export default function TheManPage() {
+export default async function TheManPage() {
+  const man = await getSectionData<ManPageData>('the_man')
+  const MAN_SECTIONS = man.sections
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
@@ -32,12 +36,12 @@ export default function TheManPage() {
               <Landmark size={12} /> The Man
             </span>
             <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.5rem, 6vw, 4rem)', letterSpacing: '-0.035em', lineHeight: 1.02, fontWeight: 800, margin: '1.25rem 0', color: 'var(--p-text-1)' }}>
-              The life of a
+              {man.heroTitleA}
               <br />
-              <span className="p-serif" style={{ background: 'linear-gradient(90deg, var(--shimmer-a), var(--shimmer-b), var(--shimmer-d))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>servant-leader</span>
+              <span className="p-serif" style={{ background: 'linear-gradient(90deg, var(--shimmer-a), var(--shimmer-b), var(--shimmer-d))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{man.heroTitleAccent}</span>
             </h1>
             <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '36rem', margin: 0 }}>
-              Born in the fields of Sombo, schooled by dedication, called to the Bar, and returned to the people — four chapters trace the man behind the Speaker&apos;s chair.
+              {man.heroIntro}
             </p>
             <div style={{ marginTop: '1.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               {MAN_SECTIONS.map(s => (
@@ -63,7 +67,7 @@ export default function TheManPage() {
             <div style={{ marginTop: '0.75rem', padding: '1rem 1.25rem', border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 12, maxWidth: 380 }}>
               <Quote size={16} style={{ color: 'var(--primary)' }} />
               <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', lineHeight: 1.6, color: 'var(--p-text-2)', fontStyle: 'italic' }}>
-                &ldquo;Born a fourth of nine children to peasant farmers, I know the meaning of hard work, of family and of the dignity of every Ghanaian.&rdquo;
+                {man.heroQuote}
               </p>
             </div>
           </div>

@@ -3,6 +3,8 @@ import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import SpeakerResearchExplorer, { type PublicEvent, type PublicSource } from '@/components/SpeakerResearchExplorer'
 import { prisma } from '@/lib/prisma'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { PageHeroData } from '@/lib/content'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,12 +82,15 @@ export default async function SpeakerRecordPage() {
     scope_statement?: string
   } | undefined
 
+  const hero = await getSectionData<PageHeroData>('hero_speaker_record')
+
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
       <SpeakerResearchExplorer
         sources={sources}
         events={events}
+        hero={hero}
         accessedDate={dataset?.accessedDate ?? 'Unknown'}
         cutoffDate={dataset?.cutoffDate ?? 'Unknown'}
         pagesInspected={coverage?.pages_or_items_directly_inspected ?? 0}

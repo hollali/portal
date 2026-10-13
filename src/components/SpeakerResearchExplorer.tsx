@@ -30,6 +30,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/kit'
+import type { PageHeroData } from '@/lib/content'
 
 export interface PublicSource {
   recordId: string
@@ -150,6 +151,7 @@ function isKeyMoment(event: PublicEvent): boolean {
 export default function SpeakerResearchExplorer({
   sources,
   events,
+  hero,
   accessedDate,
   cutoffDate,
   pagesInspected,
@@ -158,6 +160,7 @@ export default function SpeakerResearchExplorer({
 }: {
   sources: PublicSource[]
   events: PublicEvent[]
+  hero: PageHeroData
   accessedDate: string
   cutoffDate: string
   pagesInspected: number
@@ -326,14 +329,13 @@ export default function SpeakerResearchExplorer({
           </nav>
 
           <p style={{ margin: 0, fontFamily: 'var(--font-mono),monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>
-            Parliament · Sourced public record
+            {hero.eyebrow}
           </p>
           <h1 style={{ fontFamily: 'var(--font-display),sans-serif', fontSize: 'clamp(2.1rem,5vw,3.1rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.7rem 0 0.9rem', maxWidth: '20ch' }}>
-            The Speaker&apos;s <span className="p-serif">public record</span>, with receipts
+            {hero.titleA} <span className="p-serif">{hero.titleAccent}</span>
           </h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.65, color: 'var(--p-text-2)', maxWidth: '46rem', margin: 0 }}>
-            A source-linked chronology of Rt.&nbsp;Hon. Alban Sumana Kingsford Bagbin — every claim traceable to a Hansard,
-            order paper, report, or archived publication. Start with the timeline, then inspect the documents behind it.
+            {hero.lede}
           </p>
 
           {/* Trust strip */}

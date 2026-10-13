@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { PhotoLightbox } from '@/app/(public)/archives/photos/page'
+import { PhotoLightbox } from '@/app/(public)/archives/photos/PhotoArchive'
 
 const photo = {
   id: 1290,

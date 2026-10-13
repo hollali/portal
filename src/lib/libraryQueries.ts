@@ -1,5 +1,12 @@
 import { prisma } from '@/lib/prisma'
-import { DEFAULT_HERO, parseData, type HeroData } from '@/lib/content'
+import {
+  DEFAULT_HERO,
+  DEFAULT_SECTIONS,
+  parseData,
+  type HeroData,
+  type SectionData,
+  type SectionKey,
+} from '@/lib/content'
 
 const CACHE_TTL_MS = 60_000
 
@@ -132,4 +139,25 @@ const getHeroContentCached = memCache(async (): Promise<HeroData> => {
 
 export async function getHeroContent(): Promise<HeroData> {
   return getHeroContentCached()
+}
+
+/* ── Generic CMS section reader ─────────────────────────
+   Every public page reads its copy through here. A section only goes live
+   when its status is `published`; anything else (missing row, draft, parse
+   failure) falls back to the compiled-in default, so the site can never
+   render an empty page because a row is missing. */
+
+const getSectionRawCached = memCache(async (key: SectionKey): Promise<unknown> => {
+  try {
+    const row = await prisma.contentSection.findUnique({ where: { key } })
+    if (!row || row.status !== 'published' || !row.data) return null
+    return row.data
+  } catch {
+    return null
+  }
+})
+
+export async function getSectionData<T extends SectionData>(key: SectionKey): Promise<T> {
+  const fallback = DEFAULT_SECTIONS[key] as T
+  return parseData<T>(await getSectionRawCached(key), fallback)
 }

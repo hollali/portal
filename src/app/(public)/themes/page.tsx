@@ -4,7 +4,9 @@ import { ArrowUpRight, Compass } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
 import { prisma } from '@/lib/prisma'
-import { CORE_THEMES, resolveThemeSlug, archiveRouteForKind } from '@/lib/library'
+import { resolveThemeSlug, archiveRouteForKind } from '@/lib/library'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { CoreThemesData, PageHeroData } from '@/lib/content'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +38,11 @@ export default async function ThemesPage() {
     if (!bySlug[slug].routes.includes(route)) bySlug[slug].routes.push(route)
   }
 
+  const [hero, themes] = await Promise.all([
+    getSectionData<PageHeroData>('hero_themes'),
+    getSectionData<CoreThemesData>('core_themes'),
+  ])
+
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
@@ -43,19 +50,19 @@ export default async function ThemesPage() {
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
-          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>The man · Ideas</span>
+          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{hero.eyebrow}</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 0.75rem', color: 'var(--p-text-1)' }}>
-            Themes &amp; <span className="p-serif">ideas</span>
+            {hero.titleA} <span className="p-serif">{hero.titleAccent}</span>
           </h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '40rem', margin: 0 }}>
-            The strands that run through a public career — from the independence of Parliament to poverty reduction and pan-Africanism. Browse each theme through the speeches, papers, interviews and correspondence that give it voice.
+            {hero.lede}
           </p>
         </div>
       </section>
 
       <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1rem' }}>
-          {CORE_THEMES.map(theme => {
+          {themes.items.map(theme => {
             const stat = bySlug[theme.slug]
             const count = stat?.count ?? 0
             const href = stat ? `/archives/${stat.routes[0]}?theme=${encodeURIComponent(stat.label)}` : null

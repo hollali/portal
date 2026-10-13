@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { ArrowUpRight, BookOpen, type LucideIcon } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
-import { ARCHIVE_LINKS } from '@/lib/man'
 import { getLibraryCounts } from '@/lib/libraryQueries'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { CollectionsData, PageHeroData } from '@/lib/content'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,11 @@ const HUB_ICONS: Record<string, LucideIcon> = {
 
 export default async function ArchivesHub() {
   const counts = await getLibraryCounts()
+  const [hero, collections] = await Promise.all([
+    getSectionData<PageHeroData>('hero_archives'),
+    getSectionData<CollectionsData>('archive_collections'),
+  ])
+  const ARCHIVE_LINKS = collections.items
 
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
@@ -43,12 +49,12 @@ export default async function ArchivesHub() {
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
-          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Digital archives</span>
+          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{hero.eyebrow}</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.5rem, 6vw, 4rem)', letterSpacing: '-0.035em', lineHeight: 1.02, fontWeight: 800, margin: '1rem 0', color: 'var(--p-text-1)' }}>
-            The archive <span className="p-serif">collections</span>
+            {hero.titleA} <span className="p-serif">{hero.titleAccent}</span>
           </h1>
           <p style={{ fontSize: '1.05rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '40rem', margin: 0 }}>
-            Speeches, papers, interviews, correspondence, milestones, testimonials, photographs and press coverage — a growing record of the Speaker&apos;s public life, in his own words and the words of others.
+            {hero.lede}
           </p>
         </div>
       </section>
@@ -56,8 +62,8 @@ export default async function ArchivesHub() {
       <section className="p-section" data-motion-entry style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 5rem) 1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1rem' }}>
           {ARCHIVE_LINKS.map(link => {
-            const [countKey] = COUNT_KEYS[link.count]!
-            const n = counts[countKey]
+            const entry = COUNT_KEYS[link.count]
+            const n = entry ? counts[entry[0]] : null
             const Icon = HUB_ICONS[link.label] || BookOpen
             return (
               <Link key={link.href} href={link.href} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -66,9 +72,11 @@ export default async function ArchivesHub() {
                     <span style={{ width: 42, height: 42, borderRadius: 11, background: 'var(--p-surface-2)', border: '1px solid var(--p-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
                       <Icon size={20} />
                     </span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.875rem', fontWeight: 700, color: 'var(--p-text-2)' }}>
-                      {n.toLocaleString()} <ArrowUpRight size={14} style={{ color: 'var(--primary)' }} />
-                    </span>
+                    {n !== null && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.875rem', fontWeight: 700, color: 'var(--p-text-2)' }}>
+                        {n.toLocaleString()} <ArrowUpRight size={14} style={{ color: 'var(--primary)' }} />
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontWeight: 700, fontSize: '1.1rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)', marginBottom: '0.4rem' }}>{link.label}</div>
                   <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--p-text-3)', lineHeight: 1.6 }}>{link.description}</p>

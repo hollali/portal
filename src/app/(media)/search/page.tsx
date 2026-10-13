@@ -7,6 +7,7 @@ import { Search as SearchIcon, FileText, Award, Milestone as MilestoneIcon } fro
 import { KIND_ICON } from '@/lib/kindIcon'
 import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
 import { jsonFetch } from '@/lib/jsonFetch'
+import { DEFAULT_SEARCH_HERO, parseData, type PageHeroData } from '@/lib/content'
 
 interface ArchiveHit { id: number; kind: string; title: string; slug: string; date: string | null; year: number | null; excerpt: string | null }
 interface MiscHit { id: number; title: string; description?: string; year?: string }
@@ -195,11 +196,20 @@ function SearchBox() {
 }
 
 export default function PublicSearchPage() {
+  const [hero, setHero] = useState<PageHeroData>(DEFAULT_SEARCH_HERO)
+
+  useEffect(() => {
+    jsonFetch<{ sections?: Record<string, { data?: unknown }> }>('/api/content').then(d => {
+      const raw = d?.sections?.['hero_search']?.data
+      if (raw) setHero(parseData<PageHeroData>(raw, DEFAULT_SEARCH_HERO))
+    }).catch(() => {})
+  }, [])
+
   return (
     <div style={{ maxWidth: 860 }}>
-      <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Search</span>
+      <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{hero.eyebrow}</span>
       <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2rem, 4.5vw, 3rem)', letterSpacing: '-0.03em', margin: '0.75rem 0 1.75rem', color: 'var(--p-text-1)' }}>
-        Search <span className="p-serif">the library</span>
+        {hero.titleA} <span className="p-serif">{hero.titleAccent}</span>
       </h1>
       <Suspense fallback={null}>
         <SearchBox />

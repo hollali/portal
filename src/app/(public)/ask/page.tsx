@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import PublicHeader from '@/components/PublicHeader'
 import AskConsole from '@/components/AskConsole'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { PageHeroData } from '@/lib/content'
 import { Sparkles } from 'lucide-react'
 
 /**
@@ -24,6 +26,7 @@ export default async function AskPage({
 }) {
   const raw = (await searchParams).q
   const initialQuery = (Array.isArray(raw) ? raw[0] : raw)?.trim().slice(0, 500) || null
+  const hero = await getSectionData<PageHeroData>('hero_ask')
 
   return (
     <div className="ask-page-root">
@@ -34,9 +37,9 @@ export default async function AskPage({
           <span className="ask-page-avatar" aria-hidden>
             <Sparkles size={24} />
           </span>
-          <p className="ask-page-kicker">Archive research</p>
-          <h1>Ask the archive</h1>
-          <p>Search in plain language. Every answer links back to published records.</p>
+          <p className="ask-page-kicker">{hero.eyebrow}</p>
+          <h1>{hero.titleA} <span className="p-serif">{hero.titleAccent}</span></h1>
+          {hero.lede ? <p>{hero.lede}</p> : null}
         </header>
         <AskConsole initialQuery={initialQuery} />
       </div>

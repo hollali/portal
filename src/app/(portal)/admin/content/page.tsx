@@ -26,6 +26,16 @@ import {
   type BiographyData,
   type TimelineData,
   type InstitutionsData,
+  type PageHeroData,
+  type ManPageData,
+  type SchoolsData,
+  type QuotesData,
+  type RulingsData,
+  type CollectionsData,
+  type CoreThemesData,
+  type MediaCardsData,
+  type MediaSocialsData,
+  type FooterData,
 } from '@/lib/content'
 
 type Tab = 'sections' | 'pages'
@@ -234,6 +244,262 @@ function InstitutionsEditor({ value, onChange }: { value: InstitutionsData; onCh
   )
 }
 
+function PageHeroEditor({ value, onChange }: { value: PageHeroData; onChange: (v: PageHeroData) => void }) {
+  const set = <K extends keyof PageHeroData>(k: K, v: PageHeroData[K]) => onChange({ ...value, [k]: v })
+  return (
+    <div className="space-y-4">
+      <Field label="Eyebrow"><Input value={value.eyebrow} onChange={e => set('eyebrow', e.target.value)} /></Field>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Heading (plain part)"><Input value={value.titleA} onChange={e => set('titleA', e.target.value)} /></Field>
+        <Field label="Heading (accent part)" hint="Rendered in the editorial serif accent."><Input value={value.titleAccent} onChange={e => set('titleAccent', e.target.value)} /></Field>
+      </div>
+      <Field label="Intro paragraph"><Textarea value={value.lede} onChange={e => set('lede', e.target.value)} /></Field>
+    </div>
+  )
+}
+
+function ManPageEditor({ value, onChange }: { value: ManPageData; onChange: (v: ManPageData) => void }) {
+  const set = <K extends keyof ManPageData>(k: K, v: ManPageData[K]) => onChange({ ...value, [k]: v })
+  const [selected, setSelected] = useState(0)
+  const idx = Math.min(selected, Math.max(0, value.sections.length - 1))
+  const section = value.sections[idx]
+
+  const updateSection = (i: number, patch: Partial<(typeof value.sections)[number]>) =>
+    set('sections', value.sections.map((s, n) => (n === i ? { ...s, ...patch } : s)))
+  const addSection = () =>
+    set('sections', [...value.sections, { id: `section-${value.sections.length + 1}`, eyebrow: `0${value.sections.length + 1}`, title: 'New chapter', intro: '', items: [] }])
+  const removeSection = (i: number) => {
+    set('sections', value.sections.filter((_, n) => n !== i))
+    setSelected(0)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Hero heading (plain part)"><Input value={value.heroTitleA} onChange={e => set('heroTitleA', e.target.value)} /></Field>
+        <Field label="Hero heading (accent part)"><Input value={value.heroTitleAccent} onChange={e => set('heroTitleAccent', e.target.value)} /></Field>
+      </div>
+      <Field label="Hero intro"><Textarea value={value.heroIntro} onChange={e => set('heroIntro', e.target.value)} /></Field>
+      <Field label="Hero quote"><Textarea value={value.heroQuote} onChange={e => set('heroQuote', e.target.value)} /></Field>
+      <fieldset>
+        <legend className="text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Chapters</legend>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {value.sections.map((s, i) => (
+            <div key={`${s.id}-${i}`} className="flex items-center gap-1 rounded-lg border px-2 py-1" style={{ borderColor: i === idx ? 'var(--primary)' : 'var(--border)' }}>
+              <button type="button" onClick={() => setSelected(i)} className="text-xs font-semibold px-1" style={{ color: i === idx ? 'var(--primary)' : 'var(--foreground)' }}>
+                {s.title || `Chapter ${i + 1}`}
+              </button>
+              <button type="button" onClick={() => removeSection(i)} aria-label={`Remove ${s.title || `chapter ${i + 1}`}`} title="Remove" className="p-1">
+                <Trash2 size={12} style={{ color: 'var(--danger)' }} />
+              </button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={addSection} iconLeft={<Plus size={14} />}>Add chapter</Button>
+        </div>
+        {section && (
+          <div className="space-y-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field label="Anchor id" hint="Used in #links. Lowercase, dashes."><Input value={section.id} onChange={e => updateSection(idx, { id: e.target.value })} /></Field>
+              <Field label="Eyebrow"><Input value={section.eyebrow} onChange={e => updateSection(idx, { eyebrow: e.target.value })} /></Field>
+              <Field label="Title"><Input value={section.title} onChange={e => updateSection(idx, { title: e.target.value })} /></Field>
+            </div>
+            <Field label="Intro"><Textarea value={section.intro} onChange={e => updateSection(idx, { intro: e.target.value })} minHeight={70} /></Field>
+            <fieldset>
+              <legend className="text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Entries</legend>
+              <RowEditor
+                keyOf={`man-${idx}`}
+                rows={section.items.map(it => ({ title: it.title, text: it.text }))}
+                fields={[
+                  { key: 'title', label: 'Heading' },
+                  { key: 'text', label: 'Text', type: 'textarea' },
+                ]}
+                addLabel="Add entry"
+                onChange={rows => updateSection(idx, { items: rows.map(r => ({ title: r.title, text: r.text })) })}
+              />
+            </fieldset>
+          </div>
+        )}
+      </fieldset>
+    </div>
+  )
+}
+
+function StringListEditor({ value, onChange, itemLabel, addLabel, placeholder }: {
+  value: string[]
+  onChange: (v: string[]) => void
+  itemLabel: string
+  addLabel: string
+  placeholder?: string
+}) {
+  return (
+    <div className="space-y-2">
+      {value.map((item, i) => (
+        <div key={`${itemLabel}-${i}`} className="flex gap-2 items-start">
+          <Textarea value={item} onChange={e => onChange(value.map((it, n) => (n === i ? e.target.value : it)))} placeholder={placeholder} aria-label={`${itemLabel} ${i + 1}`} minHeight={70} />
+          <Button variant="ghost" size="md" iconOnly onClick={() => onChange(value.filter((_, n) => n !== i))} aria-label={`Remove ${itemLabel.toLowerCase()} ${i + 1}`} title="Remove" className="shrink-0">
+            <Trash2 size={16} style={{ color: 'var(--danger)' }} />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={() => onChange([...value, ''])} iconLeft={<Plus size={14} />}>
+        {addLabel}
+      </Button>
+    </div>
+  )
+}
+
+const COLLECTION_COUNT_OPTIONS = ['speeches', 'papers', 'interviews', 'notes', 'milestones', 'testimonials', 'photos', 'news', 'videos', 'audio']
+
+function RulingsEditor({ value, onChange }: { value: RulingsData; onChange: (v: RulingsData) => void }) {
+  return (
+    <RowEditor
+      keyOf="ruling"
+      rows={value.items.map(r => ({ tag: r.tag, title: r.title, note: r.note }))}
+      fields={[
+        { key: 'tag', label: 'Tag' },
+        { key: 'title', label: 'Title' },
+        { key: 'note', label: 'Summary', type: 'textarea' },
+      ]}
+      addLabel="Add ruling"
+      onChange={rows => onChange({ items: rows.map(r => ({ tag: r.tag, title: r.title, note: r.note })) })}
+    />
+  )
+}
+
+function SchoolsEditor({ value, onChange }: { value: SchoolsData; onChange: (v: SchoolsData) => void }) {
+  return (
+    <RowEditor
+      keyOf="school"
+      rows={value.items.map(s => ({ name: s.name, cap: s.cap }))}
+      fields={[
+        { key: 'name', label: 'School' },
+        { key: 'cap', label: 'Caption' },
+      ]}
+      addLabel="Add school"
+      onChange={rows => onChange({ items: rows.map(r => ({ name: r.name, cap: r.cap })) })}
+    />
+  )
+}
+
+function CollectionsEditor({ value, onChange }: { value: CollectionsData; onChange: (v: CollectionsData) => void }) {
+  return (
+    <RowEditor
+      keyOf="collection"
+      rows={value.items.map(c => ({ href: c.href, label: c.label, description: c.description, count: c.count }))}
+      fields={[
+        { key: 'href', label: 'Link' },
+        { key: 'label', label: 'Label' },
+        { key: 'description', label: 'Description', type: 'textarea' },
+        { key: 'count', label: 'Live count', type: 'select', options: COLLECTION_COUNT_OPTIONS },
+      ]}
+      addLabel="Add collection"
+      onChange={rows => onChange({ items: rows.map(r => ({ href: r.href, label: r.label, description: r.description, count: r.count })) })}
+    />
+  )
+}
+
+function CoreThemesEditor({ value, onChange }: { value: CoreThemesData; onChange: (v: CoreThemesData) => void }) {
+  return (
+    <RowEditor
+      keyOf="theme"
+      rows={value.items.map(t => ({ slug: t.slug, name: t.name, motto: t.motto, description: t.description }))}
+      fields={[
+        { key: 'slug', label: 'Slug' },
+        { key: 'name', label: 'Name' },
+        { key: 'motto', label: 'Motto' },
+        { key: 'description', label: 'Description', type: 'textarea' },
+      ]}
+      addLabel="Add theme"
+      onChange={rows => onChange({ items: rows.map(r => ({ slug: r.slug, name: r.name, motto: r.motto, description: r.description })) })}
+    />
+  )
+}
+
+function MediaCardsEditor({ value, onChange }: { value: MediaCardsData; onChange: (v: MediaCardsData) => void }) {
+  return (
+    <RowEditor
+      keyOf="mediacard"
+      rows={value.items.map(c => ({ href: c.href, label: c.label, note: c.note }))}
+      fields={[
+        { key: 'href', label: 'Link' },
+        { key: 'label', label: 'Label' },
+        { key: 'note', label: 'Note', type: 'textarea' },
+      ]}
+      addLabel="Add card"
+      onChange={rows => onChange({ items: rows.map(r => ({ href: r.href, label: r.label, note: r.note })) })}
+    />
+  )
+}
+
+function MediaSocialsEditor({ value, onChange }: { value: MediaSocialsData; onChange: (v: MediaSocialsData) => void }) {
+  return (
+    <RowEditor
+      keyOf="social"
+      rows={value.items.map(s => ({ label: s.label, href: s.href, handle: s.handle }))}
+      fields={[
+        { key: 'label', label: 'Label' },
+        { key: 'href', label: 'URL' },
+        { key: 'handle', label: 'Handle' },
+      ]}
+      addLabel="Add channel"
+      onChange={rows => onChange({ items: rows.map(r => ({ label: r.label, href: r.href, handle: r.handle })) })}
+    />
+  )
+}
+
+const linksToText = (links: { label: string; href: string }[]) => links.map(l => `${l.label} | ${l.href}`).join('\n')
+const textToLinks = (text: string) =>
+  text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    const [label, href] = line.split('|').map(s => s.trim())
+    return { label: label || line, href: href || '#' }
+  })
+
+function FooterEditor({ value, onChange }: { value: FooterData; onChange: (v: FooterData) => void }) {
+  const updateCol = (i: number, patch: Partial<(typeof value.columns)[number]>) =>
+    onChange({ ...value, columns: value.columns.map((c, n) => (n === i ? { ...c, ...patch } : c)) })
+  return (
+    <div className="space-y-4">
+      <Field label="Brand tagline"><Textarea value={value.tagline} onChange={e => onChange({ ...value, tagline: e.target.value })} /></Field>
+      <fieldset>
+        <legend className="text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Link columns</legend>
+        <div className="space-y-3">
+          {value.columns.map((col, i) => (
+            <div key={`col-${i}`} className="rounded-lg border p-3 space-y-3" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Field label="Column title"><Input value={col.title} onChange={e => updateCol(i, { title: e.target.value })} /></Field>
+                </div>
+                <Button variant="ghost" size="sm" iconOnly onClick={() => onChange({ ...value, columns: value.columns.filter((_, n) => n !== i) })} aria-label={`Remove column ${col.title}`} title="Remove">
+                  <Trash2 size={14} style={{ color: 'var(--danger)' }} />
+                </Button>
+              </div>
+              <Field label="Links" hint="One per line: Label | /href">
+                <Textarea value={linksToText(col.links)} onChange={e => updateCol(i, { links: textToLinks(e.target.value) })} style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.82rem' }} minHeight={110} />
+              </Field>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => onChange({ ...value, columns: [...value.columns, { title: 'New column', links: [] }] })} iconLeft={<Plus size={14} />}>
+            Add column
+          </Button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Social links</legend>
+        <RowEditor
+          keyOf="footersocial"
+          rows={value.social.map(s => ({ label: s.label, href: s.href }))}
+          fields={[
+            { key: 'label', label: 'Label' },
+            { key: 'href', label: 'URL' },
+          ]}
+          addLabel="Add social link"
+          onChange={rows => onChange({ ...value, social: rows.map(r => ({ label: r.label, href: r.href })) })}
+        />
+      </fieldset>
+    </div>
+  )
+}
+
 /* ─────────────────────────────── Main page ─────────────────────────────── */
 
 export default function ContentAdminPage() {
@@ -420,13 +686,47 @@ export default function ContentAdminPage() {
     home_biography: <LayoutDashboard size={15} />,
     home_timeline: <ChevronDown size={15} />,
     home_institutions: <ExternalLink size={15} />,
+    home_schools: <ExternalLink size={15} />,
+    home_quotes: <Pencil size={15} />,
+    the_man: <FileText size={15} />,
+    parliament_rulings: <Eye size={15} />,
+    hero_timeline: <Eye size={15} />,
+    hero_parliament: <Eye size={15} />,
+    hero_speaker_record: <Eye size={15} />,
+    hero_themes: <Eye size={15} />,
+    hero_ask: <Eye size={15} />,
+    hero_search: <Eye size={15} />,
+    hero_media: <Eye size={15} />,
+    hero_archives: <Eye size={15} />,
+    archive_collections: <LayoutDashboard size={15} />,
+    core_themes: <LayoutDashboard size={15} />,
+    media_cards: <LayoutDashboard size={15} />,
+    media_socials: <ExternalLink size={15} />,
+    site_footer: <LayoutDashboard size={15} />,
   }
 
   const sectionTitles: Record<SectionKey, string> = {
-    home_hero: 'Hero & intro',
-    home_biography: 'Biography',
-    home_timeline: 'Career timeline',
-    home_institutions: 'Institutions marquee',
+    home_hero: 'Home · Hero & intro',
+    home_biography: 'Home · Biography',
+    home_timeline: 'Home · Career timeline',
+    home_institutions: 'Home · Institutions',
+    home_schools: 'Home · Schools marquee',
+    home_quotes: 'Home · Testimonial quotes',
+    the_man: 'The Man page · Chapters & hero',
+    parliament_rulings: 'Parliament page · Signature rulings',
+    hero_timeline: 'Hero · Timeline page',
+    hero_parliament: 'Hero · Parliament page',
+    hero_speaker_record: 'Hero · Speaker Record page',
+    hero_themes: 'Hero · Themes page',
+    hero_ask: 'Hero · Ask page',
+    hero_search: 'Hero · Search page',
+    hero_media: 'Hero · Media page',
+    hero_archives: 'Hero · Archives hub',
+    archive_collections: 'Collections (home + archives hub)',
+    core_themes: 'Themes page · Core themes',
+    media_cards: 'Media page · Collection cards',
+    media_socials: 'Media page · Social channels',
+    site_footer: 'Footer · Columns & social',
   }
 
   const notLoaded = !loaded
@@ -447,7 +747,7 @@ export default function ContentAdminPage() {
         onChange={setTab}
         className="mb-6"
         items={[
-          { value: 'sections', label: 'Homepage Sections', icon: <LayoutDashboard size={15} /> },
+          { value: 'sections', label: 'Site content', icon: <LayoutDashboard size={15} /> },
           { value: 'pages', label: 'Pages', icon: <FileText size={15} /> },
         ]}
       />
@@ -520,6 +820,16 @@ export default function ContentAdminPage() {
                     {key === 'home_biography' && <BiographyEditor value={data as BiographyData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
                     {key === 'home_timeline' && <TimelineEditor value={data as TimelineData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
                     {key === 'home_institutions' && <InstitutionsEditor value={data as InstitutionsData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'home_schools' && <SchoolsEditor value={data as SchoolsData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'home_quotes' && <StringListEditor value={(data as QuotesData).items} onChange={items => setDrafts(prev => ({ ...prev, [key]: { items } }))} itemLabel="Quote" addLabel="Add quote" placeholder="Testimonial quote shown on the home page…" />}
+                    {key === 'the_man' && <ManPageEditor value={data as ManPageData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'parliament_rulings' && <RulingsEditor value={data as RulingsData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {(key === 'hero_timeline' || key === 'hero_parliament' || key === 'hero_speaker_record' || key === 'hero_themes' || key === 'hero_ask' || key === 'hero_search' || key === 'hero_media' || key === 'hero_archives') && <PageHeroEditor value={data as PageHeroData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'archive_collections' && <CollectionsEditor value={data as CollectionsData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'core_themes' && <CoreThemesEditor value={data as CoreThemesData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'media_cards' && <MediaCardsEditor value={data as MediaCardsData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'media_socials' && <MediaSocialsEditor value={data as MediaSocialsData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
+                    {key === 'site_footer' && <FooterEditor value={data as FooterData} onChange={v => setDrafts(prev => ({ ...prev, [key]: v }))} />}
                   </div>
                 )}
               </div>

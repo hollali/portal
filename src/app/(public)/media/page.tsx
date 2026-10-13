@@ -3,22 +3,15 @@ import Link from 'next/link'
 import { ImageIcon, Newspaper, ArrowUpRight, AudioLines, Globe2, Video as VideoIcon } from 'lucide-react'
 import PublicHeader from '@/components/PublicHeader'
 import PublicFooter from '@/components/PublicFooter'
+import { getSectionData } from '@/lib/libraryQueries'
+import type { MediaCardsData, MediaSocialsData, PageHeroData } from '@/lib/content'
 
 export const metadata: Metadata = {
   title: 'Media & Social',
   description: 'Photos, video, audio, news clippings and the social channels that connect the Speaker to Ghana and the world.',
 }
 
-// No `force-dynamic`: this page reads no database and takes no request input,
-// so it is prerendered at build time and served from the full-route cache.
-
-interface SocialLink {
-  label: string
-  href: string
-  handle: string
-  verified: boolean
-  icon: (size: number) => React.ReactNode
-}
+export const dynamic = 'force-dynamic'
 
 const BRAND_PATHS: Record<string, string> = {
   facebook: 'M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z',
@@ -40,21 +33,29 @@ function BrandIcon({ paths, size }: { paths: string; size: number }) {
   )
 }
 
-const SOCIAL_CARDS: SocialLink[] = [
-  { label: 'Facebook', href: 'https://www.facebook.com/askbagbin', handle: 'Alban Bagbin', verified: true, icon: s => <BrandIcon paths={BRAND_PATHS.facebook} size={s} /> },
-  { label: 'X (Twitter)', href: 'https://twitter.com/askbagbin', handle: '@askbagbin', verified: true, icon: s => <BrandIcon paths={BRAND_PATHS.x} size={s} /> },
-  { label: 'Instagram', href: 'https://www.instagram.com/askbagbin', handle: 'askbagbin', verified: true, icon: s => <BrandIcon paths={BRAND_PATHS.instagram} size={s} /> },
-  { label: 'YouTube', href: 'https://www.youtube.com/@askbagbin', handle: 'Alban Bagbin', verified: true, icon: s => <BrandIcon paths={BRAND_PATHS.youtube} size={s} /> },
-]
+const MEDIA_CARD_ICONS: Record<string, typeof ImageIcon> = {
+  '/archives/photos': ImageIcon,
+  '/videos': VideoIcon,
+  '/audio': AudioLines,
+  '/news': Newspaper,
+}
 
-const MEDIA_CARDS = [
-  { href: '/archives/photos', label: 'Photo Library', note: 'Official and historical photographs, curated by year, event and theme.', icon: ImageIcon, countLabel: 'Collection' },
-  { href: '/videos', label: 'Videos', note: 'Speeches, interviews and parliamentary moments captured on camera.', icon: VideoIcon, countLabel: 'Trusted clips' },
-  { href: '/audio', label: 'Audio', note: 'Radio engagements, interviews and audio recordings.', icon: AudioLines, countLabel: 'Recordings' },
-  { href: '/news', label: 'News', note: 'Press clippings and coverage across Ghanaian and international media.', icon: Newspaper, countLabel: 'Clippings' },
-]
+function socialIcon(label: string, size: number) {
+  if (label === 'Facebook') return <BrandIcon paths={BRAND_PATHS.facebook} size={size} />
+  if (label === 'X (Twitter)') return <BrandIcon paths={BRAND_PATHS.x} size={size} />
+  if (label === 'Instagram') return <BrandIcon paths={BRAND_PATHS.instagram} size={size} />
+  if (label === 'YouTube') return <BrandIcon paths={BRAND_PATHS.youtube} size={size} />
+  return <Globe2 size={size} />
+}
 
-export default function MediaPage() {
+export default async function MediaPage() {
+  const [hero, cards, socials] = await Promise.all([
+    getSectionData<PageHeroData>('hero_media'),
+    getSectionData<MediaCardsData>('media_cards'),
+    getSectionData<MediaSocialsData>('media_socials'),
+  ])
+  const MEDIA_CARDS = cards.items
+  const SOCIAL_CARDS = socials.items
   return (
     <div style={{ background: 'var(--p-bg)', color: 'var(--p-text-1)', minHeight: '100vh' }}>
       <PublicHeader />
@@ -63,12 +64,12 @@ export default function MediaPage() {
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
         <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 5vw, 4.5rem) 1.5rem' }}>
-          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>Media & Social</span>
+          <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{hero.eyebrow}</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.25rem, 5vw, 3.25rem)', letterSpacing: '-0.03em', lineHeight: 1.05, margin: '0.75rem 0 1rem' }}>
-            The moving record, <span className="p-serif">heard and seen</span>
+            {hero.titleA} <span className="p-serif">{hero.titleAccent}</span>
           </h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--p-text-2)', maxWidth: '38rem', margin: 0 }}>
-            Photographs, film, sound and the clippings of public conversation — gathered here so the legacy can be watched, listened to and read, not just listed.
+            {hero.lede}
           </p>
         </div>
       </section>
@@ -76,20 +77,23 @@ export default function MediaPage() {
       <main style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(2.5rem, 5vw, 4rem) 1.5rem' }}>
         {/* Media collection tiles */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: '1rem', marginBottom: '3rem' }}>
-          {MEDIA_CARDS.map(c => (
-            <Link key={c.href} href={c.href} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div className="p-card-lift" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 16, padding: '1.5rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <span style={{ width: 42, height: 42, borderRadius: 12, background: 'color-mix(in srgb, var(--primary) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-                    <c.icon size={19} />
-                  </span>
-                  <ArrowUpRight size={16} style={{ color: 'var(--p-text-3)' }} />
+          {MEDIA_CARDS.map(c => {
+            const Icon = MEDIA_CARD_ICONS[c.href] || Globe2
+            return (
+              <Link key={c.href} href={c.href} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="p-card-lift" style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 16, padding: '1.5rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <span style={{ width: 42, height: 42, borderRadius: 12, background: 'color-mix(in srgb, var(--primary) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                      <Icon size={19} />
+                    </span>
+                    <ArrowUpRight size={16} style={{ color: 'var(--p-text-3)' }} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)', marginBottom: '0.4rem' }}>{c.label}</div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--p-text-3)', lineHeight: 1.55, flex: 1 }}>{c.note}</p>
                 </div>
-                <div style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-display), sans-serif', color: 'var(--p-text-1)', marginBottom: '0.4rem' }}>{c.label}</div>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--p-text-3)', lineHeight: 1.55, flex: 1 }}>{c.note}</p>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            )
+          })}
         </div>
 
         {/* Social channels */}
@@ -108,7 +112,7 @@ export default function MediaPage() {
                 className="p-card-lift"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', textDecoration: 'none', color: 'var(--p-text-2)', border: '1px solid var(--p-border)', background: 'var(--p-surface-2)', borderRadius: 12, padding: '0.85rem 1rem' }}>
                 <span style={{ width: 32, height: 32, borderRadius: 999, background: 'var(--p-surface-3)', border: '1px solid var(--p-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
-                  {s.icon(15)}
+                  {socialIcon(s.label, 15)}
                 </span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</span>
               </a>
