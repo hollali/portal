@@ -23,6 +23,7 @@ import {
   FileText,
   Library,
   Globe,
+  BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
@@ -72,6 +73,7 @@ const adminSections: NavSection[] = [
       { href: '/admin/users', label: 'Users', icon: Users },
       { href: '/admin/content', label: 'Content', icon: FileText },
       { href: '/admin/archive', label: 'Archive', icon: Library },
+      { href: '/admin/research', label: 'Speaker Research', icon: BookOpen },
       { href: '/admin/notifications', label: 'Notifications', icon: Bell },
       { href: '/admin/settings', label: 'Settings', icon: Settings },
       { href: '/admin/health', label: 'Health', icon: Activity },

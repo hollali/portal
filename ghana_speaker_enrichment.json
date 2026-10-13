@@ -1,0 +1,1346 @@
+{
+  "enrichment_id": "GH-PARL-SPEAKER-BAGBIN-ENRICHMENT-2026-10-13",
+  "dataset_id": "GH-PARL-SPEAKER-BAGBIN-2026-10-13",
+  "subject_name": "Rt. Hon. Alban Sumana Kingsford Bagbin",
+  "accessed_date": "2026-10-13",
+  "research_scope": "Additional public web and repository research, checked against the existing PostgreSQL research tables and Bagbin-related News, ArchiveItem, and Milestone records before writing.",
+  "pre_import_database_check": {
+    "existing_research_sources": 32,
+    "existing_research_events": 19,
+    "news_records_matching_bagbin_in_title_snippet_or_notes": 100,
+    "archive_items_matching_bagbin_in_title_excerpt_or_body": 7,
+    "milestones_matching_bagbin_in_title_or_description": 1,
+    "exact_new_candidate_urls_already_in_research_sources_or_news": 0,
+    "matched_incomplete_news_records_updated": [
+      15,
+      16,
+      49,
+      55,
+      57,
+      101
+    ],
+    "duplicate_news_cluster": {
+      "description": "The 9 July 2026 Constitution of the Republic of Ghana Bill referral appeared through multiple Google News and Bing feed records; only the two existing canonical-story records were updated and linked to the event.",
+      "graphic_online_news_ids": [
+        15,
+        58,
+        107,
+        119,
+        133
+      ],
+      "modern_ghana_news_ids": [
+        16,
+        59,
+        96,
+        106,
+        120,
+        135
+      ],
+      "updated_primary_match_ids": [
+        15,
+        16
+      ],
+      "repeated_feed_ids_left_unchanged": [
+        58,
+        59,
+        96,
+        106,
+        107,
+        119,
+        120,
+        133,
+        135
+      ]
+    },
+    "additional_matched_news_records": {
+      "49": "GBC Ghana Online report and keynote transcript on the 4th African Inter-Parliamentary Conference.",
+      "55": "Graphic Online report on Bagbin's election as IPU Africa Group Chairperson.",
+      "57": "Citi Newsroom report on Bagbin's election as APNAC President.",
+      "101": "University of Ghana Alumni Association biographical profile; existing row retained and enriched with attributed summary and discrepancy notes."
+    }
+  },
+  "database_change_summary": {
+    "new_research_sources": 29,
+    "research_sources_updated": 10,
+    "new_research_events": 29,
+    "existing_research_events_updated": 8,
+    "existing_news_records_updated": 6,
+    "new_news_records_inserted": 0,
+    "exact_duplicate_research_source_urls_skipped": 0,
+    "duplicate_news_feed_records_inserted": 0,
+    "new_source_count_expected": 61,
+    "new_event_count_expected": 48,
+    "preexisting_event_source_links": 23,
+    "new_event_source_links": 33,
+    "event_source_links_added_by_existing_event_updates": 6,
+    "event_source_links_removed_by_attribution_correction": 3,
+    "event_source_links_expected_after_import": 59,
+    "event_news_links_expected_after_import": 11
+  },
+  "coverage_after_enrichment": {
+    "unique_source_urls_catalogued": 61,
+    "pages_or_items_directly_inspected": 42,
+    "additional_search_index_only_sources": 18,
+    "indexed_legacy_routes_returning_404": 1,
+    "downloadable_files_identified": 11,
+    "files_downloaded_and_full_text_processed": 9,
+    "event_records": 48,
+    "scope_statement": "Broad but selective research, not a complete crawl of every public web page, database feed, or Hansard. Nine identified files were downloaded and text-extracted or visually reviewed; the 2008 election-results route remained HTML-only and the IPU proceedings file returned HTTP 403. Search-index-only items and incomplete historic electoral coverage remain explicitly marked."
+  },
+  "source_updates": [
+    {
+      "record_id": "SRC-018",
+      "publication_date": "2026-08-24",
+      "verification_status": "directly_inspected",
+      "summary": "Direct Parliament text: Bagbin explained a five-day emergency recall ending 28 August, after the President's 11 August letter, for a bank amendment bill, two ministerial nominees and three Supreme Court nominees. He clarified that Mahama Ayariga remained Majority Leader until the NDC formally notified the House of a change.",
+      "notes": "Upgraded from search-index-only after direct fetch on 2026-10-13."
+    },
+    {
+      "record_id": "SRC-012",
+      "publication_date": "2007-12-12",
+      "verification_status": "downloaded_full_text_processed",
+      "summary": "Text extraction of the downloaded 62-page Electoral Commission of Ghana results PDF confirms that the 2004 parliamentary election was held Tuesday, 7 December. On PDF page 49, Nadowli West lists Alban Sumana Kingsford Bagbin (NDC) with 11,296 votes (50.5%); the report gives 22,349 valid votes and 81.4% turnout.",
+      "notes": "Full PDF text processed. The file footer is dated 12 December 2007, while the repository item metadata says 2000; the report itself identifies the election date as 7 December 2004. Preserve the metadata conflict."
+    },
+    {
+      "record_id": "SRC-013",
+      "title": "2000 Presidential Election Results — First Run (downloaded file)",
+      "document_type": "Presidential election-results PDF",
+      "publication_date": null,
+      "verification_status": "downloaded_full_text_processed",
+      "summary": "The downloaded one-page file contains regional totals for Ghana's 2000 first-round presidential election, including national candidate totals. It contains no constituency-level or parliamentary election results and does not establish a Bagbin candidacy or result.",
+      "notes": "The file contents conflict with the repository filename ‘92 96 & 00 ELECTION RESULTS.xls’ and the URL serves a PDF. Reviewed the entire page; retain only as a presidential-election record, not evidence of Bagbin's parliamentary history."
+    },
+    {
+      "record_id": "SRC-014",
+      "publication_date": "2007-01",
+      "verification_status": "downloaded_visual_review_processed",
+      "summary": "Downloaded and visually reviewed the eight-page Parliament repository scan of Bagbin's closing remarks at the dissolution of the Sixth Parliament; the document contains his first-person address to the House and parliamentary reflections.",
+      "notes": "Image-based PDF visually reviewed page by page. Repository issue date is January 2007; no day is inferred."
+    },
+    {
+      "record_id": "SRC-015",
+      "publication_date": "2021-07-21",
+      "verification_status": "downloaded_full_text_processed",
+      "summary": "Full text of Bagbin's 21 July 2021 formal communication to the House. He addresses Members of the Eighth Parliament, reflects on its first six months, and states expectations for Members' conduct and stewardship.",
+      "notes": "Downloaded PDF text extracted and reviewed; the document heading identifies Bagbin as Speaker and dates the communication Wednesday, 21 July 2021."
+    },
+    {
+      "record_id": "SRC-016",
+      "publication_date": "2026-07-23",
+      "verification_status": "downloaded_full_text_processed",
+      "summary": "Full text of Bagbin's lecture for the Supreme Court's 150th anniversary on 23 July 2026. The address reviews the Court's constitutional role, rights protection, institutional relations, judicial accountability, and future challenges.",
+      "notes": "The downloaded repository PDF was text-extracted and reviewed; authorship and date are explicit in the document. The lecture remains an attributed public address, not a judicial or parliamentary ruling."
+    },
+    {
+      "record_id": "SRC-031",
+      "publication_date": "2013-11",
+      "verification_status": "downloaded_visual_review_processed",
+      "summary": "The downloaded 20-page report concerns the Plant Breeders' Bill, records its first reading on 12 June 2013, and recommends passage with amendments. Its final submission page identifies Hon. Alban S.K. Bagbin as Chairperson of the Committee on Constitutional, Legal and Parliamentary Affairs.",
+      "notes": "Full scanned report visually reviewed, including its cover, discussion, recommendations, and signature page. Direct text confirms committee chairperson attribution; it does not establish sponsorship of the Bill."
+    },
+    {
+      "record_id": "SRC-032",
+      "publication_date": "2023",
+      "verification_status": "downloaded_full_text_processed",
+      "summary": "Full text of the Committee of the Whole report on the draft Public Elections (Registration of Voters) Regulations, 2023. It records a 28 February 2023 meeting with the Electoral Commission, National Identification Authority, and Ministry of Finance; the report is signed by Speaker Alban Sumana Kingsford Bagbin as Chairman of the Committee of the Whole and dated 9 March 2023.",
+      "notes": "The 16-page PDF was downloaded and text-extracted. Signature block, report date, meeting date, and recommendations were checked in the full document."
+    },
+    {
+      "record_id": "SRC-057",
+      "publication_date": "2023-06-23",
+      "verification_status": "downloaded_visual_review_processed",
+      "summary": "The downloaded 26-page Standing Orders Committee report reviews Parliament's Standing Orders and proposes procedural reforms. Its signed final page identifies Rt. Hon. Alban S.K. Bagbin as Speaker and Chairman of the Committee; the report is dated 23 June 2023.",
+      "notes": "Full scanned report visually reviewed, including cover, discussion, proposals, and signed submission page. Direct document evidence confirms Bagbin's chairmanship and report submission."
+    },
+    {
+      "record_id": "SRC-058",
+      "publication_date": "2025",
+      "verification_status": "downloaded_full_text_processed",
+      "summary": "Full text of the Constitution of the Republic of Ghana (Amendment) Bill, 2025. Its memorandum proposes changes to restrictions on dual citizens holding specified public offices and related amendments; this is proposed legislation, not an enacted amendment.",
+      "notes": "The downloaded PDF was text-extracted and reviewed. The file supports the Bill's contents only; Bagbin's 2026 referral and comments are separately attributed to Parliament and the linked news sources."
+    }
+  ],
+  "event_updates": [
+    {
+      "event_id": "EVT-003",
+      "description": "The indexed Parliament-hosted 2008 results PDF reports Bagbin as the NDC candidate for Nadowli West with 12,997 votes (61.9%). Modern Ghana's directly inspected constituency table reports 12,902 votes (61.93%). The candidate-level totals conflict and remain unresolved.",
+      "source_record_ids": [
+        "SRC-011",
+        "SRC-061"
+      ],
+      "evidence_status": "official_index_plus_conflicting_secondary_result",
+      "notes": "The 2008 Parliament-hosted PDF route returned an HTML page in this run; its result remains search-index-only. Modern Ghana is a directly inspected secondary table and reports the discrepant total."
+    },
+    {
+      "event_id": "EVT-001",
+      "start_date": "1993-01-07",
+      "description": "Graphic's 2025 retrospective reports that Bagbin entered Parliament on 7 January 1993 after election in 1992 and served in all nine Fourth Republic Parliaments. Parliament's 2025 report separately says he has been in the Chamber since 1993.",
+      "source_record_ids": [
+        "SRC-024",
+        "SRC-027",
+        "SRC-059"
+      ],
+      "news_record_ids": [
+        101
+      ],
+      "notes": "The University of Ghana Alumni profile says Nadowli West since 1994, while Graphic says Nadowli at first entry and the indexed 2008 election record reports Nadowli West; this constituency chronology remains unresolved."
+    },
+    {
+      "event_id": "EVT-004",
+      "description": "A 2025 House statement records the incoming Majority Leader's account of Bagbin's prior progression through Minority Leader, Majority Leader, Executive office and Deputy Speaker. Graphic's retrospective dates Minority Leadership to 7 January 2001, Majority Leadership to January 2009 and Second Deputy Speakership to January 2017; the Alumni profile gives Minority Leader as 2001–2008.",
+      "source_record_ids": [
+        "SRC-025",
+        "SRC-059"
+      ],
+      "news_record_ids": [
+        101
+      ],
+      "notes": "The named ministerial portfolios and complete appointment dates remain to be independently verified from primary appointment instruments."
+    },
+    {
+      "event_id": "EVT-008",
+      "source_record_ids": [
+        "SRC-022",
+        "SRC-057"
+      ],
+      "notes": "The signed Standing Orders Committee report dated 2023-06-23 identifies Bagbin as Speaker and Committee Chairman; it documents committee-led review recommendations. Parliament's orientation report states the revised Orders took effect 2024-01-02."
+    },
+    {
+      "event_id": "EVT-009",
+      "description": "The Ninth Parliament began on 7 January 2025. IPU Parline's indexed profile and Graphic's contemporaneous report state that Bagbin was re-elected Speaker on 7 January 2025 for a second term.",
+      "source_record_ids": [
+        "SRC-002",
+        "SRC-003",
+        "SRC-052",
+        "SRC-059"
+      ],
+      "notes": "Re-election date is corroborated; official ballot tally/vote breakdown was not retrieved."
+    },
+    {
+      "event_id": "EVT-016",
+      "description": "Bagbin delivered the 150th-anniversary lecture on 23 July 2026. The downloaded full text addresses the Supreme Court's constitutional role, rights protection, institutional relations, judicial accountability, and future challenges.",
+      "attribution": "Speaker / lecture author",
+      "source_record_ids": [
+        "SRC-016",
+        "SRC-021"
+      ],
+      "evidence_status": "downloaded_full_text_and_official_report",
+      "notes": "The repository working paper was downloaded and text-extracted; Parliament's report separately summarizes the event."
+    },
+    {
+      "event_id": "EVT-018",
+      "description": "The downloaded Plant Breeders' Bill committee report records the Bill's first reading on 12 June 2013 and recommends passage with amendments. Its signed submission page identifies Alban S.K. Bagbin as Chairperson of the Committee on Constitutional, Legal and Parliamentary Affairs.",
+      "attribution": "Chairperson, Committee on Constitutional, Legal and Parliamentary Affairs (signed report)",
+      "source_record_ids": [
+        "SRC-031"
+      ],
+      "evidence_status": "downloaded_visual_review_processed",
+      "notes": "The scan was visually reviewed, including the final signature page. This establishes the chairperson attribution, not individual bill sponsorship."
+    },
+    {
+      "event_id": "EVT-019",
+      "start_date": "2023-03-09",
+      "description": "The downloaded Committee of the Whole report records its 28 February 2023 meeting on the draft Public Elections (Registration of Voters) Regulations and related matters. The signed report identifies Speaker Alban Sumana Kingsford Bagbin as Chairman of the Committee of the Whole and is dated 9 March 2023.",
+      "attribution": "Chairman, Committee of the Whole (signed report)",
+      "source_record_ids": [
+        "SRC-032"
+      ],
+      "evidence_status": "downloaded_full_text_processed",
+      "notes": "Full PDF text extraction confirms meeting date, report contents, signature block, and report date."
+    }
+  ],
+  "news_updates": [
+    {
+      "news_id": 49,
+      "expected_title_contains": "Bagbin warns against aid conditions",
+      "canonical_url": "https://www.gbcghanaonline.com/general/bagbin-african-family-values/2026/",
+      "title": "Speaker Bagbin warns against aid conditions that undermine African family values",
+      "date": "2026-06-04",
+      "source_name": "GBC Ghana Online",
+      "snippet": "GBC reports Bagbin's 3 June keynote at the 4th African Inter-Parliamentary Conference and includes the complete keynote text covering sovereignty, conditional aid, family policy, African constitutional values and inter-parliamentary action.",
+      "notes_addition": "Existing Google News feed match upgraded to the canonical publisher page; no duplicate News row or transcript copy created."
+    },
+    {
+      "news_id": 55,
+      "expected_title_contains": "Bagbin elected chair of Africa group",
+      "canonical_url": "https://www.graphic.com.gh/news/politics/bagbin-elected-chair-of-africa-group-of-inter-parliamentary-union.html",
+      "title": "Speaker Bagbin elected chair of Africa group of Inter-Parliamentary Union",
+      "date": "2025-10-20",
+      "source_name": "Graphic Online",
+      "snippet": "Graphic reports Bagbin was elected Chairperson of the IPU Africa Geopolitical Group at the 151st Assembly in Geneva on 19 October 2025 and describes his coordination/representation duties.",
+      "notes_addition": "Existing Google News redirect upgraded to canonical Graphic source; independent GNA report catalogued as SRC-053."
+    },
+    {
+      "news_id": 57,
+      "expected_title_contains": "Bagbin elected President of African Anti-Corruption Network",
+      "canonical_url": "https://www.citinewsroom.com/2025/11/bagbin-elected-president-of-african-anti-corruption-network/",
+      "title": "Bagbin elected President of African Parliamentarians’ Network Against Corruption",
+      "date": "2025-11-09",
+      "source_name": "Citi Newsroom",
+      "snippet": "Citi Newsroom reports Bagbin's APNAC election at the ninth Biennial General Meeting in Accra and his pledge to strengthen integrity, accountability and parliamentary oversight.",
+      "notes_addition": "Existing Google News redirect upgraded to canonical Citi article; separate Graphic and GBC accounts are catalogued as SRC-054 and SRC-060."
+    },
+    {
+      "news_id": 15,
+      "expected_title_contains": "Bagbin refers Constitution Amendment Bill to committee",
+      "canonical_url": "https://www.graphic.com.gh/news/politics/ghana-news-bagbin-refers-constitution-amendment-bill-to-committee.html",
+      "title": "Bagbin refers Constitution Amendment Bill to committee",
+      "date": "2026-07-09",
+      "source_name": "Graphic Online",
+      "snippet": "Graphic reports the Speaker referred the dual-citizenship Constitution Bill, 2025 to the Constitutional and Legal Affairs Committee after Council of State advice against passage; he said the advice was not binding and the Speaker should not determine merits.",
+      "notes_addition": "Canonical publisher URL replaces the existing Google News URL; duplicate feed copies left unchanged and logged."
+    },
+    {
+      "news_id": 16,
+      "expected_title_contains": "Bagbin refers constitutional amendment bill to committee following Council of State's advice",
+      "canonical_url": "https://www.modernghana.com/news/1509127/bagbin-refers-constitutional-amendment-bill-to.html",
+      "title": "Bagbin refers constitutional amendment bill to committee following Council of State's advice",
+      "date": "2026-07-09",
+      "source_name": "Modern Ghana",
+      "snippet": "Modern Ghana reports Bagbin's 7 July 2026 account of Council of State advice, the bill's Eighth Parliament history, Attorney-General review and referral to the current committee. The Speaker said the advice was not binding.",
+      "notes_addition": "Canonical publisher URL replaces the existing Google News URL; duplicate feed copies left unchanged and logged."
+    },
+    {
+      "news_id": 101,
+      "expected_title_contains": "Alumni Spotlight",
+      "canonical_url": "https://alumni.ug.edu.gh/alumni-spotlight",
+      "title": "Alumni Spotlight — Rt. Hon. Kingsford Alban Sumana Bagbin",
+      "date": null,
+      "source_name": "University of Ghana Alumni Association",
+      "snippet": "The Alumni Association profile describes Bagbin's 1977–80 University of Ghana studies, 1980–82 Ghana School of Law, public-service and legal employment, Law Trust Company partnership, and reported committee/leadership roles including Minority Leader and Public Accounts Committee chair.",
+      "notes_addition": "Enriched the pre-existing direct-profile row. Claims are attributed; its constituency chronology (‘Nadowli West since 1994’) differs from Graphic's 1993 entry account and the indexed 2008 election result. Not treated as a primary record."
+    }
+  ],
+  "source_records": [
+    {
+      "record_id": "SRC-033",
+      "title": "The 4th African Inter-Parliamentary Conference on Family, Sovereignty and Values",
+      "original_url": "https://www.parliament.gh/news?CO=297",
+      "download_url": null,
+      "publication_date": "2026-06-03",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / keynote summary",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "African parliamentary delegations",
+        "John Dramani Mahama",
+        "Julius Debrah"
+      ],
+      "locator": "Opening ceremony report",
+      "summary": "Parliament reports Bagbin's keynote at the conference opening, calling for African cultural identity, legislative independence and practical family-support policies. It identifies him as CoSPAL President and says representatives of 20 countries attended.",
+      "relevance": "Official source for his keynote and Pan-African host/presiding role.",
+      "verification_status": "directly_inspected",
+      "notes": "Conference was held 3–6 June 2026. Hansard follow-up SRC-034 supplies further logistical outcomes."
+    },
+    {
+      "record_id": "SRC-034",
+      "title": "The Successful Hosting of the 4th African Inter-Parliamentary Conference on Family, Sovereignty and Values",
+      "original_url": "https://www.parliament.gh/floor?dis=269",
+      "download_url": null,
+      "publication_date": "2026-07-07",
+      "sitting_date": "2026-07-07",
+      "accessed_date": "2026-10-13",
+      "document_type": "Hansard / House statement",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Andrew Asiamah Amoako",
+        "Conference delegates"
+      ],
+      "locator": "Statement by Hon. Andrew Asiamah Amoako, Fomena",
+      "summary": "Second Deputy Speaker Andrew Asiamah Amoako reports the June 3–6 conference was held under Bagbin's auspices, with his agreement to host and his keynote address. The statement says the Accra Declaration/African Charter was adopted and identifies Asiamah as the planning committee chair.",
+      "relevance": "Contemporaneous parliamentary follow-up; clarifies Bagbin's hosting/keynote role and the planning chair role.",
+      "verification_status": "directly_inspected",
+      "notes": "Statement and chair role are attributed to Andrew Asiamah Amoako, not Bagbin."
+    },
+    {
+      "record_id": "SRC-035",
+      "title": "Bagbin challenges Ewe diaspora to turn cultural network into investment platform",
+      "original_url": "https://www.parliament.gh/news?CO=350",
+      "download_url": null,
+      "publication_date": "2026-09-12",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / public address",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban S.K. Bagbin",
+        "Council of Ewe Associations of North America",
+        "Gabriel Tanko Kwamigah-Atokple",
+        "Johnson Asiama"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports Bagbin spoke as Special Guest of Honour at CEANA's 33rd anniversary in Washington, D.C., urging the diaspora to develop investment partnerships beyond remittances.",
+      "relevance": "New overseas public engagement and economic-development remarks.",
+      "verification_status": "directly_inspected",
+      "notes": "The article attributes economic statements and remittance figures to its named speakers."
+    },
+    {
+      "record_id": "SRC-036",
+      "title": "Speaker launches National Integrity Awards Scheme",
+      "original_url": "https://www.parliament.gh/news?CO=315",
+      "download_url": null,
+      "publication_date": "2026-07-27",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / institutional initiative",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "John Dramani Mahama"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports Bagbin launched the National Integrity Awards Scheme on behalf of the President, under a theme of ethical leadership and national development, calling for honesty and accountability.",
+      "relevance": "New Speaker-led institutional initiative.",
+      "verification_status": "directly_inspected",
+      "notes": "The launch is not described as a personal award to Bagbin."
+    },
+    {
+      "record_id": "SRC-037",
+      "title": "Speaker Bagbin launches information-sharing session between Parliament, academia and civil society",
+      "original_url": "https://www.parliament.gh/news?CO=323",
+      "download_url": null,
+      "publication_date": "2026-07-29",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / civic engagement",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "World Bank",
+        "FCDO",
+        "ISSER",
+        "Citizens’ Bureau"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports Bagbin launched a session on Economic Governance and Public Financial Management to connect research, policymaking, committees and citizens.",
+      "relevance": "New research-informed oversight and civic-engagement initiative.",
+      "verification_status": "directly_inspected",
+      "notes": "The article describes broader Open Parliament/e-petition/broadcast reforms."
+    },
+    {
+      "record_id": "SRC-038",
+      "title": "Speaker Bagbin honours Chief Imam, pledges ‘Sunset Fund’ to support needy children",
+      "original_url": "https://www.parliament.gh/news?CO=328",
+      "download_url": null,
+      "publication_date": "2026-07-30",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / public engagement",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Nuhu Sharubutu",
+        "Sulemana Yusif"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports Bagbin announced an educational-support fund for underprivileged children during a courtesy call on the National Chief Imam and spoke about privacy, law reform and unity.",
+      "relevance": "New engagement and future educational-support pledge.",
+      "verification_status": "directly_inspected",
+      "notes": "The fund was announced as a pledge, not a completed or funded programme."
+    },
+    {
+      "record_id": "SRC-039",
+      "title": "Upper West Region gets major healthcare boost as Speaker Bagbin commissions expanded dialysis unit",
+      "original_url": "https://www.parliament.gh/news?CO=337",
+      "download_url": null,
+      "publication_date": "2026-08-04",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / public service",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "SHEILD",
+        "Upper West Regional Hospital"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports an expanded dialysis unit commissioning in Wa and Bagbin's donation of six dialysis machines/recliners through SHEILD, with remarks about regional access to kidney care.",
+      "relevance": "New Upper West public-service action.",
+      "verification_status": "directly_inspected",
+      "notes": "Reported donation and remarks; not an election-return record."
+    },
+    {
+      "record_id": "SRC-040",
+      "title": "Data Protection Agency delegation pays courtesy call on Speaker of Parliament",
+      "original_url": "https://www.parliament.gh/news?CO=303",
+      "download_url": null,
+      "publication_date": "2026-07-21",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / institutional engagement",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Arnold Kavaarpuo",
+        "Data Protection Agency"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports a DPA citation and briefing visit to Bagbin; he described privacy as a fundamental right and pledged review of data-protection laws, public education and stronger enforcement.",
+      "relevance": "New public policy position and institutional meeting.",
+      "verification_status": "directly_inspected",
+      "notes": "Promises are stated as future commitments, not completed amendments."
+    },
+    {
+      "record_id": "SRC-041",
+      "title": "Celebrating Excellence: Rt. Hon. Speaker honoured by Ghana Chamber of Construction Industry",
+      "original_url": "https://www.parliament.gh/news?CO=304",
+      "download_url": null,
+      "publication_date": "2026-07-21",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / recognition",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Ghana Chamber of Construction Industry"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports the Chamber presented Bagbin with the 2024/2025 Ghana Construction Industry Excellence Award trophy and citation and records his response on construction and infrastructure.",
+      "relevance": "New recognition record.",
+      "verification_status": "directly_inspected",
+      "notes": "Award is attributed to the Ghana Chamber."
+    },
+    {
+      "record_id": "SRC-042",
+      "title": "Speaker of Parliament praises UBIDS’ resilience at second congregation and donates law books",
+      "original_url": "https://www.parliament.gh/news?CO=302",
+      "download_url": null,
+      "publication_date": "2026-07-04",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / education address",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "University of Business and Integrated Development Studies"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports Bagbin's keynote at UBIDS's second congregation, donation of law books, support for legal education, and remarks on university infrastructure and a proposed medical school.",
+      "relevance": "New education and regional engagement.",
+      "verification_status": "directly_inspected",
+      "notes": "Future plans are distinguished from completed projects."
+    },
+    {
+      "record_id": "SRC-043",
+      "title": "Speaker Bagbin strengthens Ghana–UK football partnership with Sunderland AFC",
+      "original_url": "https://www.parliament.gh/news?CO=289",
+      "download_url": null,
+      "publication_date": "2026-03-17",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / international engagement",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Sunderland AFC"
+      ],
+      "locator": "Parliament news archive search excerpt",
+      "summary": "Indexed Parliament report says Bagbin's UK visit included advancing a Sunderland AFC fixture for Democracy Cup winners and wider opportunities for Ghanaian/African football talent.",
+      "relevance": "International visit and youth/sports initiative.",
+      "verification_status": "search_index_only",
+      "notes": "Direct item fetch not completed; indexed text only."
+    },
+    {
+      "record_id": "SRC-044",
+      "title": "Ongoing engagements to strengthen inter-parliamentary cooperation",
+      "original_url": "https://www.parliament.gh/news?CO=260",
+      "download_url": null,
+      "publication_date": "2026-01-15",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Parliament news / diplomatic engagement",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Idi Gado Boubacar",
+        "African Parliamentary Union"
+      ],
+      "locator": "News article",
+      "summary": "Parliament reports the APU Secretary-General paid Bagbin a courtesy call, discussing the Union's visibility, democratic governance and collaboration among African legislatures.",
+      "relevance": "New inter-parliamentary diplomatic engagement.",
+      "verification_status": "directly_inspected",
+      "notes": ""
+    },
+    {
+      "record_id": "SRC-045",
+      "title": "The Speaker’s nostalgic return to ESAMI Arusha",
+      "original_url": "https://esami-africa.org/courtesy-visit-by-speaker-of-ghanas-parliament/",
+      "download_url": null,
+      "publication_date": "2026-10-09",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "ESAMI institutional news / alumni engagement",
+      "term_or_session": "2026",
+      "persons": [
+        "Alban Kingsford Sumana Bagbin",
+        "Caiphas Chekwoti",
+        "ESAMI"
+      ],
+      "locator": "Article text",
+      "summary": "ESAMI says it welcomed its distinguished alumnus, Ghana's Speaker, and his delegation for an official courtesy visit to the Arusha institute.",
+      "relevance": "Latest verified engagement at the research cut-off and alumni association with a regional institution.",
+      "verification_status": "directly_inspected",
+      "notes": "Article published 2026-10-09; visit day not stated. No image files were collected."
+    },
+    {
+      "record_id": "SRC-046",
+      "title": "Speaker Bagbin to convene African parliamentary leaders at 10th GITFiC in Accra",
+      "original_url": "https://gna.org.gh/2026/05/speaker-bagbin-to-convene-african-parliamentary-leaders-at-10th-gitfic-in-accra/",
+      "download_url": null,
+      "publication_date": "2026-05-31",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Ghana News Agency article",
+      "term_or_session": "2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "GITFiC",
+        "Samuel Sarpong"
+      ],
+      "locator": "Article text",
+      "summary": "GNA reports a GITFiC consultation with Bagbin on the Global Debt Initiative. It says he directed his office to support agreed action plans and, as CoSPAL President, invite African Speakers to the October 2026 annual meeting.",
+      "relevance": "New Speaker action on debt policy and planned African parliamentary convening.",
+      "verification_status": "directly_inspected",
+      "notes": "October 14–15 meeting was future-dated at the 13 October research cut-off."
+    },
+    {
+      "record_id": "SRC-047",
+      "title": "Speaker Bagbin leads 2026 GITFiC’s advocacy for global debt initiative",
+      "original_url": "https://gna.org.gh/2026/08/speaker-bagbin-leads-2026-gitfics-advocacy-for-global-debt-initiative/",
+      "download_url": null,
+      "publication_date": "2026-08-09",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Ghana News Agency article",
+      "term_or_session": "2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "GITFiC",
+        "CoSPAL"
+      ],
+      "locator": "Article text",
+      "summary": "GNA reports Bagbin's endorsement recording on global-debt initiative strategies and his plan, as CoSPAL chair, to invite African Speakers and parliamentarians to Accra.",
+      "relevance": "Separate August advocacy statement in the GITFiC series.",
+      "verification_status": "directly_inspected",
+      "notes": "Announcement concerns the future October 14–15 meeting, not an event completed by the cutoff."
+    },
+    {
+      "record_id": "SRC-048",
+      "title": "Speaker Bagbin calls for stronger collaboration between Ghana and the US",
+      "original_url": "https://3news.com/news/speaker-bagbin-calls-for-stronger-collaboration-between-ghana-and-the-us-to-promote-sustainable-growth-and-devt",
+      "download_url": null,
+      "publication_date": "2026-06-16",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "3News article",
+      "term_or_session": "Ninth Parliament; 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Vern Buchanan",
+        "U.S. Congressional delegation",
+        "Alexander Afenyo-Markin",
+        "Alfred Oko Vanderpuije"
+      ],
+      "locator": "Article text",
+      "summary": "3News reports Bagbin met a U.S. Congressional delegation led by Vern Buchanan, called for stronger cooperation and discussed parliamentary leadership, governance, investment and youth opportunity.",
+      "relevance": "New international engagement and attributed diplomatic position.",
+      "verification_status": "directly_inspected",
+      "notes": ""
+    },
+    {
+      "record_id": "SRC-049",
+      "title": "Bagbin secures IPU roles, boosts ties",
+      "original_url": "https://dailyguidenetwork.com/bagbin-secures-ipu-roles-boosts-ties/",
+      "download_url": null,
+      "publication_date": "2026-04-28",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Daily Guide Network article",
+      "term_or_session": "152nd IPU Assembly; Istanbul; April 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Bernard Ahiafor",
+        "African Group delegations"
+      ],
+      "locator": "Article text",
+      "summary": "Daily Guide reports Bagbin, as IPU Africa Group President, nominated First Deputy Speaker Bernard Ahiafor and South Africa's Speaker to the Resolution Drafting Committee; both were endorsed. It also describes meetings with parliamentary delegations from nine countries.",
+      "relevance": "New detail on Bagbin's April 2026 international parliamentary activities.",
+      "verification_status": "directly_inspected",
+      "notes": "Secondary report; official IPU assembly report indexed as SRC-050."
+    },
+    {
+      "record_id": "SRC-050",
+      "title": "152nd IPU Assembly and related meetings — report of proceedings",
+      "original_url": "https://www.ipu.org/file/23713/download",
+      "download_url": "https://www.ipu.org/file/23713/download",
+      "publication_date": "2026-08-21",
+      "sitting_date": "2026-04-15",
+      "accessed_date": "2026-10-13",
+      "document_type": "IPU Assembly report / PDF",
+      "term_or_session": "152nd IPU Assembly; Istanbul; 15–19 April 2026",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Martin Chungong",
+        "African Group"
+      ],
+      "locator": "Closing remarks by geopolitical-group representatives, indexed excerpt",
+      "summary": "Official IPU report excerpt names Bagbin as President of the African Group and records his participation in group representatives' remarks at the 152nd Assembly.",
+      "relevance": "Primary IPU source corroborating his international role at the 152nd Assembly.",
+      "verification_status": "search_index_only",
+      "notes": "Direct IPU file endpoint not text-processed in this session; assembly dates surfaced through the official IPU event listing."
+    },
+    {
+      "record_id": "SRC-051",
+      "title": "African Group — Inter-Parliamentary Union",
+      "original_url": "https://www.ipu.org/about-ipu/members/geopolitical-groups/african-group",
+      "download_url": null,
+      "publication_date": null,
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Official IPU group directory",
+      "term_or_session": "Current at access date",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin"
+      ],
+      "locator": "Chairperson field",
+      "summary": "IPU's indexed group page identifies Bagbin as Chairperson / President of the African Group and as Ghana's Speaker.",
+      "relevance": "Current official international confirmation of the IPU chair role.",
+      "verification_status": "search_index_only",
+      "notes": "Direct page returned 403; claim is independently supported by dated GNA, Graphic and IPU assembly results."
+    },
+    {
+      "record_id": "SRC-052",
+      "title": "Ghana Parliament profile — IPU Parline",
+      "original_url": "https://data.ipu.org/parliament/gh/GH-LC01/",
+      "download_url": null,
+      "publication_date": null,
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Official IPU parliamentary database",
+      "term_or_session": "Speaker term; 2021–2025",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin"
+      ],
+      "locator": "Speaker term and additional information fields",
+      "summary": "IPU Parline's indexed Ghana entry says Bagbin began as Speaker 7 January 2021 and was re-elected 7 January 2025.",
+      "relevance": "Independent verification of the 2025 second Speakership term date.",
+      "verification_status": "search_index_only",
+      "notes": "Direct data endpoint returned 403; no vote total was visible."
+    },
+    {
+      "record_id": "SRC-053",
+      "title": "Speaker Bagbin elected Chairman of IPU’s Africa Group",
+      "original_url": "https://gna.org.gh/2025/10/speaker-bagbin-elected-chairman-of-ipus-africa-group/",
+      "download_url": null,
+      "publication_date": "2025-10-20",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Ghana News Agency article",
+      "term_or_session": "151st IPU Assembly; Geneva; 2025",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "David Sebastian Damoah",
+        "Angela Thokozile Didiza"
+      ],
+      "locator": "Article text",
+      "summary": "GNA reports Bagbin's unanimous election as Chair of the 52-member African Geopolitical Group on 19 October 2025 at the 151st IPU Assembly, based on a Parliamentary Service statement.",
+      "relevance": "Independent report of the new IPU role, with date and remit.",
+      "verification_status": "directly_inspected",
+      "notes": "This source is distinct from pre-existing News #55 (Graphic Online); both are retained as independent reports."
+    },
+    {
+      "record_id": "SRC-054",
+      "title": "Speaker Bagbin elected President of African Parliamentarians Network Against Corruption",
+      "original_url": "https://www.graphic.com.gh/news/politics/speaker-bagbin-elected-president-of-african-parliamentarians-anti-corruption-network.html",
+      "download_url": null,
+      "publication_date": "2025-11-09",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Graphic Online article",
+      "term_or_session": "APNAC 9th Biennial General Meeting; 2025",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "APNAC members"
+      ],
+      "locator": "Article text",
+      "summary": "Graphic reports Bagbin was elected APNAC President, accepted the role and pledged to work with African legislators on integrity and accountability. It also notes his recent IPU Russia–Ukraine task force appointment.",
+      "relevance": "Independent report of an international anti-corruption leadership appointment.",
+      "verification_status": "directly_inspected",
+      "notes": "Existing News #57 is a Citi Newsroom account; GBC's 8 November keynote is a distinct event in SRC-060."
+    },
+    {
+      "record_id": "SRC-055",
+      "title": "Speaker Bagbin calls for increased funding for climate action",
+      "original_url": "https://gna.org.gh/2025/10/speaker-bagbin-calls-for-increased-funding-for-climate-action/",
+      "download_url": null,
+      "publication_date": "2025-10-31",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Ghana News Agency article",
+      "term_or_session": "Ninth Parliament; 2025",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Alex Ogutu",
+        "Budget Committee",
+        "Climate Change Caucus"
+      ],
+      "locator": "Article text",
+      "summary": "GNA reports Bagbin urged the Budget Committee to fund climate work during the launch of a two-year Parliament–IPU methane-reduction partnership. He cited chronic underfunding of Parliament and called climate change a crisis requiring legislative leadership.",
+      "relevance": "New policy statement and institutional climate partnership.",
+      "verification_status": "directly_inspected",
+      "notes": "Launch-stage commitments, not completed programme results."
+    },
+    {
+      "record_id": "SRC-056",
+      "title": "How the IPU helps Ghana to reduce methane emissions",
+      "original_url": "https://www.ipu.org/news/case-studies/2026-05/how-ipu-helps-ghana-reduce-methane-emissions",
+      "download_url": null,
+      "publication_date": "2026-05-05",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "IPU case study",
+      "term_or_session": "Climate partnership; 2025–2026",
+      "persons": [
+        "Alban Kingsford Sumana Bagbin",
+        "Ghana Parliament",
+        "Global Methane Hub"
+      ],
+      "locator": "IPU indexed page excerpt",
+      "summary": "IPU reports the cooperation framework was signed at the 151st Assembly, formally launched by Bagbin in Accra on 31 October 2025, and led to methane reduction being added to the Budget Committee's 2026 work plan.",
+      "relevance": "Official institution's follow-up account of the climate partnership Bagbin launched.",
+      "verification_status": "search_index_only",
+      "notes": "Direct page fetch returned 403; use summary only from IPU's indexed excerpt. GNA launch coverage is SRC-055."
+    },
+    {
+      "record_id": "SRC-057",
+      "title": "Report of the Standing Orders Committee on the Review of the Standing Orders of the Parliament of Ghana",
+      "original_url": "https://repository.parliament.gh/items/25b48374-f814-463e-b225-676214b8c94a/full",
+      "download_url": "https://repository.parliament.gh/bitstreams/d38c6239-9192-42d1-a6c5-03a30cc9d6e5/download",
+      "publication_date": "2023-06-23",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Standing Orders Committee report / PDF",
+      "term_or_session": "Eighth Parliament; 2023",
+      "persons": [
+        "Alban S.K. Bagbin",
+        "Standing Orders Committee"
+      ],
+      "locator": "Repository author and issue-date metadata",
+      "summary": "Parliament repository names Bagbin as author of the Standing Orders Committee review, covering such matters as order of business, committee leadership and the Clerk's role.",
+      "relevance": "Primary repository record of procedural reform work that preceded the 2024 Standing Orders.",
+      "verification_status": "directly_inspected",
+      "notes": "PDF identified (6.91 MB), not downloaded/text-processed; author metadata does not establish committee chairmanship."
+    },
+    {
+      "record_id": "SRC-058",
+      "title": "Constitution of the Republic of Ghana Amendment Bill, 2025",
+      "original_url": "https://repository.parliament.gh/items/b3b4f6d1-93c4-4ecc-a686-6d37d645b10e",
+      "download_url": "https://repository.parliament.gh/bitstreams/65ccb2b2-dc94-42a3-8e97-2edaf128e8ee/download",
+      "publication_date": "2025",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Private Member’s constitutional amendment bill / PDF",
+      "term_or_session": "Ninth Parliament; 2025 Bill",
+      "persons": [
+        "Kennedy Osei Nyarko",
+        "Kwame Governs Agbodza",
+        "Emmanuel Armah-Kofi Buah",
+        "Davis Ansah-Opoku",
+        "Alban Sumana Kingsford Bagbin"
+      ],
+      "locator": "Repository item metadata and Bill clauses",
+      "summary": "Official repository holds the Bill addressing eligibility restrictions related to dual citizenship/allegiance. It supplies legislative context for Bagbin's July 2026 referral; Bagbin is not named as a sponsor.",
+      "relevance": "Primary source for the legislative matter behind a newly catalogued Speaker procedure event.",
+      "verification_status": "directly_inspected",
+      "notes": "Four MPs are listed as sponsors. PDF identified (1.42 MB), not downloaded/text-processed."
+    },
+    {
+      "record_id": "SRC-059",
+      "title": "Bagbin sets record for being part of all Parliaments since 1993 and serves second term as Speaker",
+      "original_url": "https://www.graphic.com.gh/news/politics/bagbin-equals-justice-d-f-annans-record-as-speaker-of-parliament-for-two-terms-sets-record-for-being-part-of-all-parliaments-since-1993.html",
+      "download_url": null,
+      "publication_date": "2025-01-07",
+      "sitting_date": "2025-01-07",
+      "accessed_date": "2026-10-13",
+      "document_type": "Graphic Online career retrospective",
+      "term_or_session": "Fourth Republic; Ninth Parliament inauguration",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Justice Daniel Francis Annan"
+      ],
+      "locator": "‘Who is Alban Sumana Kingsford Bagbin’ section",
+      "summary": "Graphic reports Bagbin entered Parliament on 7 January 1993 after election in 1992, was part of all nine Fourth Republic Parliaments and was elected Speaker for a second term in 2025. It also describes legal employment, parliamentary leadership and committee service.",
+      "relevance": "Career chronology and prior role dates not present in the base research sources.",
+      "verification_status": "directly_inspected",
+      "notes": "Secondary retrospective. Constituency spelling/name varies across sources (Nadowli/Nadowli West); committee chronology attributed to the profile and not yet matched to each primary appointment record."
+    },
+    {
+      "record_id": "SRC-060",
+      "title": "APNAC 9th Biennial General Meeting: Speaker Bagbin calls for stronger parliamentary role in Africa’s anti-corruption fight",
+      "original_url": "https://www.gbcghanaonline.com/news/politics/apnac-9th-biennial-general-meeting-speaker-bagbin-calls-for-a-stronger-parliamentary-role-in-africas-anti-corruption-fight/2025/",
+      "download_url": null,
+      "publication_date": "2025-11-08",
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Ghana Broadcasting Corporation keynote coverage",
+      "term_or_session": "APNAC 9th Biennial General Meeting; 2025",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "APNAC",
+        "Louis G. Vlavonou"
+      ],
+      "locator": "Keynote summary",
+      "summary": "GBC reports Bagbin's 8 November keynote urging parliamentary oversight, financial transparency, accountability and cooperation against corruption. It lists Ghana Parliament reforms he described: Ethics and Standards Committee, Commissioner of Standards, Corruption Risk Management Plan and Anti-Corruption Department.",
+      "relevance": "New detailed anti-corruption agenda and institutional-reform information delivered immediately before his APNAC presidency election.",
+      "verification_status": "directly_inspected",
+      "notes": "Distinct from the APNAC election reports dated 9 November (existing News #57 and SRC-054)."
+    },
+    {
+      "record_id": "SRC-061",
+      "title": "Nadowli West Summary — 2008 Parliamentary Election Results",
+      "original_url": "https://www.modernghana.com/ghanahome/ghanavotes/2008/result_constituency.asp?constituency_id=46",
+      "download_url": null,
+      "publication_date": null,
+      "sitting_date": null,
+      "accessed_date": "2026-10-13",
+      "document_type": "Third-party parliamentary election-results table",
+      "term_or_session": "2008 parliamentary election",
+      "persons": [
+        "Alban Sumana Kingsford Bagbin",
+        "Nadowli West candidates"
+      ],
+      "locator": "Parliament: Upper West Region Summary — Nadowli West",
+      "summary": "Modern Ghana's constituency table reports Bagbin (NDC) with 12,902 votes (61.93%) in Nadowli West on 7 December 2008.",
+      "relevance": "Directly inspected secondary result useful for cross-checking the Parliament-hosted indexed 2008 result.",
+      "verification_status": "directly_inspected_secondary_result",
+      "notes": "The indexed Parliament-hosted result reports 12,997 votes (61.9%); the difference is unresolved. Modern Ghana spells the middle name as ‘Kinsford’. Do not substitute this secondary total for the official index lead."
+    }
+  ],
+  "events": [
+    {
+      "event_id": "EVT-020",
+      "start_date": "2025-10-19",
+      "end_date": null,
+      "type": "IPU Africa Group Chairperson election",
+      "description": "Bagbin was elected Chairperson of the IPU Africa Geopolitical Group at the 151st Assembly in Geneva. GNA reports unanimity and cites a Parliamentary Service statement; Graphic describes his coordination and representative duties.",
+      "attribution": "Speaker / elected regional-group chair",
+      "source_record_ids": [
+        "SRC-051",
+        "SRC-053"
+      ],
+      "news_record_ids": [
+        55
+      ],
+      "evidence_status": "direct_report_plus_official_index",
+      "notes": "Existing Graphic News #55 was canonicalized in place; IPU's indexed group page independently lists him as current chair."
+    },
+    {
+      "event_id": "EVT-021",
+      "start_date": "2025-11-08",
+      "end_date": null,
+      "type": "APNAC keynote address",
+      "description": "At the opening of APNAC's ninth Biennial General Meeting in Accra, Bagbin urged African parliaments to strengthen oversight, transparency and cooperation against corruption and cited Ghana Parliament's ethics and anti-corruption structures.",
+      "attribution": "Speaker / keynote speaker",
+      "source_record_ids": [
+        "SRC-060"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "directly_inspected_media_report",
+      "notes": "This 8 November keynote is distinct from the APNAC presidency election the following day."
+    },
+    {
+      "event_id": "EVT-022",
+      "start_date": "2025-11-09",
+      "end_date": null,
+      "type": "APNAC presidency election",
+      "description": "Bagbin was elected President of the African Parliamentarians’ Network Against Corruption at its ninth Biennial General Meeting in Accra and pledged to work with African legislators on integrity and accountability.",
+      "attribution": "Speaker / elected APNAC President",
+      "source_record_ids": [
+        "SRC-054"
+      ],
+      "news_record_ids": [
+        57
+      ],
+      "evidence_status": "directly_inspected_media_reports",
+      "notes": "Existing Citi Newsroom News #57 was canonicalized; Graphic and Citi are separate accounts."
+    },
+    {
+      "event_id": "EVT-023",
+      "start_date": "2025-10-31",
+      "end_date": null,
+      "type": "Parliament–IPU methane-reduction partnership launch",
+      "description": "Bagbin launched Parliament's two-year IPU project to build capacity on methane reduction, urged Budget Committee funding and called for legislative leadership on climate action.",
+      "attribution": "Speaker / launch host",
+      "source_record_ids": [
+        "SRC-055",
+        "SRC-056"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_GNA_and_IPU_indexed_follow_up",
+      "notes": "GNA directly reports the launch; the IPU May 2026 follow-up is indexed-only after a 403 direct fetch."
+    },
+    {
+      "event_id": "EVT-024",
+      "start_date": "2026-04-15",
+      "end_date": "2026-04-19",
+      "type": "152nd IPU Assembly and parliamentary diplomacy",
+      "description": "At the Istanbul Assembly, Bagbin served as President of the African Group, nominated First Deputy Speaker Bernard Ahiafor and South Africa's Speaker to the Resolution Drafting Committee (both nominations were endorsed), and held bilateral meetings with parliamentary delegations from nine countries.",
+      "attribution": "Speaker / President of IPU African Group",
+      "source_record_ids": [
+        "SRC-049",
+        "SRC-050"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_secondary_report_and_official_IPU_index",
+      "notes": "Daily Guide is secondary coverage; the official IPU proceedings report is indexed-only."
+    },
+    {
+      "event_id": "EVT-025",
+      "start_date": "2026-05-31",
+      "end_date": null,
+      "type": "GITFiC Global Debt Initiative consultation",
+      "description": "After a GITFiC consultation, Bagbin agreed to convene African parliamentary leaders for the planned 10th GITFiC meeting and directed his office to support agreed action plans as CoSPAL President.",
+      "attribution": "Speaker / CoSPAL President",
+      "source_record_ids": [
+        "SRC-046"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_GNA_report",
+      "notes": "The annual meeting was announced for 14–15 October 2026, after the research cut-off; attendance/outcome is not asserted."
+    },
+    {
+      "event_id": "EVT-026",
+      "start_date": "2026-06-03",
+      "end_date": "2026-06-06",
+      "type": "4th African Inter-Parliamentary Conference on Family, Sovereignty and Values",
+      "description": "Bagbin, as Speaker and CoSPAL President, hosted the Accra conference and delivered the opening keynote. Parliament reports delegations from 20 African countries and adoption of the Accra Declaration/African Charter; House follow-up identifies Andrew Asiamah Amoako as Planning Committee chair.",
+      "attribution": "Speaker / host / keynote speaker",
+      "source_record_ids": [
+        "SRC-033",
+        "SRC-034"
+      ],
+      "news_record_ids": [
+        49
+      ],
+      "evidence_status": "direct_Parliament_and_GBC_sources",
+      "notes": "GBC News #49 contains the keynote transcript and was canonicalized in place. Statements in the speech are attributed to Bagbin."
+    },
+    {
+      "event_id": "EVT-027",
+      "start_date": "2026-06-16",
+      "end_date": null,
+      "type": "U.S. Congressional delegation meeting",
+      "description": "Bagbin met a U.S. Congressional delegation led by Vern Buchanan and called for stronger Ghana–U.S. cooperation; reported discussions covered governance, investment, jobs and youth opportunity.",
+      "attribution": "Speaker / host",
+      "source_record_ids": [
+        "SRC-048"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_3News_report",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-028",
+      "start_date": "2026-07-07",
+      "end_date": null,
+      "type": "Constitution Amendment Bill referral",
+      "description": "Bagbin announced Council of State advice against passage of the Constitution of the Republic of Ghana Bill, 2025 and referred it to the Constitutional and Legal Affairs Committee. He said the advice was not binding and the Speaker should not decide the Bill's merits or prejudge the House.",
+      "attribution": "Speaker / procedural decision-maker",
+      "source_record_ids": [
+        "SRC-058"
+      ],
+      "news_record_ids": [
+        15,
+        16
+      ],
+      "evidence_status": "attributed_contemporaneous_news_plus_primary_bill",
+      "notes": "Bagbin is not a sponsor of this Private Member's Bill. News #15 and #16 were canonicalized; repeated feed copies are logged and left untouched. This is not a final House decision on the Bill."
+    },
+    {
+      "event_id": "EVT-029",
+      "start_date": "2026-07-04",
+      "end_date": null,
+      "type": "UBIDS graduation and education engagement",
+      "description": "Bagbin delivered a keynote at UBIDS's second congregation and School of Law graduation, donated law books and voiced support for legal education and facilities.",
+      "attribution": "Speaker / keynote speaker and donor",
+      "source_record_ids": [
+        "SRC-042"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-030",
+      "start_date": "2026-07-21",
+      "end_date": null,
+      "type": "Data Protection Agency courtesy call",
+      "description": "A DPA delegation presented Bagbin with a citation and briefed him on privacy policy; he described privacy as a fundamental right and pledged parliamentary attention to legal gaps, education and enforcement.",
+      "attribution": "Speaker / meeting host",
+      "source_record_ids": [
+        "SRC-040"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": "Future commitments, not completed amendments."
+    },
+    {
+      "event_id": "EVT-031",
+      "start_date": "2026-07-21",
+      "end_date": null,
+      "type": "Construction Industry Excellence Award",
+      "description": "The Ghana Chamber of Construction Industry presented Bagbin a 2024/2025 Excellence Award trophy and citation for his role as an industry-supporting public personality.",
+      "attribution": "Award recipient",
+      "source_record_ids": [
+        "SRC-041"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-032",
+      "start_date": "2026-07-27",
+      "end_date": null,
+      "type": "National Integrity Awards Scheme launch",
+      "description": "Bagbin launched the National Integrity Awards Scheme on behalf of President John Dramani Mahama and called for integrity and ethical leadership.",
+      "attribution": "Speaker / launch representative",
+      "source_record_ids": [
+        "SRC-036"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": "Institutional initiative, not a personal award."
+    },
+    {
+      "event_id": "EVT-033",
+      "start_date": "2026-07-29",
+      "end_date": null,
+      "type": "Parliament–academia–civil society information session",
+      "description": "Bagbin launched an information-sharing session on economic governance and public financial management to connect parliamentary committees, researchers, civil society and citizens.",
+      "attribution": "Speaker / launch host",
+      "source_record_ids": [
+        "SRC-037"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-034",
+      "start_date": "2026-07-30",
+      "end_date": null,
+      "type": "Chief Imam visit and education-fund pledge",
+      "description": "During a courtesy call on National Chief Imam Nuhu Sharubutu, Bagbin pledged an education-support fund for underprivileged children to be called the Sunset Fund.",
+      "attribution": "Speaker / visitor",
+      "source_record_ids": [
+        "SRC-038"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": "Pledge only; establishment and funding not verified."
+    },
+    {
+      "event_id": "EVT-035",
+      "start_date": "2026-08-04",
+      "end_date": null,
+      "type": "Dialysis unit commissioning and health donation",
+      "description": "Bagbin commissioned the expanded Wa dialysis unit and donated six dialysis machines and recliners through SHEILD, according to Parliament's report.",
+      "attribution": "Speaker / donor and commissioning guest",
+      "source_record_ids": [
+        "SRC-039"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-036",
+      "start_date": "2026-09-12",
+      "end_date": null,
+      "type": "CEANA anniversary address",
+      "description": "As Special Guest of Honour at the Council of Ewe Associations of North America anniversary in Washington, Bagbin urged the diaspora to connect cultural networks to investment and development in Ghana.",
+      "attribution": "Speaker / Special Guest of Honour",
+      "source_record_ids": [
+        "SRC-035"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-037",
+      "start_date": null,
+      "end_date": null,
+      "type": "ESAMI alumni courtesy visit",
+      "description": "ESAMI reports it welcomed alumnus Bagbin and his delegation for an official courtesy visit to its Arusha campus.",
+      "attribution": "Speaker / alumnus and visitor",
+      "source_record_ids": [
+        "SRC-045"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_institutional_report",
+      "notes": "Article published 2026-10-09; visit date is not stated."
+    },
+    {
+      "event_id": "EVT-038",
+      "start_date": "2026-01-15",
+      "end_date": null,
+      "type": "African Parliamentary Union Secretary-General courtesy call",
+      "description": "Bagbin met APU Secretary-General Idi Gado Boubacar; Parliament reports discussion of the Union's visibility, governance and cooperation among African legislatures.",
+      "attribution": "Speaker / host",
+      "source_record_ids": [
+        "SRC-044"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_Parliament_news",
+      "notes": ""
+    },
+    {
+      "event_id": "EVT-039",
+      "start_date": "2026-03-17",
+      "end_date": null,
+      "type": "Sunderland AFC partnership discussions",
+      "description": "Parliament's indexed report says Bagbin and a delegation discussed a possible Democracy Cup fixture and wider football opportunities during a UK visit.",
+      "attribution": "Speaker / delegation lead",
+      "source_record_ids": [
+        "SRC-043"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "search_index_only",
+      "notes": "Proposed fixture and partnership are under discussion."
+    },
+    {
+      "event_id": "EVT-040",
+      "start_date": "2023-06-23",
+      "end_date": null,
+      "type": "Standing Orders Committee review report",
+      "description": "The downloaded Standing Orders Committee report reviews Parliament's procedures, order of business, committee leadership and the Clerk's role. Its signed final page identifies Rt. Hon. Alban S.K. Bagbin as Speaker and Chairman of the Committee.",
+      "attribution": "Speaker and Chairman, Standing Orders Committee (signed report)",
+      "source_record_ids": [
+        "SRC-057"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "downloaded_visual_review_processed",
+      "notes": "The 26-page scanned report was visually reviewed, including its signed submission page dated 23 June 2023."
+    },
+    {
+      "event_id": "EVT-041",
+      "start_date": "1980",
+      "end_date": "1993",
+      "type": "Professional and legal career (profile account)",
+      "description": "The University of Ghana Alumni Association profile reports Bagbin worked at the Bureau of Statistics/Statistical Service, State Hotels Corporation, taught English in Tripoli, joined Akyem Chambers and Law Trust Company, and served external legal clients.",
+      "attribution": "Biographical claims attributed to University of Ghana Alumni Association profile",
+      "source_record_ids": [],
+      "news_record_ids": [
+        101
+      ],
+      "evidence_status": "directly_inspected_secondary_profile",
+      "notes": "Some work/education dates overlap or are summarized imprecisely in the profile; no separate employment instruments were inspected."
+    },
+    {
+      "event_id": "EVT-042",
+      "start_date": null,
+      "end_date": null,
+      "type": "Early parliamentary committee appointments (profile account)",
+      "description": "The Alumni profile says Bagbin chaired Subsidiary Legislation, served as Mines and Energy vice-chair and on Local Government and Rural Development in the First Parliament; it also attributes a Constitutional, Legal and Parliamentary Affairs chair role to the Second Parliament.",
+      "attribution": "Claims attributed to University of Ghana Alumni Association profile",
+      "source_record_ids": [],
+      "news_record_ids": [
+        101
+      ],
+      "evidence_status": "directly_inspected_secondary_profile",
+      "notes": "Specific appointment documents and dates were not independently corroborated; dates left unset."
+    },
+    {
+      "event_id": "EVT-043",
+      "start_date": "2001",
+      "end_date": "2005",
+      "type": "Public Accounts Committee chair / Appointments Committee role",
+      "description": "The Alumni profile reports Bagbin chaired the Public Accounts Committee from 2001 to 2005 and served as Vice-Chair of the Appointments Committee.",
+      "attribution": "Committee roles attributed to University of Ghana Alumni Association profile",
+      "source_record_ids": [],
+      "news_record_ids": [
+        101
+      ],
+      "evidence_status": "directly_inspected_secondary_profile",
+      "notes": "The profile does not date the Appointments Committee vice-chair role."
+    },
+    {
+      "event_id": "EVT-044",
+      "start_date": "2001-01-07",
+      "end_date": "2008",
+      "type": "Minority Leader",
+      "description": "Graphic reports Bagbin first led the NDC as Minority Leader from 7 January 2001; the Alumni profile describes the term as 2001–2008.",
+      "attribution": "Dates attributed to Graphic Online and University of Ghana Alumni Association",
+      "source_record_ids": [
+        "SRC-059"
+      ],
+      "news_record_ids": [
+        101
+      ],
+      "evidence_status": "directly_inspected_secondary_profiles",
+      "notes": "The exact transition date is not verified by an appointment instrument in this run."
+    },
+    {
+      "event_id": "EVT-045",
+      "start_date": "2009-01",
+      "end_date": null,
+      "type": "Majority Leader",
+      "description": "Graphic's career retrospective reports Bagbin was appointed Majority Leader in January 2009.",
+      "attribution": "Appointment date attributed to Graphic Online",
+      "source_record_ids": [
+        "SRC-059"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "directly_inspected_secondary_profile",
+      "notes": "End date not established by that source; the 2025 Hansard separately attests prior Majority Leader service."
+    },
+    {
+      "event_id": "EVT-046",
+      "start_date": "2017-01",
+      "end_date": "2021-01",
+      "type": "Second Deputy Speaker",
+      "description": "Graphic reports Bagbin was elected Second Deputy Speaker in January 2017 and served until his Speakership began in January 2021.",
+      "attribution": "Appointment period attributed to Graphic Online",
+      "source_record_ids": [
+        "SRC-059"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "directly_inspected_secondary_profile",
+      "notes": "Deputy-Speaker election ballot record was not retrieved."
+    },
+    {
+      "event_id": "EVT-047",
+      "start_date": "2026-08-09",
+      "end_date": null,
+      "type": "GITFiC global-debt initiative endorsement announcement",
+      "description": "GNA reports Bagbin recorded an endorsement outlining debt initiative strategies and announced plans, as CoSPAL chair, to convene African Speakers at the October GITFiC meeting.",
+      "attribution": "Speaker / CoSPAL President",
+      "source_record_ids": [
+        "SRC-047"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "direct_GNA_report",
+      "notes": "The announced October 14–15 meeting was after the 13 October research cut-off; no meeting outcome is claimed."
+    },
+    {
+      "event_id": "EVT-048",
+      "start_date": "2004-12-07",
+      "end_date": null,
+      "type": "General election — Nadowli West",
+      "description": "The full-text Electoral Commission results list Alban Sumana Kingsford Bagbin as the NDC candidate for Nadowli West, with 11,296 votes (50.5% of valid votes). The report gives 22,349 valid votes and 81.4% turnout.",
+      "attribution": "Candidate / NDC; Electoral Commission of Ghana result",
+      "source_record_ids": [
+        "SRC-012"
+      ],
+      "news_record_ids": [],
+      "evidence_status": "downloaded_full_text_processed",
+      "notes": "The 62-page official results PDF identifies election day as 7 December 2004; PDF page 49 contains the Nadowli West constituency table."
+    }
+  ]
+}

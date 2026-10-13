@@ -10,6 +10,8 @@
     "lint": "eslint",
     "check:avatar": "npx tsx scripts/check-avatar-asset.ts",
     "seed": "npx tsx prisma/seed.ts",
+    "import:speaker-research": "npx tsx scripts/import-speaker-research.ts",
+    "enrich:speaker-research": "npx tsx scripts/enrich-speaker-research.ts",
     "eval:ask": "npx tsx scripts/ask-eval.ts"
   },
   "dependencies": {

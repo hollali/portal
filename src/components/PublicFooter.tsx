@@ -28,6 +28,7 @@ const FOOTER_COLS: { title: string; links: [string, string][] }[] = [
     title: 'Explore',
     links: [
       ['/timeline', 'Timeline'],
+      ['/speaker-record', 'Speaker record & sources'],
       ['/videos', 'Videos'],
       ['/audio', 'Audio'],
       ['/news', 'News Clippings'],

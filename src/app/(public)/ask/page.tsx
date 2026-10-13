@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import PublicHeader from '@/components/PublicHeader'
-import PublicFooter from '@/components/PublicFooter'
 import AskConsole from '@/components/AskConsole'
 import { Sparkles } from 'lucide-react'
 
@@ -41,8 +40,6 @@ export default async function AskPage({
         </header>
         <AskConsole initialQuery={initialQuery} />
       </div>
-
-      <PublicFooter />
     </div>
   )
 }

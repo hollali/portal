@@ -175,6 +175,7 @@ model News {
   rawHtml     String?  @map("raw_html")
   notes       String?
   tags        String?
+  researchEventLinks ResearchEventNews[]
 
   @@index([source])
   @@index([sourceName])
@@ -275,4 +276,86 @@ model ContentPage {
 
   @@index([status])
   @@map("content_pages")
+}
+
+model ResearchDataset {
+  id         String           @id
+  title      String
+  accessedDate String         @map("accessed_date")
+  cutoffDate String           @map("cutoff_date")
+  subject    Json
+  coverage   Json
+  sources    ResearchSource[]
+  events     ResearchEvent[]
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  @@map("research_datasets")
+}
+
+model ResearchSource {
+  recordId           String                @id @map("record_id")
+  datasetId          String                @map("dataset_id")
+  title              String
+  originalUrl        String                @map("original_url")
+  downloadUrl        String?               @map("download_url")
+  publicationDate    String?               @map("publication_date")
+  sittingDate        String?               @map("sitting_date")
+  accessedDate       String                @map("accessed_date")
+  documentType       String                @map("document_type")
+  termOrSession      String?               @map("term_or_session")
+  persons            Json
+  locator            String?
+  summary            String
+  relevance          String
+  verificationStatus String                @map("verification_status")
+  notes              String?
+  dataset            ResearchDataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  eventLinks         ResearchEventSource[]
+
+  @@unique([datasetId, originalUrl])
+  @@index([datasetId])
+  @@index([verificationStatus])
+  @@map("research_sources")
+}
+
+model ResearchEvent {
+  eventId          String                @id @map("event_id")
+  datasetId        String                @map("dataset_id")
+  startDate        String?               @map("start_date")
+  endDate          String?               @map("end_date")
+  type             String
+  description      String
+  attribution      String
+  evidenceStatus   String                @map("evidence_status")
+  notes            String?
+  dataset          ResearchDataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  sourceLinks      ResearchEventSource[]
+  newsLinks        ResearchEventNews[]
+
+  @@index([datasetId, startDate])
+  @@map("research_events")
+}
+
+model ResearchEventSource {
+  eventId  String         @map("event_id")
+  recordId String         @map("record_id")
+  event    ResearchEvent  @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  source   ResearchSource @relation(fields: [recordId], references: [recordId], onDelete: Cascade)
+
+  @@id([eventId, recordId])
+  @@index([recordId])
+  @@map("research_event_sources")
+}
+
+
+model ResearchEventNews {
+  eventId String        @map("event_id")
+  newsId  Int           @map("news_id")
+  event   ResearchEvent @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  news    News          @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, newsId])
+  @@index([newsId])
+  @@map("research_event_news")
 }

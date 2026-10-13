@@ -78,6 +78,7 @@ const ARCHIVES: NavPanel = {
     leaf('/archives/testimonials', 'Testimonials', 'What prominent figures in Ghana and the world have said of him.', Award),
     leaf('/archives/photos', 'Photo Library', 'Historical and current photographs, curated by year, event and theme.', ImageIcon),
     leaf('/parliament', 'Parliamentary Legacy', 'A thirty-year record in the House, in his own words.', Landmark),
+    leaf('/speaker-record', 'Speaker Record', 'A sourced chronology and public record of the current Speaker.', ScrollText),
     leaf('/themes', 'Themes & Ideas', 'The ideas that shaped the record, collected and cross-referenced.', Lightbulb),
     leaf('/news', 'News Clippings', 'Press coverage from across the Ghanaian and international media.', Newspaper),
   ],
