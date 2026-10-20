@@ -92,7 +92,7 @@ const CAPABILITIES: Capability[] = [
 
 export default function AskIntegrations() {
   return (
-    <section className="ask-integrations-page" aria-label="Archive capabilities">
+    <section className="ask-integrations-page" aria-label="Ask Bagbin capabilities">
       <header className="ask-screen-heading">
         <span className="ask-eyebrow">Integrations</span>
         <h1 className="ask-screen-title">Collections &amp; capabilities</h1>
@@ -124,9 +124,11 @@ export default function AskIntegrations() {
       <div className="ask-integrations-note">
         <Sparkles size={16} aria-hidden />
         <p>
-          <strong>Ask the archive</strong> searches the published records above and
-          links every answer back to the item it came from. Photographs are held and
-          browsable, but are not searched because they carry no captions or dates.
+          <strong>Ask about the man</strong> composes life and history answers from the
+          biography, timeline, research and archive rows above, and searches the same
+          database for his own words. Every answer links back to its source.
+          Photographs are held and browsable, but are not searched because they carry
+          no captions or dates.
         </p>
       </div>
     </section>

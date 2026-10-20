@@ -13,9 +13,10 @@ export default function AdminPage() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    jsonFetch<{ isAdmin?: boolean }>('/api/me')
+    jsonFetch<{ role?: string }>('/api/me')
       .then(d => {
-        if (!d?.isAdmin) {
+        // The CMS admits admins, editors and viewers; the dashboard is read-only.
+        if (d?.role !== 'admin' && d?.role !== 'editor' && d?.role !== 'viewer') {
           router.push('/login')
           return
         }

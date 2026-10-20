@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { detectKnowledgeTopic } from '@/lib/askKnowledge'
 import {
   ASK_SUGGESTIONS,
   collectionFilter,
@@ -25,8 +26,10 @@ describe('queryTerms', () => {
     }
   })
 
-  it('produces at least one usable term for every suggestion chip', () => {
+  it('produces at least one usable term for every archive suggestion chip', () => {
     for (const chip of ASK_SUGGESTIONS) {
+      // Identity/life questions are answered from the person rows, not search.
+      if (detectKnowledgeTopic(chip)) continue
       expect(queryTerms(chip).length, `no terms for: ${chip}`).toBeGreaterThan(0)
     }
   })

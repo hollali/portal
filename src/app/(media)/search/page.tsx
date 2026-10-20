@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Search as SearchIcon, FileText, Award, Milestone as MilestoneIcon } from 'lucide-react'
 import { KIND_ICON } from '@/lib/kindIcon'
 import { KIND_CONFIG, archiveRouteForKind, type ArchiveKind } from '@/lib/library'
@@ -26,27 +26,55 @@ interface SearchResults {
 }
 
 function SearchBox() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [query, setQuery] = useState('')
+  const [searchedQuery, setSearchedQuery] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+  const requestRef = useRef(0)
 
-  const run = (q: string) => {
-    if (!q.trim()) { setResults(null); return }
+  const run = useCallback((q: string) => {
+    const term = q.trim()
+    if (!term) {
+      setResults(null)
+      setError(false)
+      setLoading(false)
+      setSearchedQuery('')
+      return
+    }
+
+    const requestId = ++requestRef.current
+    setSearchedQuery(term)
     setLoading(true)
-    jsonFetch<SearchResults>(`/api/search?q=${encodeURIComponent(q.trim())}`)
-      .then(d => { if (d) setResults(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }
+    setError(false)
+    jsonFetch<SearchResults>(`/api/search?q=${encodeURIComponent(term)}`)
+      .then(d => {
+        if (requestId !== requestRef.current) return
+        if (d) setResults(d)
+        else {
+          setResults(null)
+          setError(true)
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        if (requestId !== requestRef.current) return
+        setResults(null)
+        setError(true)
+        setLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
     const q0 = searchParams.get('q') || ''
     const id = requestAnimationFrame(() => {
       setQuery(q0)
-      if (q0) run(q0)
+      run(q0)
     })
     return () => cancelAnimationFrame(id)
-  }, [searchParams])
+  }, [searchParams, run])
 
   const groupTitle = (label: string, href: string | null, total: number) => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
@@ -59,10 +87,25 @@ function SearchBox() {
   return (
     <div>
       <form
-        onSubmit={e => { e.preventDefault(); run(query) }}
+        onSubmit={e => {
+          e.preventDefault()
+          const term = query.trim()
+          if (!term) {
+            if (searchParams.get('q')) router.replace('/search')
+            run('')
+            return
+          }
+          if (term === (searchParams.get('q') || '')) {
+            run(term)
+            return
+          }
+          router.replace(`/search?q=${encodeURIComponent(term)}`)
+        }}
         style={{ display: 'flex', gap: '0.6rem', maxWidth: 640, margin: '0 0 2rem' }}
       >
+        <label htmlFor="public-search" className="sr-only">Search the portal</label>
         <input
+          id="public-search"
           placeholder="Search speeches, letters, milestones, media…"
           value={query}
           onChange={e => setQuery(e.target.value)}
@@ -73,13 +116,29 @@ function SearchBox() {
         </button>
       </form>
 
-      {loading && <p style={{ color: 'var(--p-text-3)' }}>Searching…</p>}
-
-      {results && !loading && (
-        <>
-          <p style={{ color: 'var(--p-text-3)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-            {results.total.toLocaleString()} result{results.total === 1 ? '' : 's'} for &ldquo;<strong style={{ color: 'var(--p-text-1)' }}>{query}</strong>&rdquo;
+      <div aria-live="polite" aria-atomic="true">
+        {loading && <p role="status" style={{ color: 'var(--p-text-3)' }}>Searching…</p>}
+        {error && !loading && (
+          <p role="alert" style={{ color: 'var(--danger)' }}>
+            Search is unavailable right now. Please try again.
           </p>
+        )}
+        {results && !loading && !error && (
+          <p style={{ color: 'var(--p-text-3)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            {results.total.toLocaleString()} result{results.total === 1 ? '' : 's'} for &ldquo;<strong style={{ color: 'var(--p-text-1)' }}>{searchedQuery}</strong>&rdquo;
+          </p>
+        )}
+      </div>
+
+      {results && !loading && !error && (
+        <>
+          {results.total === 0 && (
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <p style={{ margin: 0, color: 'var(--p-text-2)' }}>
+                No results for &ldquo;<strong>{searchedQuery}</strong>&rdquo;. Try a broader term or check the spelling.
+              </p>
+            </div>
+          )}
 
           {results.archive.total > 0 && (
             <section className="card" style={{ marginBottom: '1rem' }}>

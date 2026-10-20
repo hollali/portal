@@ -274,7 +274,7 @@ describe('PublicHeader mobile drawer', () => {
     // Scoped to the drawer: the desktop bar is still in the DOM (CSS hides it
     // below 768px), so an unscoped query would match both copies.
     const drawer = within(document.getElementById('mobile-menu')!)
-    for (const label of ['The Man', 'Timeline', 'Ask Bagbin Archive']) {
+    for (const label of ['The Man', 'Timeline', 'Ask Bagbin']) {
       expect(drawer.getByRole('link', { name: label })).toBeInTheDocument()
     }
     // Home lives in the drawer brand, not as a row of its own, so a phone still

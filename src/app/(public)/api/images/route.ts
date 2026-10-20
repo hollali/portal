@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
   const where: Record<string, unknown> = {}
   if (query) {
     where.OR = [
-      { url: { contains: query } },
-      { source: { contains: query } },
-      { query: { contains: query } },
+      { url: { contains: query, mode: 'insensitive' } },
+      { source: { contains: query, mode: 'insensitive' } },
+      { query: { contains: query, mode: 'insensitive' } },
     ]
   }
   if (source) where.source = source

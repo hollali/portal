@@ -15,75 +15,75 @@ export async function GET(request: NextRequest) {
 
   const where = {
     OR: [
-      { url: { contains: q } },
-      { source: { contains: q } },
-      { query: { contains: q } },
-      { caption: { contains: q } },
+      { url: { contains: q, mode: 'insensitive' as const } },
+      { source: { contains: q, mode: 'insensitive' as const } },
+      { query: { contains: q, mode: 'insensitive' as const } },
+      { caption: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 
   const whereV = {
     OR: [
-      { title: { contains: q } },
-      { url: { contains: q } },
-      { source: { contains: q } },
-      { channel: { contains: q } },
-      { platform: { contains: q } },
-      { caption: { contains: q } },
-      { category: { contains: q } },
+      { title: { contains: q, mode: 'insensitive' as const } },
+      { url: { contains: q, mode: 'insensitive' as const } },
+      { source: { contains: q, mode: 'insensitive' as const } },
+      { channel: { contains: q, mode: 'insensitive' as const } },
+      { platform: { contains: q, mode: 'insensitive' as const } },
+      { caption: { contains: q, mode: 'insensitive' as const } },
+      { category: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 
   const whereN = {
     OR: [
-      { title: { contains: q } },
-      { url: { contains: q } },
-      { source: { contains: q } },
-      { sourceName: { contains: q } },
-      { snippet: { contains: q } },
+      { title: { contains: q, mode: 'insensitive' as const } },
+      { url: { contains: q, mode: 'insensitive' as const } },
+      { source: { contains: q, mode: 'insensitive' as const } },
+      { sourceName: { contains: q, mode: 'insensitive' as const } },
+      { snippet: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 
   const whereA = {
     OR: [
-      { title: { contains: q } },
-      { url: { contains: q } },
-      { source: { contains: q } },
-      { artist: { contains: q } },
-      { caption: { contains: q } },
-      { category: { contains: q } },
+      { title: { contains: q, mode: 'insensitive' as const } },
+      { url: { contains: q, mode: 'insensitive' as const } },
+      { source: { contains: q, mode: 'insensitive' as const } },
+      { artist: { contains: q, mode: 'insensitive' as const } },
+      { caption: { contains: q, mode: 'insensitive' as const } },
+      { category: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 
   const whereArchive = {
     OR: [
-      { title: { contains: q } },
-      { excerpt: { contains: q } },
-      { body: { contains: q } },
-      { event: { contains: q } },
-      { occasion: { contains: q } },
-      { location: { contains: q } },
-      { person: { contains: q } },
-      { institution: { contains: q } },
-      { parliament: { contains: q } },
-      { theme: { contains: q } },
-      { source: { contains: q } },
+      { title: { contains: q, mode: 'insensitive' as const } },
+      { excerpt: { contains: q, mode: 'insensitive' as const } },
+      { body: { contains: q, mode: 'insensitive' as const } },
+      { event: { contains: q, mode: 'insensitive' as const } },
+      { occasion: { contains: q, mode: 'insensitive' as const } },
+      { location: { contains: q, mode: 'insensitive' as const } },
+      { person: { contains: q, mode: 'insensitive' as const } },
+      { institution: { contains: q, mode: 'insensitive' as const } },
+      { parliament: { contains: q, mode: 'insensitive' as const } },
+      { theme: { contains: q, mode: 'insensitive' as const } },
+      { source: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 
   const whereMilestones = {
     OR: [
-      { title: { contains: q } },
-      { description: { contains: q } },
+      { title: { contains: q, mode: 'insensitive' as const } },
+      { description: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 
   const whereTestimonials = {
     OR: [
-      { author: { contains: q } },
-      { role: { contains: q } },
-      { quote: { contains: q } },
-      { source: { contains: q } },
+      { author: { contains: q, mode: 'insensitive' as const } },
+      { role: { contains: q, mode: 'insensitive' as const } },
+      { quote: { contains: q, mode: 'insensitive' as const } },
+      { source: { contains: q, mode: 'insensitive' as const } },
     ],
   }
 

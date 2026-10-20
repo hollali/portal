@@ -13,9 +13,9 @@ import { Sparkles } from 'lucide-react'
  */
 
 export const metadata: Metadata = {
-  title: 'Ask the Archive · AlbanBagbin',
+  title: 'Ask about the man · AlbanBagbin',
   description:
-    'Question the Alban Bagbin digital library in plain language. Every answer is drawn from the published speeches, letters, papers, milestones and testimonials held in the archive, and links back to the item it came from.',
+    'A database-backed conversation about Rt. Hon. Alban Bagbin — his life, education, career, ideas, Speakership and public record. Answers link back to the source they came from.',
   alternates: { canonical: '/ask' },
 }
 

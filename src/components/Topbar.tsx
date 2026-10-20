@@ -65,28 +65,28 @@ export default function Topbar({
   const [q, setQ] = useState('')
   const [username, setUsername] = useState<string | null>(null)
   const [role, setRole] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
   const [unread, setUnread] = useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
+
+  const canManageMedia = role === 'admin' || role === 'editor'
 
   useEffect(() => {
     jsonFetch<{ username?: string; role?: string; isAdmin?: boolean }>('/api/me').then(d => {
       if (d?.username) {
         setUsername(d.username)
         setRole(d.role || '')
-        setIsAdmin(d.isAdmin || false)
       }
     })
   }, [])
 
   const refreshUnread = () => {
-    if (!isAdmin) return
+    if (!canManageMedia) return
     jsonFetch<{ unreadCount?: number }>('/api/admin/notifications?limit=1').then(d => {
       setUnread(d?.unreadCount || 0)
     })
   }
 
-  useEffect(refreshUnread, [isAdmin, pathname])
+  useEffect(refreshUnread, [canManageMedia, pathname])
 
   // `/` focuses search; Escape gives focus back to the page. This is the one
   // global shortcut, and it only fires when not typing in a field.
@@ -114,7 +114,6 @@ export default function Topbar({
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' })
     setUsername(null)
-    setIsAdmin(false)
     setRole('')
     window.location.href = '/login'
   }
@@ -127,7 +126,7 @@ export default function Topbar({
           onSelect: () => {},
           disabled: true,
         },
-        ...(isAdmin
+        ...(role === 'admin'
           ? [{ key: 'users', label: 'User management', icon: <UserCog size={15} aria-hidden />, onSelect: () => router.push('/admin/users') }]
           : []),
         {
@@ -250,7 +249,7 @@ export default function Topbar({
         )}
       </form>
 
-      {isAdmin && (
+      {canManageMedia && (
         <Link
           href="/admin/notifications"
           aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}

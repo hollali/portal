@@ -3,17 +3,23 @@ import { prisma } from '@/lib/prisma'
 import { getLibraryCounts } from '@/lib/libraryQueries'
 import { bestPassage, searchArchive, type ScoredCandidate } from '@/lib/askSearch'
 import { generateAskReading } from '@/lib/askReading'
+import { answerFromProfile, detectKnowledgeTopic } from '@/lib/askKnowledge'
+import { loadKnowledgeProfile } from '@/lib/askProfile'
+import { loadMediaRequest, mediaForCandidate } from '@/lib/askMedia'
 import {
   buildVoice,
+  detectSmallTalk,
   resolveQuestion,
   suggestionsFromResult,
   type PersonaVoice,
 } from '@/lib/askConversation'
 import {
   ASK_COLLECTION_LABELS,
+  ASK_HISTORY_TURNS,
   ASK_SUGGESTIONS,
   COLLECTION_PAGES,
   collectionFilter,
+  detectMediaRequest,
   describeCollections,
   describeUnsearchable,
   describeWindow,
@@ -33,8 +39,8 @@ export const dynamic = 'force-dynamic'
 /** "How many speeches…", "count of documents" — a corpus question, not a search. */
 const COUNT_QUESTION = /\b(how many|how much|number of|count of|total number)\b/i
 
-/** Turns of history used to resolve a follow-up. */
-const MAX_HISTORY_TURNS = 6
+/** Matches the composer's limit; a longer question is rejected rather than cut. */
+const MAX_QUESTION_LENGTH = 500
 
 /**
  * What to say when nothing is shown.
@@ -194,7 +200,7 @@ function describeBreadth(
         `${total === 1 ? 'only 1 covers' : `no more than ${total} cover`} the whole question.`
       : ''
 
-  return ` ${records} matched${scope}${hidden}.${wider}`
+  return ` I found ${records}${scope}${hidden}.${wider}`
 }
 
 /**
@@ -250,7 +256,7 @@ function buildSummary(
     )
   }
 
-  return `${voice.lead}${breadth}`
+  return `Here’s what I found. ${voice.lead}${breadth}`
 }
 
 /**
@@ -298,30 +304,65 @@ async function answerCountQuestion(raw: string, suggested: string[]): Promise<As
 }
 
 export async function GET() {
-  return NextResponse.json({ suggested: await suggestFromThemes() })
+  // Opening chips should show what this assistant is for: a conversation about
+  // the man, not four archive searches. Follow-up chips after an archive answer
+  // still come from the archive's live themes.
+  return NextResponse.json({ suggested: ASK_SUGGESTIONS.slice(0, 4) })
 }
 
 export async function POST(request: NextRequest) {
-  let body: { question?: string; messages?: { role?: string; content?: string }[] } = {}
+  let parsed: unknown
   try {
-    body = await request.json()
+    parsed = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  // `request.json()` can return null or an array; reading `.question` from either
+  // used to turn a malformed request into a 500 instead of a clear 400.
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  const body = parsed as { question?: unknown; messages?: unknown }
+  if (body.question !== undefined && typeof body.question !== 'string') {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  // Older clients may omit `messages`; a non-array value is a malformed request,
+  // not a history. Bound the list before filtering so a large array cannot spend
+  // work on turns that will be discarded.
+  if (body.messages !== undefined && !Array.isArray(body.messages)) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const messages = (body.messages ?? [])
+    .filter((m): m is { role?: unknown; content?: unknown } => !!m && typeof m === 'object')
+    .slice(-50)
+
   // Prefer the explicit `question`; fall back to the last user turn for older clients.
+  const lastUserTurn = [...messages]
+    .reverse()
+    .find(m => m.role === 'user' && typeof m.content === 'string')
   const raw =
     typeof body.question === 'string'
       ? body.question
-      : [...(body.messages || [])].reverse().find(m => m.role === 'user')?.content || ''
+      : typeof lastUserTurn?.content === 'string'
+        ? lastUserTurn.content
+        : ''
+
+  if (raw.length > MAX_QUESTION_LENGTH) {
+    return NextResponse.json(
+      { error: `Question is too long (maximum ${MAX_QUESTION_LENGTH} characters)` },
+      { status: 400 },
+    )
+  }
 
   // The turns before this one, so "more on that?" and "and the debt?" can be
   // resolved against what is already under discussion. Capped, and user turns
   // only: an assistant turn is a summary we wrote, not something the reader asked.
-  const history = (body.messages || [])
+  const history = messages
     .filter(m => m.role === 'user' && typeof m.content === 'string' && m.content.trim())
-    .map(m => m.content as string)
-    .slice(-MAX_HISTORY_TURNS)
+    .map(m => (m.content as string).slice(0, MAX_QUESTION_LENGTH))
+    .slice(-ASK_HISTORY_TURNS)
     // The turn being answered is still in the array on a client that sends the
     // whole transcript; using it as its own history would make every question a
     // follow-up to itself.
@@ -375,10 +416,63 @@ export async function POST(request: NextRequest) {
     ...extra,
   })
 
+  // Greetings, thanks and "what can you do?" are conversation, not search. A
+  // search for the word "hello" can only return nothing, and answering a reader
+  // who is opening a conversation with a dead-end listing of archive pages is
+  // the opposite of what a chat assistant is for.
+  const smallTalk = detectSmallTalk(raw)
+  if (smallTalk) {
+    return NextResponse.json(
+      empty(smallTalk.summary, 'all', {
+        // Nothing was searched, so nothing is uncovered.
+        unmatched: [],
+        suggested: smallTalk.suggested,
+        conversation: {
+          kind: 'chat',
+          lead: '',
+          quotes: [],
+          firstPerson: false,
+          anchor: [],
+        },
+      }),
+    )
+  }
+
+  // Life, history and biography questions are answered from the person rows in
+  // the database — not by ranking archive text. Detection is deliberately
+  // narrow so “what did he say about education” still goes to the archive, and
+  // a database failure falls through to the existing search rather than
+  // turning the whole assistant off.
+  const knowledgeTopic = detectKnowledgeTopic(raw)
+  if (knowledgeTopic) {
+    try {
+      return NextResponse.json(answerFromProfile(knowledgeTopic, await loadKnowledgeProfile()))
+    } catch {
+      // Fall through to the archive search.
+    }
+  }
+
   // "How many speeches are there?" is a question about the corpus, not its
   // contents — searching for "many" can only ever return nothing.
   if (COUNT_QUESTION.test(raw) && searchTerms.length <= 2) {
     return NextResponse.json(await answerCountQuestion(raw, suggestions))
+  }
+
+  // "Show me the photographs/videos/audio" names a collection and asks to see
+  // it, rather than asking a question whose answer is the word "photographs".
+  // Handle this before the no-subject branch, which would otherwise tell the
+  // reader that photographs cannot be searched at all.
+  const mediaRequest = detectMediaRequest(named.collections, searchTerms)
+  if (mediaRequest) {
+    try {
+      return NextResponse.json(await loadMediaRequest(mediaRequest, period))
+    } catch {
+      return NextResponse.json(
+        empty(
+          `I could not read the ${ASK_COLLECTION_LABELS[mediaRequest as AskCollectionName].toLowerCase()} records just now. Try again in a moment, or browse them directly.`,
+        ),
+      )
+    }
   }
 
   if (searchTerms.length === 0 && !period && collections.length === 0) {
@@ -469,6 +563,7 @@ export async function POST(request: NextRequest) {
       })
       continue
     }
+    const media = mediaForCandidate(candidate)
     citations.push({
       kind: candidate.kind,
       kindLabel: candidate.kindLabel,
@@ -496,6 +591,8 @@ export async function POST(request: NextRequest) {
       ...(candidate.hasCapture && candidate.id !== undefined
         ? { captureHref: `/api/news/${candidate.id}/original` }
         : {}),
+      ...(candidate.note ? { note: candidate.note } : {}),
+      ...(media ? { media } : {}),
     })
   }
 
@@ -504,6 +601,22 @@ export async function POST(request: NextRequest) {
   // result cards, but the reader still saw them — so they count towards what
   // the response is able to show, and the summary must not understate it.
   const shown = citations.length + timeline.length + testimonials.length
+
+  // Say what the search could not see. A media card found by its title is a
+  // real record, but it is not evidence that a phrase was spoken in the
+  // recording; without this sentence a reader would take a title match for a
+  // transcript match.
+  const limitations: string[] = []
+  if (results.some(r => r.candidate.collection === 'videos' || r.candidate.collection === 'audio')) {
+    limitations.push(
+      'Video and audio results are matched on titles and catalogue metadata only; the archive has no transcripts for them yet.',
+    )
+  }
+  if (collections.includes('photos') || unsearchable.includes('photos')) {
+    limitations.push(
+      'Photographs are browsable, but they have no captions or dates, so they are not used as evidence in answers.',
+    )
+  }
   const matchedTerms = searchTerms.filter(t => covered.has(t))
 
   const voice = buildVoice(resolved.kind, resolved.anchor, results)
@@ -564,6 +677,7 @@ export async function POST(request: NextRequest) {
     ...(undated?.length ? { undated } : {}),
     ...(collections.length ? { collections } : {}),
     ...(unsearchable.length ? { unsearchable } : {}),
+    ...(limitations.length ? { limitations } : {}),
     ...(reading ? { reading } : {}),
     suggested: resultSuggestions.length > 0 ? resultSuggestions : suggestions,
     conversation: {

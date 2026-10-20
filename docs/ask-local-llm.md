@@ -6,9 +6,17 @@ The future local model belongs behind the existing server route at
 
 ## Current behavior
 
-- Archive retrieval and ranking remain authoritative and deterministic.
-- The route constructs citations, quotes, timelines, counts, search terms, and
-  the summary from published records.
+- The route is deterministic and makes no language-model call.
+- Life, birth, education, career, political record, Speakership, rulings,
+  personal history, timeline, values and international roles are composed by the
+  person-knowledge layer from CMS and database rows. The loader is
+  `src/lib/askProfile.ts`; the composition is `src/lib/askKnowledge.ts`.
+- Archive retrieval and ranking remain authoritative for questions about what he
+  said or wrote.
+- Reader-supplied links are fetched by `/api/ask/link` with SSRF protections and
+  returned as marked excerpts; there is no web search.
+- The route constructs citations, quotes, timelines, counts, search terms,
+  inline media, and the summary from published records.
 - `src/lib/askReading.ts` defines the optional reading-provider contract. Its
   default provider is disabled and makes no network call, so the current answer
   remains unchanged.
@@ -16,6 +24,8 @@ The future local model belongs behind the existing server route at
   generated prose explicitly labeled as interpretation, not as the Speaker's
   words. The server marks it `generated: true` and accepts `basedOn` references
   only from the evidence supplied to that request.
+- Voice input and read-aloud remain browser features. Read-aloud uses
+  `speechSynthesis`; no cloned voice or speech-synthesis provider is configured.
 
 ## Provider contract
 
@@ -26,9 +36,10 @@ It returns a short `text` and the `basedOn` refs it used. The validator drops
 empty readings, unknown refs, and provider errors; search results and the
 deterministic summary still return normally.
 
-The model should not decide which records matched, create or rewrite links,
-produce source quotations, change counts, or speak in the Speaker's first
-person. Those remain controlled by retrieval and formatting code.
+The model should not decide which records matched, answer person-knowledge
+questions from its own memory, create or rewrite links, produce source
+quotations, change counts, or speak in the Speaker's first person. Those remain
+controlled by the database loader, retrieval and formatting code.
 Retrieved excerpts are untrusted source data, not instructions to the model; the
 provider prompt must keep them in a clearly delimited evidence section.
 
@@ -45,6 +56,8 @@ provider prompt must keep them in a clearly delimited evidence section.
    against the supplied evidence before returning the reading.
 5. Evaluate groundedness, source attribution, refusal behavior, latency, and
    resource use against the existing `/api/ask` fixtures before enabling it.
+6. Do not use the model to clone or imitate the Speaker's voice. Voice output is
+   a separate consent-gated feature and is not part of this integration.
 
 No model URL, credentials, training pipeline, or model dependency is configured
 by this preparation. The default remains the current deterministic archive

@@ -107,6 +107,88 @@ const COMBINED: AskResult = {
   unmatched: [],
 }
 
+const PROFILE: AskResult = {
+  ...FULL,
+  summary:
+    'Rt. Hon. Alban Bagbin is a Ghanaian lawyer and statesman. Alban Sumana Kingsford Bagbin was born on 24 September 1957 in Sombo.',
+  terms: [],
+  citations: [
+    {
+      kind: 'profile',
+      kindLabel: 'Biography',
+      collection: 'profile',
+      collectionLabel: 'The Man',
+      title: 'The life of a servant-leader',
+      href: '/the-man',
+      year: null,
+      excerpt: 'Born on 24 September 1957 to Sansunni Bagbin and Margaret B. Bagbin.',
+      hasTranscript: false,
+      matched: [],
+    },
+  ],
+  collectionCounts: [],
+  matchedTerms: [],
+  totalMatched: 1,
+  suggested: ['Where was he born?', 'Tell me about his education'],
+  conversation: { kind: 'profile', lead: '', quotes: [], firstPerson: false, anchor: [] },
+}
+
+const MEDIA: AskResult = {
+  ...FULL,
+  summary: 'Here are 3 media records from the archive.',
+  citations: [
+    {
+      kind: 'video',
+      kindLabel: 'Video',
+      collection: 'videos',
+      collectionLabel: 'Videos',
+      title: 'Keynote on Parliament',
+      href: '/videos/7',
+      year: null,
+      excerpt: 'Politics · Example Channel',
+      hasTranscript: false,
+      matched: [],
+      media: {
+        type: 'video',
+        poster: 'https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg',
+        embedUrl: 'https://www.youtube-nocookie.com/embed/abc123DEF45?rel=0',
+      },
+    },
+    {
+      kind: 'audio',
+      kindLabel: 'Audio',
+      collection: 'audio',
+      collectionLabel: 'Audio',
+      title: 'Interview on the budget',
+      href: '/audio/8',
+      year: null,
+      excerpt: 'Interview · Example Radio',
+      hasTranscript: false,
+      matched: [],
+      media: { type: 'audio', src: '/api/media/audio/interview.mp3' },
+    },
+    {
+      kind: 'photo',
+      kindLabel: 'Photograph',
+      collection: 'photos',
+      collectionLabel: 'Photographs',
+      title: 'Photograph #9',
+      href: '/images/9',
+      year: null,
+      excerpt: null,
+      hasTranscript: false,
+      matched: [],
+      media: {
+        type: 'image',
+        src: '/api/media/images/photo.jpg',
+        alt: 'Photograph 9 from Example News',
+      },
+    },
+  ],
+  collectionCounts: [],
+  totalMatched: 3,
+}
+
 const DEAD_END: AskResult = {
   ...FULL,
   match: 'none',
@@ -141,7 +223,7 @@ afterEach(() => {
 
 async function ask(question: string, initialQuery: string | null = null) {
   render(<AskConsole initialQuery={initialQuery} />)
-  const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+  const input = await screen.findByPlaceholderText(/Ask about his life/i)
   fireEvent.change(input, { target: { value: question } })
   fireEvent.click(screen.getByLabelText('Send question'))
 }
@@ -184,19 +266,77 @@ function deferredPosts(result: AskResult = FULL) {
 }
 
 describe('/ask research workspace', () => {
+  it('reads a pasted link as a page outside the archive', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/api/ask/link')) {
+          return {
+            ok: true,
+            json: async () => ({
+              title: 'Budget statement',
+              url: 'https://example.com/budget',
+              siteName: 'Example',
+              description: null,
+              excerpt: 'Education spending rose this year.',
+              matched: ['education'],
+              retrievedAt: '2026-10-20T00:00:00.000Z',
+            }),
+          } as Response
+        }
+        return { ok: true, json: async () => ({ suggested: [] }) } as Response
+      }),
+    )
+
+    await ask('What does this say about education? https://example.com/budget')
+
+    const open = await screen.findByRole('link', { name: 'Open the page' })
+    expect(open).toHaveAttribute('href', 'https://example.com/budget')
+    expect(open).toHaveAttribute('target', '_blank')
+    expect(screen.getByText('Web page')).toBeInTheDocument()
+    expect(screen.getByText(/outside the archive/i)).toBeInTheDocument()
+    const posts = vi.mocked(fetch).mock.calls.filter(
+      ([, init]) => (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(posts.some(([url]) => String(url) === '/api/ask/link')).toBe(true)
+    expect(posts.some(([url]) => String(url) === '/api/ask')).toBe(false)
+  })
+
+  it('shows video, audio and photographs inline on a media answer', async () => {
+    answer = MEDIA
+    await ask('Show me media from the archive')
+
+    const play = await screen.findByRole('button', { name: /Play video: Keynote on Parliament/ })
+    fireEvent.click(play)
+    expect(screen.getByTitle('Keynote on Parliament')).toHaveAttribute(
+      'src',
+      'https://www.youtube-nocookie.com/embed/abc123DEF45?rel=0',
+    )
+    expect(screen.getByRole('img', { name: 'Photograph 9 from Example News' })).toHaveAttribute(
+      'src',
+      '/api/media/images/photo.jpg',
+    )
+    expect(document.querySelector('audio')).toHaveAttribute(
+      'src',
+      '/api/media/audio/interview.mp3',
+    )
+  })
+
   it('makes the first question clear and provides tappable examples', async () => {
     const { container } = render(<AskConsole />)
-    await screen.findByPlaceholderText(/Ask about a speech/i)
+    await screen.findByPlaceholderText(/Ask about his life/i)
 
     expect(screen.getByText('Ask a question', { selector: 'label' })).toBeInTheDocument()
-    expect(screen.getByText(/Speaker isn’t answering directly/)).toBeInTheDocument()
+    expect(container.querySelector('#ask-source-disclaimer')).toHaveTextContent(/not the Speaker himself/i)
     const composer = container.querySelector('.ask-composer')
     expect(composer).not.toHaveClass('fixed', 'sticky')
     expect(container.querySelector('#ask-question')).toHaveAttribute(
       'aria-describedby',
       'ask-source-disclaimer ask-composer-help',
     )
-    const examples = container.querySelectorAll('.ask-suggestions button')
+    const examples = within(
+      screen.getByRole('group', { name: 'Example questions' }),
+    ).getAllByRole('button')
     expect(examples).toHaveLength(3)
     examples.forEach(example => expect(example).toHaveStyle({ minHeight: '44px' }))
 
@@ -466,6 +606,17 @@ describe('/ask answer transparency', () => {
     expect(screen.queryByText('Ask next')).not.toBeInTheDocument()
   })
 
+  it('renders a life/history answer from the database with its provenance', async () => {
+    answer = PROFILE
+    await ask('Who is he?')
+    expect(await screen.findByText(/From the site’s database/)).toBeInTheDocument()
+    expect(screen.getAllByText(/24 September 1957/).length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'The life of a servant-leader' })).toHaveAttribute(
+      'href',
+      '/the-man',
+    )
+  })
+
   it('announces a short status rather than re-reading the whole answer', async () => {
     answer = PARTIAL
     await ask('cryptocurrency mining')
@@ -480,6 +631,42 @@ describe('/ask answer transparency', () => {
     await ask('digitalisation youth')
     const status = await within(screen.getByRole('main')).findByRole('status')
     await waitFor(() => expect(status).toHaveTextContent('Answer found. 1 source found.'))
+  })
+})
+
+describe('/ask follow-up context', () => {
+  it('sends only the recent turns the server resolves against', async () => {
+    const messages = Array.from({ length: 8 }, (_, i) => ({
+      role: 'user',
+      content: `question ${i + 1}`,
+    }))
+    window.localStorage.setItem(
+      'askbagbin-chat-history-v1',
+      JSON.stringify([
+        { id: 'long-chat', title: 'Long chat', createdAt: 1, updatedAt: 1, messages },
+      ]),
+    )
+
+    render(<AskConsole />)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
+    fireEvent.change(input, { target: { value: 'question 9' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+
+    await waitFor(() => expect(postedQuestions()).toEqual(['question 9']))
+    const post = vi
+      .mocked(fetch)
+      .mock.calls.find(call => (call[1] as RequestInit | undefined)?.method === 'POST')
+    const body = JSON.parse(String((post?.[1] as RequestInit).body)) as {
+      messages: { content: string }[]
+    }
+    expect(body.messages.map(message => message.content)).toEqual([
+      'question 3',
+      'question 4',
+      'question 5',
+      'question 6',
+      'question 7',
+      'question 8',
+    ])
   })
 })
 
@@ -541,8 +728,30 @@ describe('/ask interaction defects', () => {
     // neither `:focus` nor `:focus-visible` in getComputedStyle, so the guard is
     // on the suppression itself, which is the thing that was wrong.
     await ask('digitalisation youth')
-    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
     expect(input.style.outline).not.toBe('none')
+  })
+
+  it('reports a malformed success response as a failure', async () => {
+    // A 200 is not the same thing as an answer. Coercing `{}` into an empty
+    // result left a blank assistant turn with no retry and no error.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          return { ok: true, json: async () => ({ unexpected: true }) } as Response
+        }
+        return { ok: true, json: async () => ({ suggested: [] }) } as Response
+      }),
+    )
+    render(<AskConsole />)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
+
+    fireEvent.change(input, { target: { value: 'digitalisation youth' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+
+    expect(await screen.findByText(/could not be reached/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 
   it('retries the question its own turn failed on', async () => {
@@ -561,7 +770,7 @@ describe('/ask interaction defects', () => {
       }),
     )
     render(<AskConsole />)
-    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
 
     fireEvent.change(input, { target: { value: 'QUESTION-ONE' } })
     fireEvent.click(screen.getByLabelText('Send question'))
@@ -591,7 +800,7 @@ describe('/ask interaction defects', () => {
     // reader with a typed question and no way to send it.
     const release = deferredPosts()
     render(<AskConsole />)
-    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
 
     fireEvent.change(input, { target: { value: 'first question' } })
     fireEvent.click(screen.getByLabelText('Send question'))
@@ -610,13 +819,39 @@ describe('/ask interaction defects', () => {
     expect(screen.getByText('second question')).toBeInTheDocument()
   })
 
+  it('does not leave a stopped turn behind when the question was replaced', async () => {
+    // Stop aborts the request, and a question asked immediately afterwards is
+    // then superseded by the same request. Appending "the question is still
+    // here" and only then removing that question left the stopped card attached
+    // to the replacement question.
+    const release = deferredPosts()
+    render(<AskConsole />)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
+
+    fireEvent.change(input, { target: { value: 'first question' } })
+    fireEvent.click(screen.getByLabelText('Send question'))
+    await screen.findByLabelText('Stop searching')
+
+    fireEvent.change(input, { target: { value: 'second question' } })
+    fireEvent.click(screen.getByLabelText('Stop searching'))
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(postedQuestions()).toEqual(['first question', 'second question']))
+    release.all()
+
+    expect(await screen.findByText(/Closest match/)).toBeInTheDocument()
+    expect(screen.queryByText(/Search stopped/)).not.toBeInTheDocument()
+    expect(screen.queryByText('first question')).not.toBeInTheDocument()
+    expect(screen.getByText('second question')).toBeInTheDocument()
+  })
+
   it('keeps the composer in its searching state when the replaced request settles', async () => {
     // The superseded request finishing after its replacement must not report the
     // search as finished. That swaps the Stop button back to Send while the new
     // search is still running, so the reader is left with no way to stop it.
     const release = deferredPosts()
     render(<AskConsole />)
-    const input = await screen.findByPlaceholderText(/Ask about a speech/i)
+    const input = await screen.findByPlaceholderText(/Ask about his life/i)
 
     fireEvent.change(input, { target: { value: 'first question' } })
     fireEvent.click(screen.getByLabelText('Send question'))
@@ -684,6 +919,34 @@ answer = {
   })
 })
 
+describe('/ask with corrupted saved conversations', () => {
+  it('drops unrenderable turns instead of crashing the page', async () => {
+    // localStorage is editable and older builds wrote different shapes. An object
+    // in `content` used to reach the history preview's `.replace(...)` call and
+    // throw during render, taking the whole console down before it could be used.
+    window.localStorage.setItem(
+      'askbagbin-chat-history-v1',
+      JSON.stringify([
+        {
+          id: 'broken-chat',
+          title: null,
+          createdAt: 'not a date',
+          updatedAt: {},
+          messages: [
+            { role: 'user', content: { text: 'not a string' } },
+            { role: 'assistant', content: 42 },
+            { role: 'tool', content: 'not a known role' },
+          ],
+        },
+      ]),
+    )
+
+    render(<AskConsole />)
+    expect(await screen.findByPlaceholderText(/Ask about his life/i)).toBeInTheDocument()
+    expect(screen.queryByText('not a string')).not.toBeInTheDocument()
+  })
+})
+
 describe('/ask with a transcript saved by an older version', () => {
   /**
    * The crash this guards against: `loadHistory` only ever checked `role` and
@@ -743,7 +1006,7 @@ describe('/ask with a transcript saved by an older version', () => {
   it('drops a corrupt transcript rather than rendering it', async () => {
     window.localStorage.setItem('askbagbin-chat-v1', 'not json at all')
     render(<AskConsole />)
-    expect(await screen.findByPlaceholderText(/Ask about a speech/i)).toBeInTheDocument()
+    expect(await screen.findByPlaceholderText(/Ask about his life/i)).toBeInTheDocument()
     expect(screen.queryByText('On the youth')).not.toBeInTheDocument()
   })
 })

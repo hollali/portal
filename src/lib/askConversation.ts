@@ -35,6 +35,10 @@ export type ConversationKind =
   | 'followup'
   /** No subject at all — "who was he?". Needs a route, not a search. */
   | 'unresolved'
+  /** Conversation rather than a search: greeting, thanks, help. */
+  | 'chat'
+  /** A life/history answer composed from the person rows in the database. */
+  | 'profile'
 
 export interface ConversationState {
   kind: ConversationKind
@@ -102,6 +106,70 @@ const IDENTITY_QUESTION = [
 function isIdentityQuestion(question: string): boolean {
   const flat = normalise(question)
   return IDENTITY_QUESTION.some(pattern => pattern.test(flat))
+}
+
+export interface SmallTalk {
+  summary: string
+  suggested: string[]
+}
+
+/** Example questions a greeting or help reply can offer. */
+const STARTERS = [
+  'Who is Alban Bagbin?',
+  'Tell me about his life',
+  'What has the Speaker said about democracy?',
+]
+
+/**
+ * Conversation that is not a search.
+ *
+ * The archive answered every turn with a search, so "hello" produced a dead end
+ * and a row of archive pages. A reader who greets an assistant is not asking a
+ * question; they are opening a conversation, and the honest reply is to say what
+ * this one can do. Nothing here invents a fact — every reply describes the
+ * archive's real behaviour — and every reply hands the reader examples that the
+ * archive can actually answer.
+ */
+export function detectSmallTalk(question: string): SmallTalk | null {
+  const flat = normalise(question)
+  if (!flat) return null
+
+  const greeting = /^(?:hi|hello|hey|greetings|yo|good (?:morning|afternoon|evening))(?:\s+(?:there|bagbin|archive|friend|sir))?[!.?]*$/
+  if (greeting.test(flat)) {
+    return {
+      summary:
+        'Hello. I’m the Bagbin assistant. I can talk you through his life, history, ideas and public record — and search the archive for his own words — then show you where every answer comes from. What would you like to know?',
+      suggested: STARTERS.slice(0, 3),
+    }
+  }
+
+  const thanks = /^(?:thanks|thank you|thankyou|much appreciated|cheers|nice one|great, thanks)(?:\s+(?:a lot|so much|very much))?[!.?]*$/
+  if (thanks.test(flat)) {
+    return {
+      summary:
+        'You’re welcome. If you want to keep going, ask me about another period, another theme, or one of the records I just showed you.',
+      suggested: ['What else is in the archive?', 'What are the key speeches?', 'What is on the timeline?'],
+    }
+  }
+
+  const goodbye = /^(?:bye|goodbye|see you|good night|goodnight|that’s all|thats all)[!.?]*$/
+  if (goodbye.test(flat)) {
+    return {
+      summary: 'Goodbye. The archive is here whenever you want to come back to it.',
+      suggested: STARTERS.slice(0, 2),
+    }
+  }
+
+  const help = /(?:what can (?:you|this) do|what do you do|how (?:do|does) (?:you|this) work|who are you|what are you|how (?:can|do) i (?:use|ask)|help me get started)/
+  if (help.test(flat)) {
+    return {
+      summary:
+        'I answer from this site’s database rather than from a model. Ask about his early life, education, career, family, political record or Speakership and I’ll compose the answer from the published biography, timeline, research and archive, then show you the sources. I can carry a conversation forward too — “tell me more”, “what about education?”, “the second one” — and I’ll say plainly when the stored record does not cover something.',
+      suggested: STARTERS.slice(0, 3),
+    }
+  }
+
+  return null
 }
 
 function normalise(text: string): string {

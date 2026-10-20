@@ -1,6 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+/* The hash effect hydrates browser-owned navigation state after mount. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowUpRight,
@@ -175,6 +178,41 @@ export default function SpeakerResearchExplorer({
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
   const [legendOpen, setLegendOpen] = useState(false)
+  const hashHandled = useRef(false)
+
+  // A citation from /ask links straight to one source or event. The explorer is
+  // paginated, so the target can be on a page the default view never renders;
+  // honour the hash by switching to the right tab and page before scrolling.
+  useEffect(() => {
+    if (hashHandled.current) return;
+    const raw = window.location.hash.slice(1);
+    if (!raw) return;
+    let id: string;
+    try {
+      id = decodeURIComponent(raw);
+    } catch {
+      return;
+    }
+    const isSource = id.startsWith('source-');
+    const isEvent = id.startsWith('event-');
+    if (!isSource && !isEvent) return;
+    hashHandled.current = true;
+
+    const list: Array<{ recordId: string } | { eventId: string }> = isSource ? sources : events;
+    const key = isSource ? 'recordId' : 'eventId';
+    const index = list.findIndex(item => `${isSource ? 'source' : 'event'}-${(item as Record<string, string>)[key]}` === id);
+    setView(isSource ? 'sources' : 'timeline');
+    setSearch('');
+    setCategory(ALL);
+    setTier(ALL);
+    setSort('chrono-asc');
+    if (index >= 0) setPage(Math.floor(index / perPage) + 1);
+
+    const timer = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ block: 'center' });
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [events, sources, perPage])
 
   const categories = useMemo(() => {
     const labels = view === 'timeline' ? events.map(eventCategory) : sources.map(sourceCategory)
@@ -603,7 +641,7 @@ function TimelineCard({ event }: { event: PublicEvent }) {
   const CatIcon = CATEGORY_ICONS[cat] ?? BookOpen
   const key = isKeyMoment(event)
   return (
-    <li className="sr-timeline-item">
+    <li className="sr-timeline-item" id={`event-${event.eventId}`}>
       <span aria-hidden="true" style={{
         position: 'absolute', left: 2, top: 22, width: 16, height: 16, borderRadius: 999,
         background: key ? 'var(--primary)' : 'var(--p-surface)',
@@ -682,7 +720,7 @@ function SourceCard({ source }: { source: PublicSource }) {
   const cat = sourceCategory(source)
   const CatIcon = CATEGORY_ICONS[cat] ?? FileText
   return (
-    <article aria-labelledby={`${source.recordId}-title`}
+    <article id={`source-${source.recordId}`} aria-labelledby={`${source.recordId}-title`}
       style={{ border: '1px solid var(--p-border)', background: 'var(--p-surface)', borderRadius: 14, padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem' }}>
         <span style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--p-surface-2)', border: '1px solid var(--p-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>

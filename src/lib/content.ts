@@ -318,10 +318,10 @@ export const DEFAULT_THEMES_HERO: PageHeroData = {
 }
 
 export const DEFAULT_ASK_HERO: PageHeroData = {
-  eyebrow: 'Archive research',
-  titleA: 'Ask the',
-  titleAccent: 'archive',
-  lede: 'Search in plain language. Every answer links back to published records.',
+  eyebrow: 'Conversation',
+  titleA: 'Ask about',
+  titleAccent: 'the man',
+  lede: 'Talk about his life, career and record. Answers are composed from the site’s database, with a source beside every claim.',
 }
 
 export const DEFAULT_SEARCH_HERO: PageHeroData = {

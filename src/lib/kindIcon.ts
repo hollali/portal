@@ -1,7 +1,10 @@
 import {
   Award,
+  CalendarDays,
   Clapperboard,
+  FileSearch,
   FileText,
+  Globe2,
   Image as ImageIcon,
   Mic,
   MessagesSquare,
@@ -9,6 +12,7 @@ import {
   Newspaper,
   ScrollText,
   AudioLines,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -34,4 +38,8 @@ export const KIND_ICON: Record<string, LucideIcon> = {
   // Reference collections.
   milestone: Milestone,
   testimonial: Award,
+  research: FileSearch,
+  event: CalendarDays,
+  web: Globe2,
+  profile: UserRound,
 }

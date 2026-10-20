@@ -85,6 +85,9 @@ const ALIASES: Record<string, string[]> = {
 
 export const ASK_MAX_TERMS = 6
 
+/** Recent user turns the follow-up resolver sees; the client sends no more. */
+export const ASK_HISTORY_TURNS = 6
+
 function foldPlural(term: string): string | null {
   if (term.length > 4 && term.endsWith('ies')) return `${term.slice(0, -3)}y`
   if (term.length > 4 && term.endsWith('es') && !term.endsWith('ses')) return term.slice(0, -2)
@@ -149,6 +152,8 @@ export const ASK_COLLECTION_LABELS = {
   news: 'News',
   milestones: 'Milestones',
   testimonials: 'Testimonials',
+  research: 'Research sources',
+  research_events: 'Research events',
 } as const
 
 /**
@@ -191,6 +196,11 @@ const COLLECTION_WORDS: Record<string, string> = {
   photos: 'photos',
   photographs: 'photos',
   photograph: 'photos',
+  research: 'research',
+  'research source': 'research',
+  'research sources': 'research',
+  'research event': 'research_events',
+  'research events': 'research_events',
 }
 
 /**
@@ -226,6 +236,27 @@ export const NOT_ANSWERABLE_COLLECTIONS: Record<string, string> = {
   photos: 'every photograph is uncaptioned and undated, so it can only match its own scrape query',
 }
 
+/**
+ * A request to see a collection rather than search inside it.
+ *
+ * "Show me the photographs" has no subject terms left after the collection noun
+ * is removed, and searching for the word "photographs" would find nothing. The
+ * reader has named the collection and asked to see it, so the route lists its
+ * records instead. Only one collection can be listed at a time.
+ */
+export function detectMediaRequest(
+  collections: string[],
+  terms: string[] = [],
+): 'photos' | 'videos' | 'audio' | null {
+  if (collections.length !== 1) return null
+  const collection = collections[0]
+  if (collection !== 'photos' && collection !== 'videos' && collection !== 'audio') return null
+  // "Show me audio recordings" leaves "recordings" after the collection noun is
+  // removed. It names the medium, not a subject, so it is not a search term.
+  const generic = new Set(['recording', 'recordings', 'clip', 'clips', 'footage', 'file', 'files'])
+  return terms.every(term => generic.has(term)) ? collection : null
+}
+
 /** Where a reader goes instead for a collection that cannot answer questions. */
 export const COLLECTION_PAGES: Record<string, string> = {
   photos: '/archives/photos',
@@ -235,6 +266,8 @@ export const COLLECTION_PAGES: Record<string, string> = {
   documents: '/archives',
   milestones: '/archives/milestones',
   testimonials: '/archives/testimonials',
+  research: '/speaker-record',
+  research_events: '/speaker-record',
 }
 
 /**
@@ -512,13 +545,34 @@ export function periodYears(period: AskPeriod | null): string[] {
 }
 
 export const ASK_SUGGESTIONS = [
-  'What has the Speaker said about democracy?',
-  'What are the key speeches on parliamentary independence?',
-  'Find the notice recalling Parliament',
-  'What has been said about education and the youth?',
-  'Speeches on health and social protection',
-  "What is the Speaker's position on digitalisation?",
+  'Who is Alban Bagbin?',
+  'Where was he born?',
+  'Tell me about his education',
+  'How did his political career begin?',
+  'What are his key rulings?',
+  'What has he said about democracy?',
+  'Show me photographs of him',
 ]
+
+/**
+ * The playable or viewable part of a media record, resolved on the server.
+ *
+ * A citation can exist without one — a video row with only a YouTube watch page
+ * has a thumbnail and an embed, but an audio row with no local file and no
+ * direct media address has neither. The card then stays a link rather than
+ * showing a player that cannot play.
+ */
+export interface AskMedia {
+  type: 'image' | 'video' | 'audio'
+  /** A local `/api/media/...` path or an http(s) media address. */
+  src?: string
+  /** A thumbnail for a video that is embedded rather than streamed directly. */
+  poster?: string
+  /** A privacy-preserving YouTube embed address for click-to-play. */
+  embedUrl?: string
+  /** Alternative text for an image. */
+  alt?: string
+}
 
 export interface AskCitation {
   kind: string
@@ -547,6 +601,8 @@ export interface AskCitation {
   url?: string | null
   /** The publication a clipping came from, shown beside the link to it. */
   sourceName?: string | null
+  /** Inline preview/player data, when the record has a playable source. */
+  media?: AskMedia
   /**
    * The aggregator a clipping was found through, when the row names one instead
    * of a paper. Carried so the card can say "via Google News" — the difference
@@ -559,6 +615,11 @@ export interface AskCitation {
    * survives the paper changing or deleting the page later.
    */
   captureHref?: string
+  /**
+   * A record-level statement of why this record matters, where the collection
+   * stores one. It is the archive's own note, never a quotation from the record.
+   */
+  note?: string | null
 }
 
 export interface AskTimelineEntry {
@@ -655,6 +716,12 @@ export interface AskResult {
   /** Named collections the archive holds but does not search for answers. */
   unsearchable?: string[]
   /**
+   * Plain statements about what the search could not see, in the reader's terms.
+   * Today this is used for media: video and audio rows are matched on titles and
+   * metadata because the archive holds no transcripts for them.
+   */
+  limitations?: string[]
+  /**
    * A reading of the records, as distinct from the records themselves.
    *
    * Absent unless something generated it, and marked `generated: true` when
@@ -747,7 +814,7 @@ export interface AskPersonaQuote {
 }
 
 export interface AskConversation {
-  kind: 'new' | 'followup' | 'unresolved'
+  kind: 'new' | 'followup' | 'unresolved' | 'chat' | 'profile'
   /** The opening line, in the Speaker's voice where that is possible. */
   lead: string
   /**

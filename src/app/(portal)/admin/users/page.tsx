@@ -51,7 +51,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     jsonFetch<{ isAdmin?: boolean; role?: string }>('/api/me').then(d => {
-      if (!d?.isAdmin || d.role !== 'admin') {
+      if (d?.role !== 'admin') {
         router.push('/login')
         return
       }

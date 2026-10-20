@@ -30,7 +30,7 @@ type DrawerEntry =
 
 const DRAWER_NAV: DrawerEntry[] = [
   ...PRIMARY_NAV,
-  { kind: 'link', href: ASK_HREF, label: 'Ask Bagbin Archive', icon: Sparkles, accent: true },
+  { kind: 'link', href: ASK_HREF, label: 'Ask Bagbin', icon: Sparkles, accent: true },
 ]
 
 /**

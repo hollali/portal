@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 import { MEDIA_ROOT as DEFAULT_MEDIA_ROOT } from '@/lib/media'
+import { resolveWithin } from '@/lib/mediaFiles'
 
 const MEDIA_ROOT = path.resolve(process.env.MEDIA_ROOT || DEFAULT_MEDIA_ROOT)
 
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: pathSegments } = await params
-  const filePath = path.join(MEDIA_ROOT, ...pathSegments)
+  const filePath = resolveWithin(MEDIA_ROOT, pathSegments)
 
-  if (!filePath.startsWith(MEDIA_ROOT)) {
+  if (!filePath) {
     return new NextResponse('Forbidden', { status: 403 })
   }
 

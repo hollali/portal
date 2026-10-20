@@ -30,6 +30,7 @@ type VoiceStatus =
   | "submitting"
   | "answered"
   | "speaking"
+  | "stopped"
   | "error";
 
 export interface AskVoiceHandle {
@@ -88,6 +89,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const sessionRef = useRef(0);
   const stoppedRef = useRef(false);
+  const mountedRef = useRef(true);
   const statusRef = useRef<VoiceStatus>("idle");
   const transcriptRef = useRef("");
   const prefsRef = useRef(prefs);
@@ -111,6 +113,19 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
   }, []);
+
+  /**
+   * The Stop-speaking button cannot rely on `cancel()` emitting `onend`: some
+   * engines leave the page stuck on "Speaking" forever. Move the state back to
+   * the answer so the reader can read it or ask again.
+   */
+  const stopSpeakingNow = useCallback(() => {
+    stopSpeaking();
+    if (statusRef.current === "speaking") {
+      statusRef.current = "answered";
+      setStatus("answered");
+    }
+  }, [stopSpeaking]);
 
   const speak = useCallback(
     (text: string) => {
@@ -171,6 +186,10 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
       try {
         await ask(text, {
           onResult: result => {
+            // The reader may have gone back to the chat while the request was
+            // in flight. Updating an unmounted page is pointless, and starting
+            // read-aloud after they left would talk to an empty room.
+            if (!mountedRef.current) return;
             const summary =
               result && typeof result === "object" && "summary" in result &&
               typeof (result as { summary?: unknown }).summary === "string"
@@ -181,6 +200,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
             if (prefsRef.current.readAloud && summary) speak(summary);
           },
           onError: () => {
+            if (!mountedRef.current) return;
             setError("The archive could not be reached. The question is still in your chat — try again from there.");
             setStatus("error");
           },
@@ -296,7 +316,27 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
   const stop = useCallback(() => {
     stoppedRef.current = true;
     endRecognition();
+    // `endRecognition` removes the callbacks before aborting, so no `onend`
+    // arrives to move the page out of "listening". A stopped session with words
+    // in it becomes reviewable rather than pretending the mic is still live.
+    const next = transcriptRef.current.trim() ? "stopped" : "idle";
+    statusRef.current = next;
+    setStatus(next);
   }, [endRecognition]);
+
+  // Leaving the Voice page must release the microphone, not leave a recognition
+  // session running behind the chat. Without this, Back/sidebar navigation kept
+  // listening and could submit an answer into a page the reader had left.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      sessionRef.current += 1;
+      stoppedRef.current = true;
+      endRecognition();
+      stopSpeaking();
+    };
+  }, [endRecognition, stopSpeaking]);
 
   const askAnother = useCallback(() => {
     stopSpeaking();
@@ -313,6 +353,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
     submitting: "Thinking through it",
     answered: "Answer ready",
     speaking: "Speaking",
+    stopped: "Session ended",
     error: "The mic needs attention",
   };
 
@@ -323,6 +364,9 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
     submitting: "Your question is being searched against the archive’s records.",
     answered: lastAnswer ? "Read the answer aloud, ask another, or head back to the chat." : "The archive answered — see the chat for the full reply.",
     speaking: "The archive is reading its answer aloud.",
+    stopped: transcript
+      ? "The mic is off. Review what was heard, ask it, or start another session."
+      : "The mic is off. Start listening to ask a question.",
     error: error || "Restart the session to try again.",
   };
 
@@ -339,7 +383,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
           aria-live="polite"
         >
           <i aria-hidden />
-          {view === "unsupported" ? "Not supported here" : "Browser voice connected"}
+          {view === "unsupported" ? "Not supported here" : statusLabel[view]}
         </span>
       </div>
 
@@ -374,7 +418,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
 
         {lastAnswer && (view === "answered" || view === "speaking") && (
           <div className="ask-voice-card ask-voice-response">
-            <span>Archive answer</span>
+            <span>Ask Bagbin answer</span>
             <p>{lastAnswer}</p>
           </div>
         )}
@@ -423,6 +467,25 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
               </button>
             </>
           )}
+          {view === "stopped" && (
+            <>
+              <button
+                type="button"
+                className="ask-voice-btn ask-voice-primary"
+                onClick={start}
+              >
+                <Mic size={17} aria-hidden /> Start listening
+              </button>
+              <button
+                type="button"
+                className="ask-voice-btn ask-voice-secondary"
+                onClick={() => void submit(transcript)}
+                disabled={!transcript.trim()}
+              >
+                Ask what was said
+              </button>
+            </>
+          )}
           {view === "submitting" && (
             <span className="ask-voice-busy">
               <LoaderCircle size={17} className="ask-voice-spin" aria-hidden />
@@ -452,7 +515,7 @@ export default function AskVoice({ ask, onBackToChat, notify, prefs }: AskVoiceH
             <button
               type="button"
               className="ask-voice-btn ask-voice-primary"
-              onClick={stopSpeaking}
+              onClick={stopSpeakingNow}
             >
               <VolumeX size={17} aria-hidden /> Stop speaking
             </button>

@@ -18,6 +18,7 @@ Built with **Next.js (App Router)** and **React 19**, backed by **Prisma + Neon 
 - [Seeding](#seeding)
 - [Authentication & Roles](#authentication--roles)
 - [Scripts](#scripts)
+- [Ask assistant](#ask-assistant)
 - [Ask voice input](#ask-voice-input)
 - [Ask local-model readiness](#ask-local-model-readiness)
 - [Database Schema](#database-schema)
@@ -31,7 +32,7 @@ Built with **Next.js (App Router)** and **React 19**, backed by **Prisma + Neon 
 
 The portal has two faces:
 
-1. **Public site** (`/`, `/the-man`, `/archives`, `/media`, `/videos`, `/news`, `/audio`, `/search`, `/ask`, …) — an editorial front end that presents the digitised library to the public: biographical chapters, a timeline of milestones, testimonials, faceted archive collections, a curated photo library, and an AI-style **Ask** assistant that answers from the archive with citations.
+1. **Public site** (`/`, `/the-man`, `/archives`, `/media`, `/videos`, `/news`, `/audio`, `/search`, `/ask`, …) — an editorial front end that presents the digitised library to the public: biographical chapters, a timeline of milestones, testimonials, faceted archive collections, a curated photo library, and a database-backed **Ask Bagbin** assistant that answers life and history questions, searches the archive, reads reader-supplied links and shows media inline — with a source beside every claim.
 2. **Admin CMS** (`/login`, `/dashboard`, `/admin/*`) — a secure, role-based content-management console for ingesting, previewing, editing and deleting images, videos, news and audio, plus duplicate detection, audit logging, user management, notifications, site settings, content-page editing and a storage health dashboard.
 
 Media files are stored on local disk and served through a secured, path-traversal-safe proxy at `/api/media/*`, while metadata lives in a Neon PostgreSQL database.
@@ -44,7 +45,7 @@ Media files are stored on local disk and served through a secured, path-traversa
 - Faceted archives — speeches, public papers, interviews, notes/letters/memos, milestones, testimonials and curated photos — filterable by `year`, `event`, `location`, `person`, `institution`, `parliament` and `theme`.
 - Media library for **photos**, **videos**, **audio** and **news clippings**, including YouTube embeds.
 - Full-text **search** across the archive.
-- **Ask** assistant: deterministic, cited answers from the live archive; browser voice dictation; and a disabled-by-default provider seam for a future server-hosted local model.
+- **Ask Bagbin** assistant: deterministic answers about his life and record from the CMS/database, cited archive search, reader-supplied link reading, inline video/audio/photograph cards, browser voice dictation and read-aloud; no language model is called. A disabled-by-default provider seam exists for a future server-hosted reading model.
 - CMS-authored pages rendered from sanitised Markdown.
 
 **Admin CMS**
@@ -230,7 +231,7 @@ Prisma schema: `prisma/schema.prisma`.
 │   ├── components/            # Shared + admin UI components
 │   ├── lib/                   # Auth, prisma, media, markdown, audit, etc.
 │   ├── generated/prisma/      # Prisma client (generated, git-ignored)
-│   └── __tests__/             # Vitest component tests
+│   └── __tests__/             # Vitest unit, route and component tests
 ├── public/                    # Static assets (+ media via proxy)
 ├── vitest.config.ts           # Test configuration
 ├── eslint.config.mjs          # ESLint configuration
@@ -250,7 +251,8 @@ Prisma schema: `prisma/schema.prisma`.
 - `/api/search` — archive full-text search
 - `/api/stats` — public archive statistics
 - `/api/content` — published content sections
-- `/api/ask` — Ask assistant (retrieves and returns cited archive answers; optional generated reading is disabled by default)
+- `/api/ask` — Ask Bagbin assistant: person knowledge, cited archive search, counts and media listings; optional generated reading is disabled by default
+- `/api/ask/link` — reads one reader-supplied http(s) page and returns a bounded, cited excerpt (SSRF-safe; no web search)
 - `/api/images`, `/api/videos`, `/api/news`, `/api/audio` (+ `/api/photos`) — paginated public media listings and single-item routes
 - `/api/news/[id]/original` — a clipping as the scraper captured it, served sandboxed; `?download=1` for the file
 - `/api/dl` — digital-library listing
@@ -336,19 +338,37 @@ A reader who types a word this site uses as a page name — milestones, testimon
 Read as a subject, "what are the milestones from the 1990s?" searched every record for the *word* "milestones". The archive holds four milestones from that decade and not one of them contains the word, so the answer was empty — and the empty answer was indistinguishable from the archive having no record of the decade at all. The restriction is also stated, in the summary and above the cards, because a narrowing the reader cannot see reads as the archive's whole contents.
 
 - The word list is deliberately short and consists of words that name a collection on this site and are not ordinary subject matter. "Speeches", "statements", "press" and "recordings" are absent: "what is his position on press freedom?" is a real question, and filtering it to clippings would answer a different one.
-- A collection on its own is a question, not a missing subject: "any videos?" returns the videos, in the order the videos page lists them, and says "the first 3 in the collection shown" rather than claiming to have ranked them.
-- **Photographs are refused with a reason and a page.** All 283 rows of the photo library are uncaptioned and undated, so the only text a match could come from is the scrape query its own subject's name was typed into, and the card would be titled with a search string rather than with anything about the picture. "Show me any photographs" is answered with that sentence and `/archives/photos`; naming photographs alongside a subject searches the rest and says where the pictures are not coming from.
+- A collection on its own is a listing, not a missing subject: "any videos?" lists videos and "show me audio recordings" lists audio. "Show me the photographs" lists image records with inline thumbnails; the answer says they are uncaptioned and cannot be used as evidence.
+- Naming photographs alongside a subject still searches the other collections and says where the pictures are not coming from. A dated media-only request is not quietly answered with undated records: videos, audio and most photographs carry no date, and the empty result says so.
 - Every refusal carries the restriction too. "Nothing published in the archive mentions “humility”" is a claim about the whole archive, and under a collection filter it is a claim about one page of it.
 
 ### Known gaps
 
-- A window or a collection on its own returns as many records as the card cap allows — two milestones, three clippings — and says how many matched. A reader who wants all of them has to visit the collection's own page, which is where the full list lives.
+- A window or a collection on its own returns as many records as the card cap allows — two milestones, three clippings, four media records — and says how many matched. A reader who wants all of them has to visit the collection's own page, which is where the full list lives.
+- Most videos and audio rows are YouTube/watch pages rather than local files. They get a thumbnail or link, not a player, until a playable file is stored.
+- Video and audio have no transcripts, and photographs have no captions. Media cards are records, not evidence that a phrase was spoken or that a person is in a picture.
+- `/the-man` still renders its compiled `MAN_SECTIONS`; the assistant's profile loader reads CMS `the_man` sections when a row exists.
+
+## Ask assistant
+
+`/ask` is branded **Ask Bagbin**. It is deterministic: no language model is called, and every sentence is composed from stored rows or a page the reader supplied.
+
+The route has four paths, in order:
+
+1. **Small talk** — greetings, thanks and capability questions are answered conversationally.
+2. **Person knowledge** — life, birth, family, education, career, political record, Speakership, rulings, values, timeline and international roles are composed by `src/lib/askKnowledge.ts` from `loadKnowledgeProfile()` in `src/lib/askProfile.ts`. The loader reads the CMS sections `home_hero`, `home_biography`, `home_timeline`, `the_man`, `parliament_rulings`, `core_themes` and `home_institutions`, plus the research dataset's subject, published milestones and testimonials, and research events. A database failure falls through to archive search rather than taking `/ask` offline.
+3. **Archive search** — questions about what he said or wrote search published documents, news, milestones, testimonials, videos, audio and the research record. Results carry matched terms, citations, original links, captured copies and explicit limits.
+4. **Reader-supplied links** — a pasted http(s) address is fetched by `/api/ask/link`, not by a search engine. The fetcher accepts only public addresses, pins DNS during the request, caps redirects, time and bytes, and returns a marked excerpt plus a link to the page.
+
+Media is displayed inline when the record has something honest to render: a local or direct video file, a YouTube thumbnail with click-to-play through `youtube-nocookie.com`, a playable audio file, or a photograph. Catalogue-only rows stay links. The assistant does not invent captions or transcripts.
+
+Limits are part of the answer: videos and audio have no transcripts; photographs have no captions; there is no live web search; and person answers only use the rows above.
 
 ## Ask voice input
 
 The `/ask` composer uses the browser Web Speech recognition API when available. Select the microphone, grant browser microphone permission, dictate, and stop; the recognized text remains in the composer so it can be reviewed or edited before pressing Send. The composer restarts after browser session pauses and retries transient speech-service network errors. The separate Voice page is also available and submits a completed spoken question automatically; it reports specific microphone, permission, language, and service errors with a retry action. Voice features depend on browser support and a secure context (`localhost` is considered secure by modern browsers).
 
-Speech recognition is handled by the browser and may use its own speech service. Composer dictation is not sent to `/api/ask` until the reader presses Send; Voice mode sends the recognized question when capture completes. See [`docs/ask-voice.md`](docs/ask-voice.md) for the interaction and privacy details.
+Speech recognition is handled by the browser and may use its own speech service. Composer dictation is not sent to `/api/ask` until the reader presses Send; Voice mode sends the recognized question when capture completes. Read-aloud uses the browser's `speechSynthesis` and a system voice; it is not a recording or clone of the Speaker's voice, and no audio is uploaded. See [`docs/ask-voice.md`](docs/ask-voice.md) for the interaction and privacy details.
 
 ### Ask local-model readiness
 

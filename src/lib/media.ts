@@ -20,12 +20,27 @@ export function isYouTubeUrl(url: string): boolean {
   return /(youtube\.com|youtu\.be)/i.test(url)
 }
 
+/** The eleven-character video id, wherever YouTube put it in the address. */
+export function getYouTubeId(url: string): string | null {
+  const match = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{6,})/)
+  return match ? match[1] : null
+}
+
 export function getYouTubeEmbedUrl(url: string): string | null {
-  const match = url.match(/(?:v=|youtu\.be\/)([\w-]+)/)
-  return match ? `https://www.youtube.com/embed/${match[1]}` : null
+  const id = getYouTubeId(url)
+  return id ? `https://www.youtube.com/embed/${id}` : null
+}
+
+/**
+ * The privacy-preserving player. Used inside /ask because an embedded video
+ * should not set YouTube's advertising cookies before the reader presses play.
+ */
+export function getYouTubeNoCookieEmbedUrl(url: string): string | null {
+  const id = getYouTubeId(url)
+  return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0` : null
 }
 
 export function getYouTubeThumbUrl(url: string): string | null {
-  const match = url.match(/(?:v=|youtu\.be\/)([\w-]+)/)
-  return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : null
+  const id = getYouTubeId(url)
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null
 }

@@ -100,33 +100,35 @@ export default function Sidebar({
 }) {
   const pathname = usePathname()
   const [username, setUsername] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [role, setRole] = useState<string>('')
   const [unread, setUnread] = useState(0)
   const asideRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
+  // Viewer is a read-only CMS role, so it can enter the admin area; only
+  // admin/editor receive notifications and management navigation.
+  const canEnterAdmin = role === 'admin' || role === 'editor' || role === 'viewer'
+  const canManageMedia = role === 'admin' || role === 'editor'
+
   useEffect(() => {
     jsonFetch<{ username?: string; isAdmin?: boolean; role?: string }>('/api/me').then(d => {
       if (d?.username) {
         setUsername(d.username)
-        setIsAdmin(d.isAdmin || false)
         setRole(d.role || '')
       }
     })
   }, [])
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!canManageMedia) return
     jsonFetch<{ unreadCount?: number }>('/api/admin/notifications?limit=1').then(d => {
       setUnread(d?.unreadCount || 0)
     })
-  }, [isAdmin, pathname])
+  }, [canManageMedia, pathname])
 
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' })
     setUsername(null)
-    setIsAdmin(false)
     setRole('')
     window.location.href = '/login'
   }
@@ -142,11 +144,15 @@ export default function Sidebar({
     [pathname]
   )
 
-  const sections = isAdmin
+  const sections = canEnterAdmin
     ? adminSections.map(section => ({
         ...section,
         links:
-          role === 'admin' ? section.links : section.links.filter(l => !systemLinks.includes(l.href)),
+          role === 'admin'
+            ? section.links
+            : role === 'editor'
+              ? section.links.filter(l => !systemLinks.includes(l.href))
+              : section.links.filter(l => l.href === '/admin' || l.href.startsWith('/admin/media/')),
       }))
     : publicSections
 

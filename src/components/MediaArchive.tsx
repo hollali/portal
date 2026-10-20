@@ -1092,6 +1092,8 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
   const [data, setData] = useState<ListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [standaloneItem, setStandaloneItem] = useState<ArchiveItem | null>(null)
+  // A slow earlier request must never overwrite the results of a newer filter.
+  const requestRef = useRef<AbortController | null>(null)
 
   const syncUrl = useCallback(
     (newQ: string, newFilters: FilterMap, newPage: number, newView: ViewMode, newItemId: number | null) => {
@@ -1110,16 +1112,21 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
 
   const load = useCallback(
     (f: FilterMap, query: string, p: number) => {
+      requestRef.current?.abort()
+      const controller = new AbortController()
+      requestRef.current = controller
       setLoading(true)
       const params = new URLSearchParams({ page: String(p), perPage: String(PER_PAGE) })
       for (const [k, v] of Object.entries(f)) if (v) params.set(k, v)
       if (query) params.set('q', query)
-      jsonFetch<ListData>(`${api}?${params.toString()}`)
+      jsonFetch<ListData>(`${api}?${params.toString()}`, { signal: controller.signal })
         .then(d => {
-          if (d) setData(d)
+          if (!controller.signal.aborted && d) setData(d)
         })
         .catch(() => {})
-        .finally(() => setLoading(false))
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false)
+        })
     },
     [api],
   )
@@ -1129,7 +1136,10 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
       load(filters, q, page)
       syncUrl(q, filters, page, viewMode, activeItemId)
     }, q ? 250 : 0)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(t)
+      requestRef.current?.abort()
+    }
   }, [filters, q, page, viewMode, activeItemId, load, syncUrl])
 
   // Deep-link loader for an item that is not on the current page of results

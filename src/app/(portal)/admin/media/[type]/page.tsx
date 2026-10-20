@@ -13,7 +13,8 @@ export default function AdminMediaPage() {
   useEffect(() => {
     jsonFetch<{ isAdmin?: boolean; role?: string }>('/api/me')
       .then(d => {
-        if (d?.role !== 'admin' && d?.role !== 'editor') {
+        // Viewers may browse media read-only; only editors and admins may edit.
+        if (d?.role !== 'admin' && d?.role !== 'editor' && d?.role !== 'viewer') {
           router.push('/login')
           return
         }

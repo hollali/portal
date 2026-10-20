@@ -78,7 +78,7 @@ export default function AskSettings({
   };
 
   return (
-    <section className="ask-settings-page" aria-label="Ask the archive settings">
+    <section className="ask-settings-page" aria-label="Ask about the man settings">
       <header className="ask-screen-heading">
         <span className="ask-eyebrow">Preferences</span>
         <h1 className="ask-screen-title">Settings</h1>

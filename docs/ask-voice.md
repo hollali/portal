@@ -26,6 +26,18 @@ when capture ends; this differs from composer dictation, which waits for the
 reader to press Send. Recognition errors explain whether the browser service,
 microphone, permission, or selected language needs attention, and offer a retry.
 
+## Read-aloud output
+
+The Voice page can read an answer aloud with the browser's `speechSynthesis` API
+and whichever system voice the reader selects. The chosen voice, rate and
+automatic read-aloud preference are stored locally in the browser.
+
+The current output is a synthetic system voice. It is **not** a recording of the
+Speaker, and no voice-cloning provider is configured. Answer text is sent to the
+browser's speech engine for playback; no answer audio is uploaded to `/ask`.
+Voice cloning is outside the current approval policy — see rule 4 in
+[`avatar-sources.md`](avatar-sources.md).
+
 ## Browser and microphone requirements
 
 - Voice recognition requires a browser that exposes `SpeechRecognition` or
@@ -40,6 +52,6 @@ microphone, permission, or selected language needs attention, and offer a retry.
   raw microphone audio to `/api/ask`; it sends recognized text when the question
   is submitted.
 
-Voice recognition is browser functionality, separate from the future
-server-hosted local language model described in
+Voice recognition and read-aloud are browser functionality, separate from the
+future server-hosted local language model described in
 [`ask-local-llm.md`](ask-local-llm.md).

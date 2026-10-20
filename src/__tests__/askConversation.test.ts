@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildVoice,
+  detectSmallTalk,
   isFollowUpShape,
   resolveQuestion,
   suggestionsFromResult,
@@ -345,5 +346,30 @@ describe('verbatim is not the same as his words', () => {
       scored({ kind: 'letter', kindLabel: 'Letter' }),
     ])
     expect(voice.firstPerson).toBe(true)
+  })
+})
+
+
+describe('detectSmallTalk', () => {
+  it('opens a conversation instead of searching for the word hello', () => {
+    const reply = detectSmallTalk('hello')
+    expect(reply?.summary).toContain('Bagbin assistant')
+    expect(reply?.suggested.length).toBeGreaterThan(0)
+  })
+
+  it('answers thanks and goodbyes without treating them as subjects', () => {
+    expect(detectSmallTalk('thanks!')?.summary).toContain('welcome')
+    expect(detectSmallTalk('goodbye')?.summary).toContain('Goodbye')
+  })
+
+  it('explains what it can do', () => {
+    const reply = detectSmallTalk('what can you do?')
+    expect(reply?.summary).toContain('rather than from a model')
+    expect(reply?.summary).toContain('tell me more')
+  })
+
+  it('leaves real questions to the archive search', () => {
+    expect(detectSmallTalk('what did he say about education')).toBeNull()
+    expect(detectSmallTalk('hello, what did he say about education')).toBeNull()
   })
 })

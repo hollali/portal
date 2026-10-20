@@ -18,11 +18,11 @@ export async function GET(request: NextRequest) {
   const and: Record<string, unknown>[] = []
   if (query) {
     where.OR = [
-      { title: { contains: query } },
-      { url: { contains: query } },
-      { source: { contains: query } },
-      { sourceName: { contains: query } },
-      { snippet: { contains: query } },
+      { title: { contains: query, mode: 'insensitive' } },
+      { url: { contains: query, mode: 'insensitive' } },
+      { source: { contains: query, mode: 'insensitive' } },
+      { sourceName: { contains: query, mode: 'insensitive' } },
+      { snippet: { contains: query, mode: 'insensitive' } },
     ]
   }
   if (source) where.sourceName = source

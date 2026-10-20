@@ -29,6 +29,7 @@ import {
   Check,
   Command,
   Copy,
+  Download,
   ExternalLink,
   FileText,
   Info,
@@ -40,7 +41,9 @@ import {
   Mic,
   MicOff,
   Pencil,
+  Play,
   Plus,
+  Quote,
   RefreshCw,
   RotateCcw,
   Search,
@@ -52,13 +55,16 @@ import {
 } from "lucide-react";
 import { KIND_ICON } from "@/lib/kindIcon";
 import {
+  ASK_HISTORY_TURNS,
   ASK_SUGGESTIONS,
   describeCollections,
   describeUnsearchable,
   describeWindow,
+  type AskMedia,
   type AskResult,
 } from "@/lib/askQuery";
 import { highlightTerms } from "@/lib/askHighlight";
+import { buildLinkAnswer, chatMessageResult, resolveCardReference } from "@/lib/askReference";
 import { Button } from "./ui/Button";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { DEFAULT_PREFS, applyTheme, loadPrefs, savePrefs, type AskPrefs } from "@/lib/askPrefs";
@@ -97,10 +103,10 @@ const COMPOSER_MAX_H = 148;
 /**
  * The composer and the API have to agree on how long a question is.
  *
- * /api/ask slices its input at 500 characters (see `queryTerms(raw.slice(0, 500))`),
- * so the field is capped at the same number. Without a cap the field accepted
- * any length and quietly discarded the overflow at the far end, which reads as
- * the archive having ignored the end of the sentence.
+ * /api/ask rejects submissions longer than 500 characters, so the field is capped
+ * at the same number. Without a cap the field accepted any length and quietly
+ * discarded the overflow at the far end, which reads as the archive having
+ * ignored the end of the sentence.
  */
 const MAX_QUESTION = 500;
 
@@ -146,9 +152,45 @@ const FALLBACK_LINKS = [
  * cannot find. Reading them defensively here means an old transcript degrades
  * to a plainer answer instead of taking the whole page down.
  */
+function normaliseMedia(value: unknown): AskMedia | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  // Only same-origin archive files and secure remote media. A `javascript:` or
+  // `data:` source here would become a player source, not a link the reader has
+  // to choose.
+  const safeSrc = (v: unknown) =>
+    typeof v === "string" && (v.startsWith("/api/media/") || /^https:\/\//i.test(v)) ? v : "";
+  const src = safeSrc(raw.src);
+  const poster = safeSrc(raw.poster);
+  const embedUrl = /^https:\/\/www\.youtube(?:-nocookie)?\.com\/embed\//i.test(str(raw.embedUrl))
+    ? str(raw.embedUrl)
+    : "";
+
+  if (raw.type === "image") {
+    return src ? { type: "image", src, ...(str(raw.alt) ? { alt: str(raw.alt) } : {}) } : undefined;
+  }
+  if (raw.type === "audio") {
+    return src ? { type: "audio", src } : undefined;
+  }
+  if (raw.type === "video") {
+    if (!src && !embedUrl) return undefined;
+    return {
+      type: "video",
+      ...(src ? { src } : {}),
+      ...(poster ? { poster } : {}),
+      ...(embedUrl ? { embedUrl } : {}),
+    };
+  }
+  return undefined;
+}
+
 function normaliseResult(value: unknown): AskResult | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
+  // Every real answer has a headline. A 200 body with none is not an answer, and
+  // accepting it would leave a blank assistant turn where an error belongs.
+  if (typeof raw.summary !== "string" || !raw.summary.trim()) return undefined;
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   const strArray = (v: unknown) =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
@@ -182,6 +224,8 @@ function normaliseResult(value: unknown): AskResult | undefined {
             ...(typeof c.captureHref === "string" && c.captureHref.startsWith("/")
               ? { captureHref: c.captureHref }
               : {}),
+            ...(typeof c.note === "string" && c.note.trim() ? { note: c.note } : {}),
+            ...(normaliseMedia(c.media) ? { media: normaliseMedia(c.media)! } : {}),
           }))
           .filter(c => c.href !== "")
       : [],
@@ -232,6 +276,9 @@ function normaliseResult(value: unknown): AskResult | undefined {
     ...(strArray(raw.collections).length > 0 ? { collections: strArray(raw.collections) } : {}),
     ...(strArray(raw.unsearchable).length > 0
       ? { unsearchable: strArray(raw.unsearchable) }
+      : {}),
+    ...(strArray(raw.limitations).length > 0
+      ? { limitations: strArray(raw.limitations) }
       : {}),
     ...(normaliseReading(raw.reading) ? { reading: normaliseReading(raw.reading)! } : {}),
   };
@@ -297,7 +344,10 @@ function normaliseConversation(value: unknown): NonNullable<AskResult["conversat
   const raw = (value ?? {}) as Record<string, unknown>
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   return {
-    kind: raw.kind === "followup" || raw.kind === "unresolved" ? raw.kind : "new",
+    kind:
+      raw.kind === "followup" || raw.kind === "unresolved" || raw.kind === "chat" || raw.kind === "profile"
+        ? raw.kind
+        : "new",
     lead: str(raw.lead),
     firstPerson: raw.firstPerson === true,
     anchor: Array.isArray(raw.anchor)
@@ -591,6 +641,131 @@ function MatchNotice({ result }: { result: AskResult }) {
   );
 }
 
+function CitationMedia({ citation }: { citation: AskResult["citations"][number] }) {
+  const media = citation.media;
+  const [playing, setPlaying] = useState(false);
+  if (!media) return null;
+
+  const frame: React.CSSProperties = {
+    width: "100%",
+    display: "block",
+    background: "#000",
+    border: "1px solid var(--p-border)",
+    borderRadius: 10,
+    marginBottom: "0.65rem",
+  };
+
+  if (media.type === "image" && media.src) {
+    return (
+      <a
+        href={citation.href}
+        style={{ display: "block", marginBottom: "0.65rem", borderRadius: 10, overflow: "hidden", background: "#000" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- archive images are served from a dynamic media route */}
+        <img
+          src={media.src}
+          alt={media.alt || citation.title}
+          loading="lazy"
+          decoding="async"
+          style={{ ...frame, marginBottom: 0, maxHeight: 320, objectFit: "contain" }}
+        />
+      </a>
+    );
+  }
+
+  if (media.type === "audio" && media.src) {
+    return (
+      <audio
+        controls
+        preload="none"
+        src={media.src}
+        style={{ width: "100%", marginBottom: "0.65rem" }}
+      />
+    );
+  }
+
+  if (media.type === "video" && media.src) {
+    return (
+      <video
+        controls
+        playsInline
+        preload="metadata"
+        poster={media.poster}
+        style={{ ...frame, maxHeight: 360, aspectRatio: "16 / 9" }}
+      >
+        <source src={media.src} />
+      </video>
+    );
+  }
+
+  if (media.type === "video" && media.embedUrl) {
+    if (playing) {
+      return (
+        <iframe
+          src={media.embedUrl}
+          title={citation.title}
+          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          style={{ ...frame, aspectRatio: "16 / 9", border: 0 }}
+        />
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => setPlaying(true)}
+        aria-label={`Play video: ${citation.title}`}
+        style={{
+          ...frame,
+          position: "relative",
+          padding: 0,
+          cursor: "pointer",
+          overflow: "hidden",
+          aspectRatio: "16 / 9",
+        }}
+      >
+        {media.poster && (
+          // eslint-disable-next-line @next/next/no-img-element -- YouTube thumbnail from a fixed host
+          <img
+            src={media.poster}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        )}
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            background: "linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.4))",
+          }}
+        >
+          <span
+            style={{
+              display: "grid",
+              placeItems: "center",
+              width: 52,
+              height: 52,
+              borderRadius: 999,
+              background: "rgba(0,0,0,0.72)",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.35)",
+            }}
+          >
+            <Play size={24} fill="currentColor" />
+          </span>
+        </span>
+      </button>
+    );
+  }
+
+  return null;
+}
+
 function CitationCard({
   citation,
   allTerms,
@@ -684,6 +859,7 @@ function CitationCard({
           <span style={{ color: "var(--p-text-4)" }}>· {citation.year}</span>
         )}
       </span>
+      <CitationMedia citation={citation} />
       <Link
         href={citation.href}
         style={{
@@ -710,6 +886,20 @@ function CitationCard({
           <Highlight text={citation.excerpt} terms={allTerms} />
         </span>
       )}
+      {citation.note && (
+        <span
+          style={{
+            display: "block",
+            marginTop: "0.3rem",
+            fontSize: "0.78rem",
+            lineHeight: 1.55,
+            color: "var(--p-text-4)",
+          }}
+        >
+          <strong style={{ color: "var(--p-text-3)", fontWeight: 650 }}>Why it matters: </strong>
+          {citation.note}
+        </span>
+      )}
       <span
         style={{
           display: "flex",
@@ -722,8 +912,16 @@ function CitationCard({
           color: "var(--primary)",
         }}
       >
-        <Link href={citation.href}>
-          {citation.hasTranscript ? "Read the full transcript" : "Open in the archive"}
+        <Link
+          href={citation.href}
+          target={citation.collection === "web" ? "_blank" : undefined}
+          rel={citation.collection === "web" ? "noopener noreferrer" : undefined}
+        >
+          {citation.hasTranscript
+            ? "Read the full transcript"
+            : citation.collection === "web"
+              ? "Open the page"
+              : "Open in the archive"}
         </Link>
         {/* Named by the publication rather than "source": the point is that the
             reader can tell whose page this is. */}
@@ -790,14 +988,14 @@ function CitationCard({
 function ResearchGuidance() {
   return (
     <div className="ask-guidance-panel">
-      <p>Search the published speeches, letters, papers, milestones and testimonials in the archive.</p>
-      <p>Answers show the strongest matches and link back to each record, so you can check the source.</p>
+      <p>Ask in plain language. For questions about his life, education, career, family or record, I compose the answer from the site’s database — the published biography, timeline, research and archive. For questions about what he said, I search the speeches, letters, papers, news and research record, then show you the sources.</p>
+      <p>Text records are searchable by their contents. Videos and audio can only be found by their titles and catalogue details — the archive has no transcripts for them yet. Ask “show me the photographs” or “show me the videos” to see them inline. Photographs have no captions, so they are shown as records, not used as evidence in answers.</p>
       <p className="ask-guidance-disclaimer">
         <span className="ask-guidance-disclaimer-icon" aria-hidden="true">
           <Info size={15} />
         </span>
         <span>
-          <strong>This is not the Speaker himself.</strong> It is a search of the published archive. First-person passages are quoted from their linked records.
+          <strong>This is not the Speaker himself.</strong> It is a database-backed assistant. Life and history answers are composed from published records, and first-person passages are quoted from their linked sources.
         </span>
       </p>
     </div>
@@ -984,6 +1182,47 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A stable, human-readable citation list for copying or pasting elsewhere. */
+function buildCitationText(result: AskResult): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return result.citations
+    .map((c, i) => {
+      const href = c.href.startsWith("/") ? `${origin}${c.href}` : c.href;
+      const publication = c.year ? ` (${c.year})` : "";
+      const original = c.url ? ` Original: ${c.url}` : "";
+      return `${i + 1}. ${c.title}${publication}. ${c.collectionLabel}. ${href}.${original}`;
+    })
+    .join("\n");
+}
+
+/** The answer as a portable Markdown file, citations included. */
+function buildAnswerMarkdown(result: AskResult): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const lines = [`# ${result.terms.length > 0 ? result.terms.join(" ") : "Ask Bagbin answer"}`, "", result.summary, ""];
+  if (result.citations.length > 0) {
+    lines.push("## Sources", "");
+    result.citations.forEach((c, i) => {
+      const href = c.href.startsWith("/") ? `${origin}${c.href}` : c.href;
+      lines.push(`${i + 1}. [${c.title}](${href})${c.year ? ` — ${c.year}` : ""}${c.url ? ` — [original](${c.url})` : ""}`);
+      if (c.excerpt) lines.push(`   > ${c.excerpt.replace(/\s+/g, " ")}`);
+      if (c.note) lines.push(`   Why it matters: ${c.note}`);
+    });
+    lines.push("");
+  }
+  if (result.timeline.length > 0) {
+    lines.push("## Timeline", "");
+    for (const item of result.timeline) lines.push(`- ${item.year ?? "—"}: ${item.title}`);
+    lines.push("");
+  }
+  if (result.testimonials.length > 0) {
+    lines.push("## Testimonials", "");
+    for (const item of result.testimonials) lines.push(`> ${item.quote} — ${item.author}${item.role ? `, ${item.role}` : ""}`);
+    lines.push("");
+  }
+  lines.push(`_Exported from ${origin || "the archive"}._`);
+  return lines.join("\n");
+}
+
 function AssistantReply({
   result,
   failed,
@@ -1004,6 +1243,7 @@ function AssistantReply({
   /** A search is in flight, so these would be dropped on the floor. */
   busy?: boolean;
 }) {
+  const [cited, setCited] = useState(false);
   const retryButton = (label: string, icon: React.ReactNode) =>
     onRetry && (
       <button
@@ -1135,12 +1375,46 @@ function AssistantReply({
         <Highlight text={result.summary} terms={result.matchedTerms} />
       </p>
 
+      {result.conversation?.kind === "profile" && (
+        <p
+          style={{
+            margin: "0.55rem 0 0",
+            maxWidth: "68ch",
+            fontSize: "0.74rem",
+            lineHeight: 1.5,
+            color: "var(--p-text-4)",
+            fontFamily: "var(--font-mono), monospace",
+          }}
+        >
+          From the site’s database · biography, timeline, research and archive
+        </p>
+      )}
+
       <div style={{ marginTop: "0.85rem" }}>
         <PersonaQuotes quotes={result.conversation?.quotes ?? []} terms={result.matchedTerms} />
         {result.reading ? <GeneratedReading reading={result.reading} /> : null}
         <WindowNotice result={result} />
         <TermsReadout result={result} />
         <MatchNotice result={result} />
+        {result.limitations && result.limitations.length > 0 && (
+          <div
+            style={{
+              marginTop: "0.65rem",
+              padding: "0.55rem 0.7rem",
+              border: "1px dashed var(--p-border-3)",
+              borderRadius: 9,
+              color: "var(--p-text-3)",
+              fontSize: "0.78rem",
+              lineHeight: 1.55,
+            }}
+          >
+            {result.limitations.map(text => (
+              <p key={text} style={{ margin: 0 }}>
+                {text}
+              </p>
+            ))}
+          </div>
+        )}
       </div>
 
       {result.citations.length > 0 && (
@@ -1351,7 +1625,7 @@ function AssistantReply({
         </>
       )}
 
-      <div style={{ marginTop: "1rem" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "1rem" }}>
         <button
           type="button"
           onClick={() => onCopy(copyText)}
@@ -1376,6 +1650,65 @@ function AssistantReply({
               announce the icon swap. */}
           <span aria-live="polite">{copied ? "Copied" : "Copy sources"}</span>
         </button>
+        {result.citations.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(buildCitationText(result)).then(() => {
+                  setCited(true);
+                  window.setTimeout(() => setCited(false), 1600);
+                });
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                background: "none",
+                border: "1px solid var(--p-border-2)",
+                borderRadius: 999,
+                padding: "0.4rem 0.8rem",
+                color: "var(--p-text-3)",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                minHeight: HIT,
+              }}
+            >
+              {cited ? <Check size={13} aria-hidden /> : <Quote size={13} aria-hidden />}
+              <span aria-live="polite">{cited ? "Citations copied" : "Cite sources"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const blob = new Blob([buildAnswerMarkdown(result)], { type: "text/markdown;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                const slug = (result.terms[0] || "archive-answer").replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
+                link.href = url;
+                link.download = `${slug || "archive-answer"}.md`;
+                link.click();
+                URL.revokeObjectURL(url);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                background: "none",
+                border: "1px solid var(--p-border-2)",
+                borderRadius: 999,
+                padding: "0.4rem 0.8rem",
+                color: "var(--p-text-3)",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                minHeight: HIT,
+              }}
+            >
+              <Download size={13} aria-hidden /> Save .md
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1457,27 +1790,75 @@ function groupChats(chats: PersistedChat[]): Record<string, PersistedChat[]> {
   }, {});
 }
 
+/**
+ * Coerce one saved conversation into the shape the history rail renders.
+ *
+ * Local storage is not a trusted database: a previous version wrote a different
+ * shape, and a user (or a failed write) can leave anything there. A chat whose
+ * message content is an object used to get as far as `preview.replace(...)` and
+ * take the whole page down, so invalid chats are dropped and invalid turns are
+ * skipped instead of being restored.
+ */
+function sanitiseChat(value: unknown): PersistedChat | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (!Array.isArray(raw.messages)) return null;
+
+  const messages: PersistedMessage[] = [];
+  for (const item of raw.messages) {
+    if (!item || typeof item !== "object") continue;
+    const message = item as Record<string, unknown>;
+    if (message.role !== "user" && message.role !== "assistant") continue;
+    if (typeof message.content !== "string") continue;
+    messages.push({
+      role: message.role,
+      content: message.content,
+      ...(typeof message.ts === "number" && Number.isFinite(message.ts)
+        ? { ts: message.ts }
+        : {}),
+      ...(message.result !== undefined ? { result: message.result } : {}),
+      ...(message.failed === true ? { failed: true } : {}),
+      ...(message.stopped === true ? { stopped: true } : {}),
+    });
+  }
+
+  const now = Date.now();
+  const numberOr = (candidate: unknown, fallback: number) =>
+    typeof candidate === "number" && Number.isFinite(candidate) ? candidate : fallback;
+  return {
+    id: typeof raw.id === "string" && raw.id ? raw.id : generateId(),
+    title:
+      typeof raw.title === "string" && raw.title.trim()
+        ? raw.title.trim()
+        : deriveTitle(messages),
+    createdAt: numberOr(raw.createdAt, now),
+    updatedAt: numberOr(raw.updatedAt, now),
+    messages,
+  };
+}
+
 export function loadAllChats(): PersistedChat[] {
   const migrated = migrateLegacy();
   if (migrated) return migrated;
-  const parsed = safeParse<PersistedChat[]>(localStorage.getItem(STORAGE_KEY));
+  const parsed = safeParse<unknown>(localStorage.getItem(STORAGE_KEY));
   if (!Array.isArray(parsed)) return [];
   return parsed
-    .filter((c) => c && Array.isArray(c.messages))
+    .map(sanitiseChat)
+    .filter((chat): chat is PersistedChat => chat !== null)
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 function migrateLegacy(): PersistedChat[] | null {
-  const legacy = safeParse<PersistedMessage[]>(localStorage.getItem(LEGACY_KEY));
+  const legacy = safeParse<unknown>(localStorage.getItem(LEGACY_KEY));
   if (!Array.isArray(legacy) || legacy.length === 0) return null;
   const now = Date.now();
-  const chat: PersistedChat = {
+  const chat = sanitiseChat({
     id: generateId(),
-    title: deriveTitle(legacy),
     createdAt: now,
     updatedAt: now,
     messages: legacy,
-  };
+  });
+  if (!chat) return null;
   const chats = [chat];
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
@@ -2022,6 +2403,108 @@ function AskShell({
       }
 
       const userMsg: ChatMsg = { role: "user", content: text };
+
+      // A pasted link is a request to read that page, not a question to run
+      // through the archive. It is handled by its own route so a slow or broken
+      // page cannot hold up search, and it is labelled as outside the archive.
+      const linkMatch = text.match(/https?:\/\/[^\s<>"']+/i);
+      const pastedUrl = linkMatch?.[0].replace(/[.,;:!?]+$/, "");
+      if (pastedUrl && linkMatch) {
+        const question = text.replace(linkMatch[0], " ").trim();
+        setMessages(prev => [...prev, userMsg]);
+        setInput("");
+        setCopiedIndex(null);
+        setLinkCopied(false);
+        setLoading(true);
+        forceScrollRef.current = true;
+        writeQueryParam(text);
+
+        const controller = new AbortController();
+        abortRef.current = controller;
+        let stopAsked = false;
+        const onStop = () => {
+          stopAsked = true;
+          controller.abort();
+        };
+        stopRef.current = onStop;
+
+        try {
+          const res = await fetch("/api/ask/link", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: pastedUrl, question }),
+            signal: controller.signal,
+          });
+          const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          if (!res.ok || typeof data.title !== "string" || typeof data.url !== "string") {
+            const message =
+              typeof data.error === "string" && data.error
+                ? data.error
+                : "I could not read that link.";
+            setMessages(prev => [
+              ...prev,
+              { role: "assistant", content: message, result: chatMessageResult(message, ["What does the archive say about this?", "What else is in the archive?"]) },
+            ]);
+          } else {
+            const source = {
+              title: data.title,
+              url: data.url,
+              siteName: typeof data.siteName === "string" ? data.siteName : null,
+              description: typeof data.description === "string" ? data.description : null,
+              excerpt: typeof data.excerpt === "string" ? data.excerpt : "",
+              matched: Array.isArray(data.matched) ? data.matched.filter((m): m is string => typeof m === "string") : [],
+              retrievedAt: typeof data.retrievedAt === "string" ? data.retrievedAt : new Date().toISOString(),
+            };
+            const result = buildLinkAnswer(source, question);
+            setMessages(prev => [...prev, { role: "assistant", content: result.summary, result }]);
+          }
+        } catch (err) {
+          if ((err as Error)?.name !== "AbortError") {
+            const message = "I could not read that link. Check the address and try again.";
+            setMessages(prev => [
+              ...prev,
+              { role: "assistant", content: message, result: chatMessageResult(message, ["What does the archive say about this?"]) },
+            ]);
+          }
+        } finally {
+          const superseded = supersededRef.current.delete(controller);
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+            setLoading(false);
+          }
+          if (stopRef.current === onStop) stopRef.current = null;
+          if (superseded) {
+            setMessages(prev => prev.filter(m => m !== userMsg));
+          } else if (stopAsked) {
+            setMessages(prev => [...prev, { role: "assistant", content: "", stopped: true }]);
+          }
+        }
+        return;
+      }
+
+      // A reference to a card already on screen is answered here, not by a new
+      // search. The reader said "the second one", and running that through the
+      // archive would search for the word "second".
+      const prior = [...messagesRef.current]
+        .reverse()
+        .find((message): message is ChatMsg & { result: AskResult } =>
+          message.role === "assistant" && !!message.result,
+        )?.result;
+      const reference = prior ? resolveCardReference(text, prior) : null;
+      if (reference) {
+        setMessages(prev => [
+          ...prev,
+          userMsg,
+          { role: "assistant", content: reference.summary, result: reference },
+        ]);
+        setInput("");
+        setCopiedIndex(null);
+        setLinkCopied(false);
+        setLoading(false);
+        writeQueryParam(text);
+        return;
+      }
+
       setMessages(prev => [...prev, userMsg]);
       setInput("");
       setCopiedIndex(null);
@@ -2057,6 +2540,10 @@ function AskShell({
             question: text,
             messages: messagesRef.current
               .filter(m => m.role === "user")
+              // The server resolves follow-ups from the same number of recent
+              // turns. Sending the whole transcript made every question in a
+              // long conversation travel again just to be discarded.
+              .slice(-ASK_HISTORY_TURNS)
               .map(m => ({ role: m.role, content: m.content })),
           }),
           signal: controller.signal,
@@ -2105,19 +2592,24 @@ function AskShell({
           setLoading(false);
         }
         if (stopRef.current === onStop) stopRef.current = null;
-        if (stopAsked) {
-          // The question stays in the transcript; this is the turn that says the
-          // search for it was cut short, so the reader is never left looking at a
-          // question that appears to have been ignored.
-          setMessages(prev => [...prev, { role: "assistant", content: "", stopped: true }]);
-        }
         if (superseded) {
           // Withdraw the abandoned question with its search. Left in place it would
           // be a question in the transcript that never gets an answer — the exact
           // dangling state the stop turn exists to avoid. Removed by identity
           // rather than position: by now the replacement question is on screen, and
           // "the last message" is no longer the one being abandoned.
+          //
+          // This wins over `stopAsked`: a reader who pressed Stop and immediately
+          // asked again has moved on, and appending "the question is still here"
+          // after removing that question leaves a stopped turn attached to the
+          // wrong question. The stop only earns a turn when the search is not
+          // being replaced.
           setMessages(prev => prev.filter(m => m !== userMsg));
+        } else if (stopAsked) {
+          // The question stays in the transcript; this is the turn that says the
+          // search for it was cut short, so the reader is never left looking at a
+          // question that appears to have been ignored.
+          setMessages(prev => [...prev, { role: "assistant", content: "", stopped: true }]);
         }
       }
     },
@@ -2435,6 +2927,7 @@ function AskShell({
 
   const handleClearHistory = () => {
     abortRef.current?.abort();
+    stopDictation();
     clearAllChats();
     const fresh = createNewChat();
     setChats([fresh]);
@@ -2513,7 +3006,7 @@ function AskShell({
         aria-label="Workspace"
       >
         <div className="ask-sidebar-top">
-          <span className="ask-sidebar-brand">Ask the archive</span>
+          <span className="ask-sidebar-brand">Ask about the man</span>
           <button
             type="button"
             className="ask-sidebar-close"
@@ -2753,7 +3246,7 @@ function AskShell({
                 <div className="ask-message-body" style={{ minWidth: 0, flex: 1 }}>
                   <header className="ask-message-meta" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", color: "var(--p-text-4)", fontSize: "0.7rem" }}>
                     <strong style={{ color: "var(--p-text-1)", fontSize: "0.8rem", fontWeight: 600 }}>
-                      {isUser ? "You" : "Archive"}
+                      {isUser ? "You" : "Ask Bagbin"}
                     </strong>
                     {m.ts && (
                       <time dateTime={new Date(m.ts).toISOString()} style={{ color: "var(--p-text-4)" }}>
@@ -2763,7 +3256,7 @@ function AskShell({
                     {loading && i === messages.length - 1 && !isUser && (
                       <span className="ask-streaming" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: "var(--primary)" }}>
                         <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--primary)", animation: "ask-dot-pulse 1s ease-in-out infinite" }} />
-                        <span>Searching…</span>
+                        <span>Looking through the records…</span>
                       </span>
                     )}
                   </header>
@@ -2820,10 +3313,10 @@ function AskShell({
               </div>
               <div className="ask-message-body" style={{ minWidth: 0, flex: 1 }}>
                 <header className="ask-message-meta" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", color: "var(--p-text-4)", fontSize: "0.7rem" }}>
-                  <strong style={{ color: "var(--p-text-1)", fontSize: "0.8rem", fontWeight: 600 }}>Archive</strong>
+                  <strong style={{ color: "var(--p-text-1)", fontSize: "0.8rem", fontWeight: 600 }}>Ask Bagbin</strong>
                   <span className="ask-streaming" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: "var(--primary)" }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--primary)", animation: "ask-dot-pulse 1s ease-in-out infinite" }} />
-                    <span>Searching…</span>
+                    <span>Looking through the records…</span>
                   </span>
                 </header>
                 <div className="ask-assistant-content">
@@ -2839,14 +3332,13 @@ function AskShell({
             <div className="ask-welcome-orb" aria-hidden>
               <Sparkles size={22} />
             </div>
-            <p className="ask-eyebrow">Archive research</p>
-            <h1 className="ask-welcome-title">Ask the archive</h1>
-            <p className="ask-welcome-subtitle">Search in plain language. Every answer links back to published records.</p>
-            <div className="ask-suggestions" role="list" aria-label="Example questions">
+            <p className="ask-eyebrow">Database-backed conversation</p>
+            <h1 className="ask-welcome-title">Ask about the man</h1>
+            <p className="ask-welcome-subtitle">His life, history, ideas and public record — with a source for every answer.</p>
+            <div className="ask-suggestions" role="group" aria-label="Example questions">
               {suggestions.map((s, idx) => (
                 <button
                   key={s}
-                  role="listitem"
                   onClick={() => void ask(s)}
                   disabled={loading}
                   className="ask-suggestion-card"
@@ -2896,7 +3388,7 @@ function AskShell({
                 }
               }}
               rows={1}
-              placeholder="Ask about a speech, letter, theme or period — e.g. “parliamentary independence” …"
+              placeholder="Ask about his life, career, ideas or time in Parliament — e.g. “Where was he born?” …"
               maxLength={MAX_QUESTION}
               enterKeyHint="send"
               autoComplete="off"
@@ -2912,7 +3404,7 @@ function AskShell({
             <div className="ask-composer-hint">
               <span className="ask-hint-dot" data-listening={dictating ? "true" : undefined} aria-hidden />
               <span aria-live="polite">
-                {dictating ? "Listening… tap the microphone to stop" : "Archive search · Published records only"}
+                {dictating ? "Listening… tap the microphone to stop" : "Database-backed · Biography, timeline & archive"}
               </span>
             </div>
             <div className="ask-composer-buttons">
@@ -2959,17 +3451,17 @@ function AskShell({
           </p>
         )}
         <p className="ask-composer-footnote">
-          Speech recognition is handled by your browser. Dictated text is sent to the archive only when submitted.
+          Speech recognition is handled by your browser. Dictated text is sent to the site only when submitted.
         </p>
         <p id="ask-source-disclaimer" className="ask-source-note">
           <MessageSquare size={14} aria-hidden style={{ marginTop: "0.05rem", flexShrink: 0 }} />
-          Archive search: Speaker isn’t answering directly; results come from published records.
+          Database answers: composed from published biography, timeline, research and archive — not the Speaker himself.
         </p>
 
         {/* Polite live region for search status announcements */}
         <p className="sr-only" role="status" aria-live="polite">
           {loading
-            ? "Searching the archive"
+            ? "Looking through the database"
             : lastAnswer
               ? `${lastAnswer} ${lastAnswerCount} source${lastAnswerCount === 1 ? "" : "s"} found.`
               : ""}

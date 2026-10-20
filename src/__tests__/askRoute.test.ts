@@ -12,11 +12,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  */
 
 const searchArchive = vi.fn()
+const loadMediaRequest = vi.fn()
 const getLibraryCounts = vi.fn()
 
 vi.mock('@/lib/askSearch', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/askSearch')>()
   return { ...actual, searchArchive: (...args: unknown[]) => searchArchive(...args) }
+})
+
+vi.mock('@/lib/askMedia', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/askMedia')>()
+  return { ...actual, loadMediaRequest: (...args: unknown[]) => loadMediaRequest(...args) }
 })
 
 vi.mock('@/lib/libraryQueries', () => ({
@@ -27,16 +33,16 @@ vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 
 import { POST } from '@/app/(public)/api/ask/route'
 
-const ask = async (question: string) => {
-  const response = await POST(
+const post = async (body: unknown) =>
+  POST(
     new Request('https://example.test/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify(body),
     }) as never,
   )
-  return response.json()
-}
+
+const ask = async (question: string) => (await post({ question })).json()
 
 const noResults = (over: { totalMatched?: number; broaderMatched?: number } = {}) => {
   searchArchive.mockResolvedValue({
@@ -52,8 +58,22 @@ const noResults = (over: { totalMatched?: number; broaderMatched?: number } = {}
 describe('POST /api/ask, with nothing to show', () => {
   beforeEach(() => {
     searchArchive.mockReset()
+    loadMediaRequest.mockReset()
     getLibraryCounts.mockReset()
     getLibraryCounts.mockResolvedValue({ total: 0, speeches: 0, papers: 0 })
+    loadMediaRequest.mockResolvedValue({
+      summary: 'Here are 4 media records from the archive.',
+      terms: [],
+      match: 'all',
+      citations: [],
+      timeline: [],
+      testimonials: [],
+      collectionCounts: [],
+      matchedTerms: [],
+      unmatched: [],
+      totalMatched: 4,
+      suggested: [],
+    })
   })
 
   it('says the archive holds nothing when nothing mentions the question', async () => {
@@ -91,11 +111,110 @@ describe('POST /api/ask, with nothing to show', () => {
   })
 })
 
+describe('POST /api/ask, conversation rather than search', () => {
+  beforeEach(() => {
+    searchArchive.mockReset()
+    loadMediaRequest.mockReset()
+    getLibraryCounts.mockReset()
+    getLibraryCounts.mockResolvedValue({ total: 0, speeches: 0, papers: 0 })
+    loadMediaRequest.mockResolvedValue({
+      summary: 'Here are 4 media records from the archive.',
+      terms: [],
+      match: 'all',
+      citations: [],
+      timeline: [],
+      testimonials: [],
+      collectionCounts: [],
+      matchedTerms: [],
+      unmatched: [],
+      totalMatched: 4,
+      suggested: [],
+    })
+  })
+
+  it('greets the reader without searching for the word hello', async () => {
+    const body = await ask('hello')
+    expect(body.match).toBe('all')
+    expect(body.conversation.kind).toBe('chat')
+    expect(body.summary).toContain('Bagbin assistant')
+    expect(body.suggested.length).toBeGreaterThan(0)
+    expect(searchArchive).not.toHaveBeenCalled()
+  })
+
+  it('explains what it can do when asked directly', async () => {
+    const body = await ask('what can you do?')
+    expect(body.summary).toContain('rather than from a model')
+    expect(body.conversation.kind).toBe('chat')
+    expect(searchArchive).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/ask, with a malformed body', () => {
+  beforeEach(() => {
+    searchArchive.mockReset()
+    loadMediaRequest.mockReset()
+    getLibraryCounts.mockReset()
+    getLibraryCounts.mockResolvedValue({ total: 0, speeches: 0, papers: 0 })
+    loadMediaRequest.mockResolvedValue({
+      summary: 'Here are 4 media records from the archive.',
+      terms: [],
+      match: 'all',
+      citations: [],
+      timeline: [],
+      testimonials: [],
+      collectionCounts: [],
+      matchedTerms: [],
+      unmatched: [],
+      totalMatched: 4,
+      suggested: [],
+    })
+  })
+
+  it.each([null, [], { messages: {} }, { question: 42, messages: {} }])(
+    'rejects %j with a 400 rather than throwing',
+    async body => {
+      const response = await post(body)
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'Invalid request body' })
+    },
+  )
+
+  it('rejects a question longer than the composer allows', async () => {
+    const response = await post({ question: 'x'.repeat(501) })
+    expect(response.status).toBe(400)
+    expect((await response.json()).error).toMatch(/maximum 500 characters/i)
+  })
+
+  it('ignores non-object turns inside a messages array', async () => {
+    noResults()
+    const response = await post({
+      question: 'quantum computing policy',
+      messages: [null, 'not a turn', { role: 'user', content: 3 }],
+    })
+    expect(response.status).toBe(200)
+    expect((await response.json()).citations).toEqual([])
+  })
+})
+
 describe('POST /api/ask, with a window of years', () => {
   beforeEach(() => {
     searchArchive.mockReset()
+    loadMediaRequest.mockReset()
     getLibraryCounts.mockReset()
     getLibraryCounts.mockResolvedValue({ total: 0, speeches: 0, papers: 0 })
+    loadMediaRequest.mockResolvedValue({
+      summary: 'Here are 4 media records from the archive.',
+      terms: [],
+      match: 'all',
+      citations: [],
+      timeline: [],
+      testimonials: [],
+      collectionCounts: [],
+      matchedTerms: [],
+      unmatched: [],
+      totalMatched: 4,
+      suggested: [],
+    })
   })
 
   it('passes the window it read from the question to the search', async () => {
@@ -211,8 +330,22 @@ describe('POST /api/ask, with a window of years', () => {
 describe('POST /api/ask, with a collection named in the question', () => {
   beforeEach(() => {
     searchArchive.mockReset()
+    loadMediaRequest.mockReset()
     getLibraryCounts.mockReset()
     getLibraryCounts.mockResolvedValue({ total: 0, speeches: 0, papers: 0 })
+    loadMediaRequest.mockResolvedValue({
+      summary: 'Here are 4 media records from the archive.',
+      terms: [],
+      match: 'all',
+      citations: [],
+      timeline: [],
+      testimonials: [],
+      collectionCounts: [],
+      matchedTerms: [],
+      unmatched: [],
+      totalMatched: 4,
+      suggested: [],
+    })
   })
 
   const oneResult = (over: Record<string, unknown> = {}) => ({
@@ -297,14 +430,25 @@ describe('POST /api/ask, with a collection named in the question', () => {
     expect(body.summary).toContain('/archives/photos')
   })
 
-  it('refuses the photograph library with a reason and a place to look', async () => {
-    // Every photograph is uncaptioned and undated, so there is nothing to answer
-    // from; "no published records" would read as though the library were empty.
+  it('lists photographs when the reader asks to see them', async () => {
+    // "Show me the photographs" is a request for the collection, not for the
+    // word "photographs" in an otherwise empty search.
+    loadMediaRequest.mockResolvedValue({
+      summary: 'Here are 4 photographs from the photo archive.',
+      terms: [],
+      match: 'all',
+      citations: [],
+      timeline: [],
+      testimonials: [],
+      collectionCounts: [],
+      matchedTerms: [],
+      unmatched: [],
+      totalMatched: 4,
+      suggested: [],
+    })
     const body = await ask('Show me any photographs of him')
-    expect(body.summary).toContain('I cannot answer from the photographs')
-    expect(body.summary).toContain('/archives/photos')
-    expect(body.summary).not.toMatch(/ask me about/i)
-    expect(body.citations).toEqual([])
+    expect(loadMediaRequest).toHaveBeenCalledWith('photos', null)
+    expect(body.summary).toContain('photographs from the photo archive')
   })
 
   it('still searches the other collections when a photograph is named alongside a subject', async () => {
@@ -384,7 +528,7 @@ describe('POST /api/ask, with a collection named in the question', () => {
       totalMatched: 4,
     })
     const body = await ask('Any milestones?')
-    expect(body.summary).toContain('4 records matched in milestones, the first 1 in the collection shown')
+    expect(body.summary).toContain('I found 4 records in milestones, the first 1 in the collection shown')
     expect(body.summary).not.toContain('strongest')
   })
 
@@ -402,11 +546,16 @@ describe('POST /api/ask, with a collection named in the question', () => {
     expect(body.summary).not.toContain('strongest')
   })
 
-  it('says a collection-only question is a listing, not a missing subject', async () => {
-    searchArchive.mockResolvedValue(oneResult())
+  it('treats “recordings” as the medium, not a search subject', async () => {
+    await ask('Show me audio recordings')
+    expect(loadMediaRequest).toHaveBeenCalledWith('audio', null)
+    expect(searchArchive).not.toHaveBeenCalled()
+  })
+
+  it('lists a collection the reader named without a subject', async () => {
     const body = await ask('Any videos?')
-    expect(body.summary).not.toMatch(/ask me about/i)
-    expect(searchArchive.mock.calls[0][0]).toEqual([])
-    expect(searchArchive.mock.calls[0][3]).toEqual(['videos'])
+    expect(loadMediaRequest).toHaveBeenCalledWith('videos', null)
+    expect(body.summary).toContain('media records from the archive')
+    expect(searchArchive).not.toHaveBeenCalled()
   })
 })

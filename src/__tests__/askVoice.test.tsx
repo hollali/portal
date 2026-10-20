@@ -17,6 +17,8 @@ class FakeRecognition {
   onerror: SpeechRecognition['onerror'] = null
   onnomatch: SpeechRecognition['onnomatch'] = null
 
+  aborted = false
+
   constructor() {
     recognitions.push(this)
   }
@@ -30,7 +32,15 @@ class FakeRecognition {
   }
 
   abort() {
+    this.aborted = true
     this.onend?.call(this as unknown as SpeechRecognition, new Event('end'))
+  }
+
+  emit(text: string) {
+    const alternative = { transcript: text, confidence: 1 } as SpeechRecognitionAlternative
+    const result = Object.assign([alternative], { isFinal: true }) as unknown as SpeechRecognitionResult
+    const event = { resultIndex: 0, results: [result] } as unknown as SpeechRecognitionEvent
+    this.onresult?.call(this as unknown as SpeechRecognition, event)
   }
 
   fail(error: string) {
@@ -94,5 +104,137 @@ describe('/ask Voice error states', () => {
 
     expect(recognitions).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Listening' })).toBeInTheDocument()
+  })
+})
+
+describe('/ask Voice session lifecycle', () => {
+  it('stops claiming to listen after the reader ends the session', () => {
+    Object.defineProperty(window, 'SpeechRecognition', {
+      configurable: true,
+      value: FakeRecognition as unknown as SpeechRecognitionConstructor,
+    })
+    render(
+      <AskVoice
+        ask={vi.fn().mockResolvedValue(undefined)}
+        onBackToChat={vi.fn()}
+        notify={vi.fn()}
+        prefs={DEFAULT_PREFS}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start listening' }))
+    expect(screen.getByText('Listening', { selector: '.ask-voice-status' })).toBeInTheDocument()
+    act(() => recognitions[0]?.emit('What did he say about the budget?'))
+    fireEvent.click(screen.getByRole('button', { name: 'End session' }))
+
+    expect(screen.getByText('Session ended', { selector: '.ask-voice-status' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Session ended' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'End session' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ask what was said' })).toBeEnabled()
+  })
+
+  it('releases the microphone when the reader leaves the page', () => {
+    Object.defineProperty(window, 'SpeechRecognition', {
+      configurable: true,
+      value: FakeRecognition as unknown as SpeechRecognitionConstructor,
+    })
+    const page = render(
+      <AskVoice
+        ask={vi.fn().mockResolvedValue(undefined)}
+        onBackToChat={vi.fn()}
+        notify={vi.fn()}
+        prefs={DEFAULT_PREFS}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start listening' }))
+    expect(recognitions[0]?.aborted).toBe(false)
+    page.unmount()
+    expect(recognitions[0]?.aborted).toBe(true)
+  })
+})
+
+describe('/ask Voice read-aloud controls', () => {
+  it('leaves the speaking state when cancel does not emit an end event', async () => {
+    const synthDescriptor = Object.getOwnPropertyDescriptor(window, 'speechSynthesis')
+    const utteranceDescriptor = Object.getOwnPropertyDescriptor(window, 'SpeechSynthesisUtterance')
+    const cancel = vi.fn()
+
+    class FakeUtterance {
+      text: string
+      lang = ''
+      rate = 1
+      voice: SpeechSynthesisVoice | null = null
+      onstart: SpeechSynthesisUtterance['onstart'] = null
+      onend: SpeechSynthesisUtterance['onend'] = null
+      onerror: SpeechSynthesisUtterance['onerror'] = null
+
+      constructor(text: string) {
+        this.text = text
+      }
+    }
+
+    Object.defineProperty(window, 'SpeechRecognition', {
+      configurable: true,
+      value: FakeRecognition as unknown as SpeechRecognitionConstructor,
+    })
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+      configurable: true,
+      value: FakeUtterance,
+    })
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel,
+        getVoices: () => [],
+        speak: (utterance: FakeUtterance) => {
+          utterance.onstart?.call(
+            utterance as unknown as SpeechSynthesisUtterance,
+            new Event('start') as SpeechSynthesisEvent,
+          )
+        },
+      },
+    })
+
+    try {
+      const ask = vi.fn(async (
+        _question: string,
+        options?: { onResult?: (result: unknown) => void },
+      ) => {
+        options?.onResult?.({ summary: 'The archive answer.' })
+      })
+
+      render(
+        <AskVoice
+          ask={ask}
+          onBackToChat={vi.fn()}
+          notify={vi.fn()}
+          prefs={{ ...DEFAULT_PREFS, readAloud: false }}
+        />,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Start listening' }))
+      act(() => recognitions[0]?.emit('What did he say about the budget?'))
+      fireEvent.click(screen.getByRole('button', { name: 'Ask what was said' }))
+
+      expect(await screen.findByRole('heading', { name: 'Answer ready' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Read the answer aloud' }))
+      expect(screen.getByRole('heading', { name: 'Speaking' })).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Stop speaking' }))
+      expect(cancel).toHaveBeenCalled()
+      expect(screen.getByRole('heading', { name: 'Answer ready' })).toBeInTheDocument()
+    } finally {
+      if (synthDescriptor) {
+        Object.defineProperty(window, 'speechSynthesis', synthDescriptor)
+      } else {
+        Reflect.deleteProperty(window, 'speechSynthesis')
+      }
+      if (utteranceDescriptor) {
+        Object.defineProperty(window, 'SpeechSynthesisUtterance', utteranceDescriptor)
+      } else {
+        Reflect.deleteProperty(window, 'SpeechSynthesisUtterance')
+      }
+    }
   })
 })

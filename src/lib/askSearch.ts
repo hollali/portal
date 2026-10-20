@@ -60,6 +60,13 @@ export interface SearchCandidate {
   /** Testimonial author role, where the collection has one. */
   role?: string | null
   /**
+   * A short, record-level note about why this record matters, where the
+   * collection stores one. Research sources carry a `relevance` statement; it is
+   * the one place the archive explains the record's significance rather than
+   * merely describing it, and it is not a quotation.
+   */
+  note?: string | null
+  /**
    * Where the record came from originally — the newspaper's page for a clipping,
    * the broadcaster's for a video.
    *
@@ -77,6 +84,8 @@ export interface SearchCandidate {
   sourceName: string | null
   /** Whether the archive kept a captured copy of the page this record came from. */
   hasCapture?: boolean
+  /** Where the archive's own copy of a video/audio file lives, when it has one. */
+  localPath?: string | null
   /**
    * The aggregator this record was found through, when that is all the row can
    * honestly name. Never a substitute for `url`: it says how we found the
@@ -195,6 +204,14 @@ export const W = {
   news: { title: 5, snippet: 4, sourceName: 2, notes: 2, query: 2 },
   milestones: { title: 5, description: 4, category: 2 },
   testimonials: { quote: 5, author: 3, role: 2 },
+  // The 61 catalogued research sources are the part of the archive with the
+  // clearest provenance: each row carries a titled original document, a summary,
+  // a statement of why it matters, and a verification status.
+  research: { title: 6, summary: 4, relevance: 3, documentType: 2, termOrSession: 2, locator: 1, notes: 1 },
+  // The 48 research events are the chronology those sources support. Their
+  // description is a researcher's account, not a quotation, so it is never used
+  // as verbatim speech.
+  research_events: { type: 5, description: 4, attribution: 2, notes: 1 },
 } as const
 
 export type CollectionName = keyof typeof W
@@ -210,6 +227,8 @@ const CAPS: Record<string, number> = {
   documents: 6,
   milestones: 2,
   testimonials: 2,
+  research: 3,
+  research_events: 2,
   news: 3,
   photos: 3,
   videos: 3,
@@ -221,6 +240,8 @@ const PRIORITY: Record<string, number> = {
   documents: 3,
   milestones: 2,
   testimonials: 2,
+  research: 2,
+  research_events: 2,
   news: 1,
   photos: 1,
   videos: 1,
@@ -277,6 +298,12 @@ interface SqlSpec {
    * guard would have to trust it.
    */
   extraPicks?: string[]
+  /**
+   * The primary key column, when it is not the `id` the other collections use.
+   * Research sources and events are addressed by their stable string record ids,
+   * so their query aliases that column to `id` for the shared row mapper.
+   */
+  key?: string
   /** Static filter, i.e. published-only. */
   where?: string
   /** Deterministic tie-break, applied after relevance. */
@@ -308,28 +335,36 @@ interface SqlSpec {
  * first one in the string is the year. Rows with neither are excluded from a
  * window rather than assumed to be in it.
  */
-type DateSource =
-  | { column: string; kind: 'int-year' }
-  | { column: string; kind: 'text-year' }
-  | { column: string; kind: 'loose-date' }
+type DateSource = {
+  column: string
+  kind: 'int-year' | 'text-year' | 'loose-date'
+  /**
+   * A second date column to try when the first is null. Research sources record
+   * a publication date on most rows and a parliamentary sitting date on the
+   * rest; either one places the source in a year.
+   */
+  fallback?: string
+}
 
 /** An SQL expression yielding the record's year as an integer, or null. */
 function yearExpr(spec: SqlSpec): string | null {
   const source = spec.dateSource
   if (!source) return null
-  if (source.kind === 'int-year') return sqlColumn(spec, source.column)
+  const column = sqlColumn(spec, source.column)
+  const fallback = source.fallback ? sqlColumn(spec, source.fallback) : null
+  const coalesced = fallback ? `COALESCE(${column}, ${fallback})` : column
+  if (source.kind === 'int-year') return coalesced
   if (source.kind === 'text-year') {
     // Guarded like the loose date below. Every milestone year in the table is
     // four digits today, and an unguarded cast would throw on the first row that
     // is not — taking the whole collection's answer with it.
-    const column = sqlColumn(spec, source.column)
-    return `CASE WHEN ${column} ~ '\\d{4}' THEN ${column}::int END`
+    return `CASE WHEN ${coalesced} ~ '\\d{4}' THEN ${coalesced}::int END`
   }
   // A row with no recognisable date yields null, and a null fails every
   // comparison below, so it drops out of the window instead of landing in it.
   return (
-    `CASE WHEN ${sqlColumn(spec, source.column)} ~ '\\d{4}' ` +
-    `THEN substring(${sqlColumn(spec, source.column)} from '\\d{4}')::int END`
+    `CASE WHEN ${coalesced} ~ '\\d{4}' ` +
+    `THEN substring(${coalesced} from '\\d{4}')::int END`
   )
 }
 
@@ -345,18 +380,20 @@ const SQL_SPECS: Record<string, SqlSpec> = {
   },
   videos: {
     table: 'videos',
-    pick: ['title', 'category', 'channel', 'source', 'platform', 'year', 'url'],
+    pick: ['title', 'category', 'channel', 'source', 'platform', 'year', 'url', 'localPath'],
     where: `status = 'published'`,
     order: 'year DESC NULLS LAST, id DESC',
+    renamed: { localPath: 'local_path' },
     // Every one of the 430 rows has a null year, so a dated question cannot be
     // answered from this collection at all.
     dateSource: null,
   },
   audio: {
     table: 'audio',
-    pick: ['title', 'caption', 'artist', 'event', 'theme', 'location', 'category', 'notes', 'query', 'year', 'url'],
+    pick: ['title', 'caption', 'artist', 'event', 'theme', 'location', 'category', 'notes', 'query', 'year', 'url', 'localPath'],
     where: `status = 'published'`,
     order: 'year DESC NULLS LAST, id DESC',
+    renamed: { localPath: 'local_path' },
     // As videos: a `year` column with nothing in it.
     dateSource: null,
   },
@@ -388,6 +425,53 @@ const SQL_SPECS: Record<string, SqlSpec> = {
     order: 'sort_order ASC, id ASC',
     renamed: { sortOrder: 'sort_order' },
     dateSource: { column: 'year', kind: 'int-year' },
+  },
+  research: {
+    table: 'research_sources',
+    key: 'recordId',
+    pick: [
+      'recordId',
+      'title',
+      'originalUrl',
+      'downloadUrl',
+      'publicationDate',
+      'sittingDate',
+      'documentType',
+      'termOrSession',
+      'locator',
+      'summary',
+      'relevance',
+      'verificationStatus',
+      'notes',
+    ],
+    order: 'publication_date DESC NULLS LAST, record_id ASC',
+    renamed: {
+      recordId: 'record_id',
+      originalUrl: 'original_url',
+      downloadUrl: 'download_url',
+      publicationDate: 'publication_date',
+      sittingDate: 'sitting_date',
+      documentType: 'document_type',
+      termOrSession: 'term_or_session',
+      verificationStatus: 'verification_status',
+    },
+    // Publication date is the editorial date; seven rows carry only the sitting
+    // date. The fallback makes those seven answer a dated question too instead of
+    // being silently treated as undated.
+    dateSource: { column: 'publicationDate', fallback: 'sittingDate', kind: 'loose-date' },
+  },
+  research_events: {
+    table: 'research_events',
+    key: 'eventId',
+    pick: ['eventId', 'startDate', 'endDate', 'type', 'description', 'attribution', 'evidenceStatus', 'notes'],
+    order: 'start_date ASC NULLS LAST, event_id ASC',
+    renamed: {
+      eventId: 'event_id',
+      startDate: 'start_date',
+      endDate: 'end_date',
+      evidenceStatus: 'evidence_status',
+    },
+    dateSource: { column: 'startDate', fallback: 'endDate', kind: 'loose-date' },
   },
 }
 
@@ -513,8 +597,14 @@ function buildCandidateSql(
   }
 
   const searched = Object.keys(W[collection as CollectionName])
-  const columns = [...new Set(['id', ...searched, ...spec.pick])]
+  const key = spec.key ?? 'id'
+  const keyColumn = sqlColumn(spec, key)
+  const columns = [...new Set([...searched, ...spec.pick])].filter(field => field !== key)
   const select = [
+    // Every row mapper reads `id`. Collections with a string key alias that
+    // key to it so they can share the mapper without inventing numeric ids —
+    // and also keep the key under its own name for the card's href.
+    key === 'id' ? keyColumn : `${keyColumn} AS "id", ${keyColumn} AS "${key}"`,
     ...columns.map(field => {
       const column = sqlColumn(spec, field)
       return column === field ? column : `${column} AS "${field}"`
@@ -784,6 +874,7 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         // transcript, so there is nothing here that may be quoted.
         body: '',
         hasTranscript: false,
+        localPath: str(r.localPath) || null,
         ...sourceAccess(str(r.url) || null, str(r.channel) || str(r.source) || null),
       })
     case 'audio':
@@ -798,6 +889,7 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         excerpt: str(r.caption) || str(r.notes) || [str(r.artist), str(r.event)].filter(Boolean).join(' · '),
         body: '',
         hasTranscript: false,
+        localPath: str(r.localPath) || null,
         ...sourceAccess(str(r.url) || null, str(r.source) || str(r.artist) || null),
       })
     case 'news':
@@ -840,6 +932,45 @@ function toCandidate(collection: string, r: Row, totals: { matchTotal: number; c
         url: null,
         sourceName: null,
       })
+    case 'research': {
+      const recordId = str(r.recordId)
+      if (!recordId) return null
+      const access = sourceAccess(str(r.originalUrl) || null, null)
+      return withFields({
+        collection: 'research',
+        collectionLabel: ASK_COLLECTION_LABELS.research,
+        kind: 'research',
+        kindLabel: 'Research source',
+        title: str(r.title),
+        href: `/speaker-record#source-${encodeURIComponent(recordId)}`,
+        year: yearOf(r.publicationDate) ?? yearOf(r.sittingDate),
+        excerpt: str(r.summary) || str(r.relevance) || str(r.documentType),
+        // A summary is the researcher's account of the document, not the
+        // document. Quoting it as the Speaker would be a fabrication.
+        body: '',
+        hasTranscript: false,
+        note: str(r.relevance) || null,
+        ...access,
+      })
+    }
+    case 'research_events': {
+      const eventId = str(r.eventId)
+      if (!eventId) return null
+      return withFields({
+        collection: 'research_events',
+        collectionLabel: ASK_COLLECTION_LABELS.research_events,
+        kind: 'event',
+        kindLabel: 'Research event',
+        title: str(r.type),
+        href: `/speaker-record#event-${encodeURIComponent(eventId)}`,
+        year: yearOf(r.startDate) ?? yearOf(r.endDate),
+        excerpt: str(r.description) || str(r.attribution),
+        body: '',
+        hasTranscript: false,
+        url: null,
+        sourceName: str(r.attribution) || null,
+      })
+    }
     case 'testimonials':
       return withFields({
         collection: 'testimonials',
@@ -1453,6 +1584,8 @@ export const ASK_COLLECTION_MODELS = {
   news: 'News',
   milestones: 'Milestone',
   testimonials: 'Testimonial',
+  research: 'ResearchSource',
+  research_events: 'ResearchEvent',
 } as const
 
 /**
