@@ -54,8 +54,8 @@ export default async function PublicFooter() {
 
   return (
     <footer style={{ borderTop: '1px solid var(--p-border)', background: 'var(--p-surface-2)' }}>
-      <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: '3rem 1.5rem 2rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2rem' }}>
+      <div className="p-section" style={{ maxWidth: 1180, margin: '0 auto', padding: '32px 1.5rem 2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
               <span style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-fg)' }}>
@@ -70,7 +70,7 @@ export default async function PublicFooter() {
               {social.map(s => (
                 <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label}
                   className="p-chip"
-                  style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--p-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--p-text-3)', textDecoration: 'none' }}>
+                  style={{ width: 44, height: 44, borderRadius: 9, border: '1px solid var(--p-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--p-text-3)', textDecoration: 'none' }}>
                   {icon(s.label)}
                 </a>
               ))}
@@ -79,9 +79,9 @@ export default async function PublicFooter() {
           {FOOTER_COLS.map(col => (
             <div key={col.title}>
               <div style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.9rem' }}>{col.title}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {col.links.map(({ href, label }) => (
-                  <Link key={href} href={href} className="p-link-strong" style={{ color: 'var(--p-text-2)', textDecoration: 'none', fontSize: '0.875rem' }}>
+                  <Link key={href} href={href} className="p-link-strong" style={{ color: 'rgb(95,102,117)', textDecoration: 'none', fontSize: '0.875rem', fontWeight: 400 }}>
                     {label}
                   </Link>
                 ))}

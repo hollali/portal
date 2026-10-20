@@ -200,18 +200,19 @@ export default function HeroSection({ stats, content }: HeroSectionProps) {
           <div className="p-cta-buttons hero-rise" style={{ animationDelay: '300ms', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
             <Link href="/archives" className="hero-cta" style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--primary)',
-              color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 600, padding: '0.8rem 1.5rem',
+              color: 'var(--primary-fg)', textDecoration: 'none', fontWeight: 700, padding: '0.9rem 1.8rem',
               borderRadius: 999, fontSize: '0.9375rem', minHeight: 44,
+              boxShadow: '0 10px 30px -12px color-mix(in srgb, var(--primary) 70%, transparent)',
             }}>
               Explore the archives <ArrowUpRight size={16} />
             </Link>
             <Link href="/the-man" style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-2)',
-              textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem', padding: '0.5rem 0.35rem',
+              display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--p-text-3)',
+              textDecoration: 'none', fontWeight: 500, fontSize: '0.9rem', padding: '0.5rem 0.25rem',
               minHeight: 44, transition: 'color 0.2s',
             }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--p-text-1)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--p-text-2)')}>
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--p-text-2)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--p-text-3)')}>
               The Man <ArrowUpRight size={14} style={{ color: 'var(--primary)' }} />
             </Link>
           </div>
@@ -275,7 +276,7 @@ export default function HeroSection({ stats, content }: HeroSectionProps) {
       </div>
 
       {/* Scroll cue */}
-      <div aria-hidden className="hero-scrollcue" style={{ position: 'absolute', left: '50%', bottom: '1.4rem', transform: 'translateX(-50%)', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
+      <div aria-hidden className="hero-scrollcue" style={{ position: 'absolute', left: '50%', bottom: '1rem', transform: 'translateX(-50%)', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', pointerEvents: 'none' }}>
         <span style={{ fontSize: '0.58rem', fontFamily: 'var(--font-mono), monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--p-text-4)' }}>Scroll</span>
         <span className="hero-scrollcue-line" style={{ width: 1, height: 34, background: 'linear-gradient(180deg, color-mix(in srgb, var(--primary) 70%, transparent), transparent)' }} />
       </div>
