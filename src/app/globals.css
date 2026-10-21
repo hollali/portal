@@ -833,16 +833,7 @@ html[data-motion="js"] .hero-cta:hover {
   animation: floatOrb 9s ease-in-out infinite;
 }
 
-/* ─── Section grid texture (used by .grid-bg on archive/media heroes) ─── */
-.grid-bg {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--p-text-1) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--p-text-1) 5%, transparent) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(820px 460px at 18% 0%, black, transparent 76%);
-  -webkit-mask-image: radial-gradient(820px 460px at 18% 0%, black, transparent 76%);
-  pointer-events: none;
-}
+/* ─── Section grid texture (removed) ─── */
 
 /* ─── Public landing responsive ─── */
 @media (max-width: 900px) {

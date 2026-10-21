@@ -840,7 +840,7 @@ function TestimonialLibraryContent({ records }: { records: TestimonialRecord[] }
     <div>
       {/* ── Hero & archive cross-navigation ── */}
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
+        
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <Breadcrumbs
             tone="public"

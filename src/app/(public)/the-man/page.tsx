@@ -29,7 +29,7 @@ export default async function TheManPage() {
 
       {/* Page hero */}
       <section id="content" data-motion-entry style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
+        
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', alignItems: 'center', gap: '3rem' }} className="p-hero">
           <div>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid color-mix(in srgb, var(--primary) 40%, transparent)', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', padding: '0.375rem 0.75rem', borderRadius: 999 }}>

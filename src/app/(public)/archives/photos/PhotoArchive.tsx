@@ -1091,7 +1091,7 @@ function PhotoLibraryContent() {
           borderBottom: "1px solid var(--p-border)",
         }}
       >
-        <div className="grid-bg" style={{ position: "absolute", inset: 0 }} />
+        
         <div
           style={{
             position: "relative",

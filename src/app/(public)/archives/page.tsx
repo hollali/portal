@@ -47,7 +47,7 @@ export default async function ArchivesHub() {
       <PublicHeader />
 
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
+        
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3.5rem, 7vw, 5.5rem) 1.5rem' }}>
           <span style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>{hero.eyebrow}</span>
           <h1 style={{ fontFamily: 'var(--font-display), sans-serif', fontSize: 'clamp(2.5rem, 6vw, 4rem)', letterSpacing: '-0.035em', lineHeight: 1.02, fontWeight: 800, margin: '1rem 0', color: 'var(--p-text-1)' }}>

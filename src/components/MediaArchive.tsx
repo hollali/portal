@@ -1246,7 +1246,7 @@ function MediaLibraryContent({ kind, eyebrow, heading, sub, categories, defaultC
     <div>
       {/* ── Hero & media cross-navigation ── */}
       <section style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)', margin: '-2rem -1.5rem 0' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} />
+        
         <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: 'clamp(3rem, 6vw, 4.5rem) 1.5rem' }}>
           <span style={{ ...mono, fontSize: '0.6875rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--primary)' }}>
             {eyebrow}

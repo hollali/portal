@@ -358,7 +358,7 @@ export default function SpeakerResearchExplorer({
 
       {/* ── Breadcrumb + hero ─────────────────────────── */}
       <section id="content" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--p-border)' }}>
-        <div className="grid-bg" style={{ position: 'absolute', inset: 0 }} aria-hidden="true" />
+        
         <div className="sr-hero-inner">
           <nav aria-label="Breadcrumb" style={{ marginBottom: '1rem', fontSize: '0.78rem', color: 'var(--p-text-4)' }}>
             <Link href="/archives" style={{ color: 'var(--p-text-3)', textDecoration: 'none' }}>Archives</Link>

@@ -126,10 +126,7 @@ export default function HeroSection({ stats, content }: HeroSectionProps) {
       {/* Layer 1 — faint archival dot texture */}
       <div aria-hidden style={{
         position: 'absolute', inset: 0, zIndex: 0,
-        backgroundImage: 'radial-gradient(color-mix(in srgb, var(--p-text-1) 6%, transparent) 1px, transparent 1.6px)',
-        backgroundSize: '26px 26px',
-        maskImage: 'radial-gradient(900px 620px at 70% 30%, black, transparent 80%)',
-        WebkitMaskImage: 'radial-gradient(900px 620px at 70% 30%, black, transparent 80%)',
+        display: 'none',
       }} />
 
       {/* Layer 2 — cursor spotlight */}
