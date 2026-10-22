@@ -11,6 +11,10 @@ The future local model belongs behind the existing server route at
   personal history, timeline, values and international roles are composed by the
   person-knowledge layer from CMS and database rows. The loader is
   `src/lib/askProfile.ts`; the composition is `src/lib/askKnowledge.ts`.
+- A question that asks for one fact is answered with that fact from the same
+  rows (`FACT_PATTERNS` in `src/lib/askKnowledge.ts`); when the record does not
+  hold the fact, the answer says so. This is pattern matching over stored data,
+  not a model call.
 - Archive retrieval and ranking remain authoritative for questions about what he
   said or wrote.
 - Reader-supplied links are fetched by `/api/ask/link` with SSRF protections and

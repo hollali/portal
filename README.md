@@ -45,7 +45,7 @@ Media files are stored on local disk and served through a secured, path-traversa
 - Faceted archives — speeches, public papers, interviews, notes/letters/memos, milestones, testimonials and curated photos — filterable by `year`, `event`, `location`, `person`, `institution`, `parliament` and `theme`.
 - Media library for **photos**, **videos**, **audio** and **news clippings**, including YouTube embeds.
 - Full-text **search** across the archive.
-- **Ask Bagbin** assistant: deterministic answers about his life and record from the CMS/database, cited archive search, reader-supplied link reading, inline video/audio/photograph cards, browser voice dictation and read-aloud; no language model is called. A disabled-by-default provider seam exists for a future server-hosted reading model.
+- **Ask Bagbin** assistant: deterministic answers about his life and record from the CMS/database (a question that asks for one fact is answered with that fact, not a topic block), cited archive search, reader-supplied link reading, inline video/audio/photograph cards, browser voice dictation and read-aloud; no language model is called. A disabled-by-default provider seam exists for a future server-hosted reading model.
 - CMS-authored pages rendered from sanitised Markdown.
 
 **Admin CMS**
@@ -285,6 +285,8 @@ npx prisma validate
 
 The CI pipeline (`.github/workflows/ci.yml`) runs Prisma validation, lint, type-check and a production build on every push and pull request, then deploys the `main` branch to Vercel when the `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` secrets are configured. A gated Netlify alternative is included (commented out).
 
+Accessibility on `/ask` is audited manually with axe-core across the light and dark themes, the desktop/tablet/mobile widths and the empty, answered, voice, settings and integrations states. axe-core is not a project dependency, so the audit is run outside `npm test`; the last pass reported no violations. The landmarks, contrast and focus behaviour it covers are listed under [Ask assistant](#ask-assistant).
+
 ### Retrieval eval for /ask
 
 `/ask` is the one feature whose quality is not visible in the unit tests: they assert that the SQL covers every collection and that a partial answer says so, not that a good question returns the right record. The eval closes that gap.
@@ -363,6 +365,30 @@ The route has four paths, in order:
 Media is displayed inline when the record has something honest to render: a local or direct video file, a YouTube thumbnail with click-to-play through `youtube-nocookie.com`, a playable audio file, or a photograph. Catalogue-only rows stay links. The assistant does not invent captions or transcripts.
 
 Limits are part of the answer: videos and audio have no transcripts; photographs have no captions; there is no live web search; and person answers only use the rows above.
+
+### Fact questions
+
+A question that asks for one fact is answered with that fact rather than with the whole topic block. The date and place of birth, the parents and siblings, the school and the bar call, the party, the constituency, the number of terms served, the year he became Speaker, the length of his parliamentary record and named international roles are each answered in a sentence or two, with the citation for that fact.
+
+When the record does not hold the fact asked for, the answer says so plainly instead of falling back to a topic block. The extraction lives in `src/lib/askKnowledge.ts` (`FACT_PATTERNS`) and reads only the stored rows — no language model is involved, and the raw question is passed to the person-knowledge layer by `src/app/(public)/api/ask/route.ts`.
+
+### The workspace
+
+- The workspace is a grid: the sidebar rail on the left, the conversation in the middle, and — where it is shown — the research panel on the right. Below the compact breakpoint the rail becomes a drawer that slides over the conversation.
+- The rail is collapsed and expanded by a single control. On a desktop layout with the rail open the control sits in the rail header; on a compact layout the top-bar control opens and closes the drawer; when the desktop rail is collapsed the top bar carries the control that expands it. Exactly one control is present at any width.
+- The composer is a single row: a text field, a microphone control and a send control. It grows to at most 160px of height as a question is typed, and the placeholder shortens on narrow screens.
+- The top bar carries the breadcrumbs, the conversation actions and the rail control where the rail is collapsed. It has no divider rule.
+- An answer card ends with **Copy sources** (the numbered source list) and **Cite sources** (the citations in reference form), both copied to the clipboard. Answers are not written to a file.
+
+### Accessibility
+
+The `/ask` workspace is operable from the keyboard and readable with assistive technology:
+
+- The question field has a visible "Ask a question" label that is bound to it; selecting the label focuses the field.
+- The page has exactly one `main` landmark, one banner, one complementary region and one `h1` inside `main`. The chat history is a labelled `section`, not a second landmark of the same kind.
+- The primary accent colour and the answer chips meet WCAG AA contrast (4.5:1) in both the light and the dark theme, and the muted text tones meet AA at their sizes.
+- The composer shows a visible focus ring (`--primary` border plus a 3px halo) when it holds focus or contains focus.
+- Toggle buttons carry `aria-expanded` and `aria-controls`, and the live regions announce copy results without announcing the icon swap.
 
 ## Ask voice input
 
