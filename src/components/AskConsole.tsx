@@ -24,12 +24,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowUp,
   AudioLines,
   CalendarRange,
   Check,
   Command,
   Copy,
-  Download,
   ExternalLink,
   FileText,
   Info,
@@ -40,6 +40,8 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Play,
   Plus,
@@ -47,7 +49,6 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  Send,
   Settings2,
   Sparkles,
   Trash2,
@@ -98,7 +99,17 @@ function browserSpeechRecognitionSupported() {
 }
 
 /** The composer stops growing here and scrolls; past this it is a reading pane. */
-const COMPOSER_MAX_H = 148;
+const COMPOSER_MAX_H = 160;
+
+/**
+ * What the empty field says. The long prompt names the ground the archive
+ * covers, but it needs a wide field to sit on one line — on a phone it wrapped
+ * onto five lines and was cut off mid-sentence, so a short prompt takes over
+ * below 640px. The example questions live on the cards under the field, so the
+ * prompt itself stays short enough to never wrap.
+ */
+const QUESTION_PLACEHOLDER = "Ask about his life, career or time in Parliament…";
+const QUESTION_PLACEHOLDER_NARROW = "Ask about his life…";
 
 /**
  * The composer and the API have to agree on how long a question is.
@@ -1195,34 +1206,6 @@ function buildCitationText(result: AskResult): string {
     .join("\n");
 }
 
-/** The answer as a portable Markdown file, citations included. */
-function buildAnswerMarkdown(result: AskResult): string {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const lines = [`# ${result.terms.length > 0 ? result.terms.join(" ") : "Ask Bagbin answer"}`, "", result.summary, ""];
-  if (result.citations.length > 0) {
-    lines.push("## Sources", "");
-    result.citations.forEach((c, i) => {
-      const href = c.href.startsWith("/") ? `${origin}${c.href}` : c.href;
-      lines.push(`${i + 1}. [${c.title}](${href})${c.year ? ` — ${c.year}` : ""}${c.url ? ` — [original](${c.url})` : ""}`);
-      if (c.excerpt) lines.push(`   > ${c.excerpt.replace(/\s+/g, " ")}`);
-      if (c.note) lines.push(`   Why it matters: ${c.note}`);
-    });
-    lines.push("");
-  }
-  if (result.timeline.length > 0) {
-    lines.push("## Timeline", "");
-    for (const item of result.timeline) lines.push(`- ${item.year ?? "—"}: ${item.title}`);
-    lines.push("");
-  }
-  if (result.testimonials.length > 0) {
-    lines.push("## Testimonials", "");
-    for (const item of result.testimonials) lines.push(`> ${item.quote} — ${item.author}${item.role ? `, ${item.role}` : ""}`);
-    lines.push("");
-  }
-  lines.push(`_Exported from ${origin || "the archive"}._`);
-  return lines.join("\n");
-}
-
 function AssistantReply({
   result,
   failed,
@@ -1678,35 +1661,6 @@ function AssistantReply({
               {cited ? <Check size={13} aria-hidden /> : <Quote size={13} aria-hidden />}
               <span aria-live="polite">{cited ? "Citations copied" : "Cite sources"}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const blob = new Blob([buildAnswerMarkdown(result)], { type: "text/markdown;charset=utf-8" });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                const slug = (result.terms[0] || "archive-answer").replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
-                link.href = url;
-                link.download = `${slug || "archive-answer"}.md`;
-                link.click();
-                URL.revokeObjectURL(url);
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                background: "none",
-                border: "1px solid var(--p-border-2)",
-                borderRadius: 999,
-                padding: "0.4rem 0.8rem",
-                color: "var(--p-text-3)",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                minHeight: HIT,
-              }}
-            >
-              <Download size={13} aria-hidden /> Save .md
-            </button>
           </>
         )}
       </div>
@@ -1970,7 +1924,7 @@ function ChatHistorySidebar({
   const groupOrder = ["Today", "Yesterday", "Earlier"];
 
   return (
-    <aside
+    <section
       className={`ask-history-sidebar ${className}`}
       aria-label="Chat history"
       style={{ width: mobile ? "min(85vw, 320px)" : undefined }}
@@ -2122,7 +2076,7 @@ function ChatHistorySidebar({
           )}
         </ul>
       </div>
-    </aside>
+    </section>
   );
 }
 
@@ -2172,6 +2126,18 @@ function AskShell({
       setIsCompactLayout(media.matches);
       if (!media.matches) setMobileSidebarOpen(false);
     };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  // The long prompt does not fit a phone-sized field: at 360px it wrapped onto
+  // five lines inside a one-line box, so it read as a clipped smear rather
+  // than as words. Below 640px the short prompt stands in; above it, the field
+  // is wide enough to hold the long one on a single line.
+  const [narrowInput, setNarrowInput] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 640px)");
+    const update = () => setNarrowInput(media.matches);
     update();
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
@@ -3007,6 +2973,19 @@ function AskShell({
       >
         <div className="ask-sidebar-top">
           <span className="ask-sidebar-brand">Ask about the man</span>
+          {!isCompactLayout && !sidebarCollapsed && (
+            <button
+              type="button"
+              className="ask-sidebar-toggle"
+              aria-label="Collapse workspace sidebar"
+              aria-expanded={true}
+              aria-controls="ask-sidebar"
+              onClick={toggleSidebar}
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose size={17} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             className="ask-sidebar-close"
@@ -3151,22 +3130,34 @@ function AskShell({
         </div>
       </aside>
 
-      <main className="ask-main flex-1 flex flex-col min-w-0">
+      <div className="ask-main flex-1 flex flex-col min-w-0">
       <div className="ask-topbar">
         <div className="ask-topbar-context">
-          <button
-            type="button"
-            className="ask-topbar-toggle"
-            aria-label={isCompactLayout
-              ? mobileSidebarOpen ? "Close workspace sidebar" : "Open workspace sidebar"
-              : sidebarCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
-            aria-expanded={isCompactLayout ? mobileSidebarOpen : !sidebarCollapsed}
-            aria-controls="ask-sidebar"
-            onClick={toggleSidebar}
-            title={isCompactLayout ? "Open workspace sidebar" : sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <LayoutPanelLeft size={17} aria-hidden />
-          </button>
+          {isCompactLayout ? (
+            <button
+              type="button"
+              className="ask-topbar-toggle"
+              aria-label={mobileSidebarOpen ? "Close workspace sidebar" : "Open workspace sidebar"}
+              aria-expanded={mobileSidebarOpen}
+              aria-controls="ask-sidebar"
+              onClick={toggleSidebar}
+              title="Open workspace sidebar"
+            >
+              <LayoutPanelLeft size={17} aria-hidden />
+            </button>
+          ) : sidebarCollapsed ? (
+            <button
+              type="button"
+              className="ask-topbar-toggle"
+              aria-label="Expand workspace sidebar"
+              aria-expanded={false}
+              aria-controls="ask-sidebar"
+              onClick={toggleSidebar}
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen size={17} aria-hidden />
+            </button>
+          ) : null}
           <nav className="ask-breadcrumbs" aria-label="Location">
             <span>{pageLabel}</span>
           </nav>
@@ -3329,12 +3320,6 @@ function AskShell({
 
         {emptyChat && (
           <section className="ask-welcome" aria-label="Welcome">
-            <div className="ask-welcome-orb" aria-hidden>
-              <Sparkles size={22} />
-            </div>
-            <p className="ask-eyebrow">Database-backed conversation</p>
-            <h1 className="ask-welcome-title">Ask about the man</h1>
-            <p className="ask-welcome-subtitle">His life, history, ideas and public record — with a source for every answer.</p>
             <div className="ask-suggestions" role="group" aria-label="Example questions">
               {suggestions.map((s, idx) => (
                 <button
@@ -3364,6 +3349,9 @@ function AskShell({
         <div ref={endRef} aria-hidden style={{ height: 1 }} />
 
         <div className="ask-composer-wrap">
+        <label className="ask-composer-label" htmlFor="ask-question">
+          Ask a question
+        </label>
         <form
           onSubmit={e => {
             e.preventDefault();
@@ -3371,40 +3359,39 @@ function AskShell({
           }}
           className="ask-composer"
         >
-          <label className="ask-composer-label" htmlFor="ask-question">
-            Ask a question
-          </label>
-          <div className="ask-composer-field">
-            <textarea
-              id="ask-question"
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (dictating) return;
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void ask(input);
-                }
-              }}
-              rows={1}
-              placeholder="Ask about his life, career, ideas or time in Parliament — e.g. “Where was he born?” …"
-              maxLength={MAX_QUESTION}
-              enterKeyHint="send"
-              autoComplete="off"
-              spellCheck
-              readOnly={dictating}
-              aria-describedby="ask-source-disclaimer ask-composer-help"
-            />
-            <span id="ask-composer-help" className="sr-only">
-              Press Enter to send, Shift+Enter for a new line. Use the microphone to dictate; tap it again to stop.
-            </span>
-          </div>
           <div className="ask-composer-actions">
+            <div className="ask-composer-field">
+              <textarea
+                id="ask-question"
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (dictating) return;
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    void ask(input);
+                  }
+                }}
+                rows={1}
+                placeholder={narrowInput ? QUESTION_PLACEHOLDER_NARROW : QUESTION_PLACEHOLDER}
+                maxLength={MAX_QUESTION}
+                enterKeyHint="send"
+                autoComplete="off"
+                spellCheck
+                readOnly={dictating}
+                aria-describedby="ask-composer-help"
+              />
+              <span id="ask-composer-help" className="sr-only">
+                Press Enter to send, Shift+Enter for a new line. Use the microphone to dictate; tap it again to stop.
+              </span>
+            </div>
             <div className="ask-composer-hint">
-              <span className="ask-hint-dot" data-listening={dictating ? "true" : undefined} aria-hidden />
+              {dictating && (
+                <span className="ask-hint-dot" data-listening="true" aria-hidden />
+              )}
               <span aria-live="polite">
-                {dictating ? "Listening… tap the microphone to stop" : "Database-backed · Biography, timeline & archive"}
+                {dictating ? "Listening… tap the microphone to stop" : ""}
               </span>
             </div>
             <div className="ask-composer-buttons">
@@ -3438,7 +3425,7 @@ function AskShell({
                     aria-label="Send question"
                     className="ask-composer-send"
                   >
-                    <Send size={17} aria-hidden />
+                    <ArrowUp size={17} aria-hidden />
                   </button>
                 </>
               )}
@@ -3452,10 +3439,6 @@ function AskShell({
         )}
         <p className="ask-composer-footnote">
           Speech recognition is handled by your browser. Dictated text is sent to the site only when submitted.
-        </p>
-        <p id="ask-source-disclaimer" className="ask-source-note">
-          <MessageSquare size={14} aria-hidden style={{ marginTop: "0.05rem", flexShrink: 0 }} />
-          Database answers: composed from published biography, timeline, research and archive — not the Speaker himself.
         </p>
 
         {/* Polite live region for search status announcements */}
@@ -3495,7 +3478,7 @@ function AskShell({
             <AskIntegrations />
           </div>
         )}
-    </main>
+    </div>
     </div>
   );
 }

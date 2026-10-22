@@ -321,7 +321,7 @@ export const DEFAULT_ASK_HERO: PageHeroData = {
   eyebrow: 'Conversation',
   titleA: 'Ask about',
   titleAccent: 'the man',
-  lede: 'Talk about his life, career and record. Answers are composed from the site’s database, with a source beside every claim.',
+  lede: '',
 }
 
 export const DEFAULT_SEARCH_HERO: PageHeroData = {

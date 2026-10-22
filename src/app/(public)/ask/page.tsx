@@ -32,17 +32,17 @@ export default async function AskPage({
     <div className="ask-page-root">
       <PublicHeader />
 
-      <div id="content" className="ask-page-main">
-        <header className="ask-page-heading">
+      <main id="content" className="ask-page-main">
+        <div className="ask-page-heading">
           <span className="ask-page-avatar" aria-hidden>
             <Sparkles size={24} />
           </span>
           <p className="ask-page-kicker">{hero.eyebrow}</p>
           <h1>{hero.titleA} <span className="p-serif">{hero.titleAccent}</span></h1>
           {hero.lede ? <p>{hero.lede}</p> : null}
-        </header>
+        </div>
         <AskConsole initialQuery={initialQuery} />
-      </div>
+      </main>
     </div>
   )
 }

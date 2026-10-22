@@ -113,11 +113,11 @@
   --surface: #f4f6f8;
   --surface-hover: #e9edf2;
   --sidebar-bg: #f7f8fa;
-  --primary: #a16207;
+  --primary: #9a5c06;
   --primary-600: #8a5406;
   --primary-dark: #b8790a;
   --primary-fg: #ffffff;
-  --primary-glow: rgba(161, 98, 7, 0.12);
+  --primary-glow: rgba(154, 92, 6, 0.12);
   --focus: #1d4289;
   --danger: #b3261e;
   --success: #1a7f37;
@@ -147,7 +147,7 @@
   --p-shadow: 0 24px 80px -20px rgba(15, 17, 23, 0.16);
   --p-navy: #1d4289;
   --p-navy-deep: #10295c;
-  --p-gold: #a16207;
+  --p-gold: #9a5c06;
 
   --shimmer-a: #b8790a;
   --shimmer-b: #966a00;
@@ -1725,11 +1725,6 @@ a:hover {
   }
 }
 
-.ask-composer textarea:focus-visible {
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-}
-
 .ask-user-bubble {
   max-width: min(88%, 34rem) !important;
   border-radius: 12px !important;
@@ -1830,7 +1825,7 @@ a:hover {
   background: transparent;
 }
 
-.ask-page-root .ask-console > main {
+.ask-page-root .ask-console > .ask-main {
   grid-column: 1;
   grid-row: 1;
   width: 100%;
@@ -1840,7 +1835,7 @@ a:hover {
   padding: 0.5rem 0 3rem;
 }
 
-.ask-page-root .ask-console-empty > main {
+.ask-page-root .ask-console-empty > .ask-main {
   justify-content: flex-start;
   padding-bottom: 1rem;
 }
@@ -1850,49 +1845,18 @@ a:hover {
   width: 100%;
   max-width: 100%;
   margin: 0 0 0.4rem;
-  color: var(--p-text-1);
-  font-size: 0.9rem;
-  font-weight: 650;
+  color: var(--p-text-3);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
-.ask-source-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.45rem;
-  margin: 0 0 0.55rem;
-  padding: 0.55rem 0.7rem;
-  border-left: 2px solid var(--primary);
-  color: var(--p-text-2);
-  font-size: 0.8rem;
-  line-height: 1.45;
-}
-
-.ask-source-note strong {
-  color: var(--p-text-1);
-}
-
-.ask-page-root .ask-source-note,
 .ask-page-root .ask-composer,
 .ask-page-root .ask-suggestions {
   width: 100%;
   max-width: 100%;
   margin-left: 0;
   margin-right: 0;
-}
-
-.ask-page-root .ask-source-note {
-  /* A one-line caveat under the composer, not a box stuck between the label
-     and the field. The box it used to be — border-left, tinted background —
-     sat crowning the input and pushed the one control of the page below a
-     paragraph of setup; the same warning reads fine as a muted line beside
-     the send button. */
-  margin: 0.6rem 0 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--p-text-4);
-  font-size: 0.75rem;
 }
 
 .ask-page-root .ask-suggestions {
@@ -1922,19 +1886,10 @@ a:hover {
   margin-right: auto;
 }
 
-.ask-page-root .ask-console-empty .ask-composer-label,
-.ask-page-root .ask-console-empty .ask-source-note {
+.ask-page-root .ask-console-empty .ask-composer-label {
   margin-left: auto;
   margin-right: auto;
   text-align: center;
-}
-
-.ask-page-root .ask-console-empty .ask-source-note {
-  justify-content: center;
-}
-
-.ask-page-root .ask-console-empty .ask-composer textarea {
-  min-height: 3.5rem !important;
 }
 
 .ask-page-root .ask-console-empty .ask-suggestions {
@@ -2159,7 +2114,7 @@ a:hover {
     top: 1rem;
   }
 
-  .ask-page-root .ask-console > main {
+  .ask-page-root .ask-console > .ask-main {
     grid-column: 2;
     grid-row: 1;
     max-width: none !important;
@@ -2275,14 +2230,8 @@ a:hover {
 .ask-console {
   font-size: 0.875rem;
 }
-.ask-composer textarea {
-  background: var(--p-surface);
-  border: 1px solid var(--p-border-3);
-}
-.ask-composer:focus-within textarea {
-  border-color: color-mix(in srgb, var(--primary) 60%, var(--p-border-3));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 8%, transparent);
-}
+/* The field itself carries the border and the focus ring, as in the reference
+   app, so the textarea inside it stays borderless and transparent. */
 .ask-user-bubble {
   box-shadow: var(--p-shadow);
 }
@@ -2471,18 +2420,6 @@ a:hover {
   animation: ask-appear 0.4s ease both;
 }
 
-.ask-welcome-orb {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  margin: 0 auto 1.0625rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--p-border));
-  border-radius: 14px;
-  color: var(--primary);
-  background: color-mix(in srgb, color-mix(in srgb, var(--primary) 18%, transparent) 72%, var(--p-surface));
-}
-
 .ask-eyebrow {
   color: var(--p-text-4);
   font-size: 0.5625rem;
@@ -2490,21 +2427,6 @@ a:hover {
   letter-spacing: 0.13em;
   text-transform: uppercase;
   margin: 0 0 0.625rem;
-}
-
-.ask-welcome-title {
-  margin: 0.625rem 0 0.4375rem;
-  color: var(--p-text-1);
-  font-size: clamp(1.625rem, 3vw, 2.125rem);
-  font-weight: 560;
-  letter-spacing: -0.0875rem;
-}
-
-.ask-welcome-subtitle {
-  margin: 0;
-  color: var(--p-text-4);
-  font-size: 0.75rem;
-  line-height: 1.55;
 }
 
 .ask-suggestions {
@@ -2562,51 +2484,55 @@ a:hover {
   font-weight: 570;
 }
 
+/* Composer (chatbot reference): one rounded field with the question and the
+   controls on a single line. The reference app builds the field this way, so
+   the archive's ask box is measured the same way — a tight radius, a hairline
+   border, a soft shadow and a focus ring that only lifts the border colour. */
 .ask-composer-wrap {
-  width: min(100% - 48px, 760px);
+  width: min(100% - 48px, 900px);
   margin: 0 auto;
   padding: 0.75rem 0;
 }
 
 .ask-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.3125rem 0.3125rem 0.4375rem 0.5625rem;
+  display: block;
+  padding: 8px 10px 8px 13px;
   border: 1px solid var(--p-border-2);
-  border-radius: 18px;
+  border-radius: 13px;
   background: var(--p-surface);
   box-shadow: 0 3px 14px rgb(0 0 0 / 8%);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .ask-composer:focus-within {
-  border-color: color-mix(in srgb, var(--primary) 55%, var(--p-border-2));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 9%, transparent);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
-.ask-composer-label {
-  display: none;
+.ask-composer-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 
 .ask-composer-field {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.625rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .ask-composer-field textarea {
-  flex: 1;
+  display: block;
+  width: 100%;
   min-width: 0;
-  min-height: 28px;
-  max-height: 200px;
+  min-height: 34px;
+  max-height: 160px;
   resize: vertical;
-  padding: 0.5rem 0.375rem 0.5rem 0.3125rem;
+  padding: 4px 0 9px;
   border: 0;
   outline: 0;
   color: var(--p-text-1);
   background: transparent;
-  font-size: 1rem;
-  line-height: 1.55;
+  font-size: 0.9375rem;
+  line-height: 1.6;
   font-family: inherit;
 }
 .ask-composer-field textarea::placeholder {
@@ -2618,18 +2544,12 @@ a:hover {
   color: var(--p-text-3);
 }
 
-.ask-composer-actions {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
 .ask-composer-hint {
+  flex: 0 1 auto;
+  align-self: center;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 7px;
   min-width: 0;
   color: var(--p-text-4);
   font-size: 0.6875rem;
@@ -2639,28 +2559,29 @@ a:hover {
 }
 
 .ask-hint-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--primary);
   flex-shrink: 0;
 }
 
 .ask-composer-buttons {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 5px;
 }
 
 .ask-composer-send,
 .ask-composer-stop,
 .ask-composer-voice {
-  width: 44px;
-  height: 44px;
+  width: 29px;
+  height: 29px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, transform 0.15s;
 }
@@ -2693,44 +2614,31 @@ a:hover {
   background: var(--p-surface-2);
 }
 .ask-composer-voice {
-  color: var(--p-text);
-  background: var(--p-surface-hover);
+  color: var(--p-text-3);
+  background: transparent;
 }
 .ask-composer-voice:hover {
   color: var(--p-text-1);
-  background: var(--p-surface-2);
+  background: var(--p-surface-hover);
 }
 
 .ask-composer-counter {
   width: 100%;
-  max-width: 760px;
+  max-width: 900px;
   margin: 0.21875rem auto 0;
   color: var(--p-text-4);
-  font-size: 0.45rem;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 .ask-composer-footnote {
   margin: 0.5rem auto 0;
-  max-width: 760px;
+  max-width: 900px;
   color: var(--p-text-4);
   text-align: center;
-  font-size: 0.5rem;
+  font-size: 0.5625rem;
   line-height: 1.5;
-}
-
-.ask-source-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.45rem;
-  margin: 0.55rem auto 0;
-  padding: 0.55rem 0.7rem;
-  max-width: 760px;
-  border-left: 2px solid var(--primary);
-  color: var(--p-text-2);
-  font-size: 0.5rem;
-  line-height: 1.45;
 }
 
 /* History sidebar */
@@ -2790,9 +2698,6 @@ a:hover {
     width: calc(100% - 34px);
     padding-bottom: 1.875rem;
   }
-  .ask-welcome-title {
-    font-size: 1.75rem;
-  }
   .ask-suggestions {
     grid-template-columns: 1fr;
     max-width: 380px;
@@ -2823,7 +2728,6 @@ a:hover {
   gap: 0.75rem;
   min-height: 54px;
   padding: 0.5rem 0.25rem;
-  border-bottom: 1px solid var(--p-border);
   margin-bottom: 0.75rem;
 }
 .ask-topbar-context {
@@ -2950,9 +2854,9 @@ a:hover {
   min-width: 0;
 }
 
-.ask-page-root .ask-console[data-page="voice"] > main,
-.ask-page-root .ask-console[data-page="settings"] > main,
-.ask-page-root .ask-console[data-page="integrations"] > main {
+.ask-page-root .ask-console[data-page="voice"] > .ask-main,
+.ask-page-root .ask-console[data-page="settings"] > .ask-main,
+.ask-page-root .ask-console[data-page="integrations"] > .ask-main {
   padding-bottom: 3rem;
 }
 
@@ -3983,7 +3887,7 @@ a:hover {
 }
 .ask-history-empty-hint {
   font-size: 0.6875rem;
-  opacity: 0.85;
+  color: var(--p-text-3);
 }
 
 @media (hover: none) {
@@ -4838,51 +4742,15 @@ a:hover {
 }
 
 .ask-composer-wrap {
-  width: min(calc(100% - 2rem), 820px);
-  padding: 0.75rem 0 0.5rem;
+  width: min(calc(100% - 2rem), 900px);
+  padding: 0.75rem 0;
 }
 .ask-composer {
-  gap: 0.375rem;
-  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
   border-color: var(--p-border);
-  border-radius: 20px;
-  box-shadow: 0 8px 28px color-mix(in srgb, #000 8%, transparent);
 }
 .ask-composer:focus-within {
-  border-color: color-mix(in srgb, var(--primary) 68%, var(--p-border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent),
-    0 10px 30px color-mix(in srgb, #000 8%, transparent);
-}
-.ask-composer-field textarea {
-  min-height: 44px;
-  max-height: 240px;
-  resize: none;
-  padding: 0.65rem 0.375rem;
-  font-size: 1rem;
-  line-height: 1.5;
-}
-.ask-composer-field textarea::placeholder {
-  color: var(--p-text-4);
-}
-.ask-composer-hint {
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
-.ask-composer-footnote {
-  font-size: 0.75rem;
-}
-.ask-composer-counter {
-  font-size: 0.75rem;
-}
-.ask-composer-send,
-.ask-composer-stop,
-.ask-composer-voice {
-  flex: 0 0 44px;
-  border-radius: 13px;
-}
-.ask-composer-send:disabled {
-  opacity: 0.55;
-  filter: saturate(0.55);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 .ask-topbar-toggle {
   width: 44px;
@@ -4959,7 +4827,20 @@ a:hover {
     padding-bottom: 0.5rem;
   }
   .ask-composer {
-    padding-left: 0.625rem;
+    padding-left: 0.75rem;
+  }
+  /* The reference app sizes its controls for a mouse; on a phone the same
+     controls grow to a thumb-sized target. */
+  .ask-composer-field textarea {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+  .ask-composer-send,
+  .ask-composer-stop,
+  .ask-composer-voice {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
   }
   .ask-composer-hint {
     font-size: 0.6875rem;
@@ -4999,7 +4880,7 @@ a:hover {
   .ask-page-root .ask-console[data-sidebar-collapsed="true"] > .ask-sidebar {
     display: none;
   }
-  .ask-page-root .ask-console[data-sidebar-collapsed="true"] > main {
+  .ask-page-root .ask-console[data-sidebar-collapsed="true"] > .ask-main {
     grid-column: 1 !important;
   }
 }
@@ -5033,7 +4914,7 @@ a:hover {
   .ask-page-root .ask-console {
     gap: 0.75rem;
   }
-  .ask-page-root .ask-console > main {
+  .ask-page-root .ask-console > .ask-main {
     padding: 0.25rem 0 2rem;
   }
   .ask-topbar {
@@ -5158,6 +5039,29 @@ a:hover {
   font-weight: 650;
   letter-spacing: -0.015em;
 }
+.ask-sidebar-toggle {
+  grid-area: toggle;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--p-text-4);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ask-sidebar-toggle:hover {
+  color: var(--p-text-1);
+  background: var(--p-surface-hover);
+  border-color: var(--p-border);
+}
+.ask-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .ask-sidebar-close {
   grid-area: close;
 }
@@ -5167,10 +5071,10 @@ a:hover {
 }
 @media (min-width: 1100px) {
   .ask-sidebar-top {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "brand"
-      "new";
+      "brand toggle"
+      "new new";
   }
   .ask-sidebar-close {
     display: none;

@@ -228,6 +228,17 @@ async function ask(question: string, initialQuery: string | null = null) {
   fireEvent.click(screen.getByLabelText('Send question'))
 }
 
+/**
+ * The console's own region. The page puts the workspace inside the document
+ * `<main>`, so the console is no longer a landmark of its own — but the
+ * polite live region that announces a search still belongs to it.
+ */
+function consoleRoot(): HTMLElement {
+  const root = document.querySelector('.ask-console')
+  if (!root) throw new Error('the Ask console is not mounted')
+  return root as HTMLElement
+}
+
 /** Every question the reader has actually sent, in order. */
 function postedQuestions(): string[] {
   return vi
@@ -327,12 +338,11 @@ describe('/ask research workspace', () => {
     await screen.findByPlaceholderText(/Ask about his life/i)
 
     expect(screen.getByText('Ask a question', { selector: 'label' })).toBeInTheDocument()
-    expect(container.querySelector('#ask-source-disclaimer')).toHaveTextContent(/not the Speaker himself/i)
     const composer = container.querySelector('.ask-composer')
     expect(composer).not.toHaveClass('fixed', 'sticky')
     expect(container.querySelector('#ask-question')).toHaveAttribute(
       'aria-describedby',
-      'ask-source-disclaimer ask-composer-help',
+      'ask-composer-help',
     )
     const examples = within(
       screen.getByRole('group', { name: 'Example questions' }),
@@ -621,15 +631,15 @@ describe('/ask answer transparency', () => {
     answer = PARTIAL
     await ask('cryptocurrency mining')
     // The toast system adds its own polite live region, so pin the search
-    // status to the conversation's own landmark.
-    const status = await within(screen.getByRole('main')).findByRole('status')
+    // status to the console's own region.
+    const status = await within(consoleRoot()).findByRole('status')
     await waitFor(() => expect(status).toHaveTextContent(/Partial answer/))
     expect(status).toHaveTextContent(/Nothing in the archive covers cryptocurrency/)
   })
 
   it('announces a successful search as found, not as a wall of prose', async () => {
     await ask('digitalisation youth')
-    const status = await within(screen.getByRole('main')).findByRole('status')
+    const status = await within(consoleRoot()).findByRole('status')
     await waitFor(() => expect(status).toHaveTextContent('Answer found. 1 source found.'))
   })
 })
