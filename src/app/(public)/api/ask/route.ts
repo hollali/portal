@@ -446,7 +446,7 @@ export async function POST(request: NextRequest) {
   const knowledgeTopic = detectKnowledgeTopic(raw)
   if (knowledgeTopic) {
     try {
-      return NextResponse.json(answerFromProfile(knowledgeTopic, await loadKnowledgeProfile()))
+      return NextResponse.json(answerFromProfile(knowledgeTopic, await loadKnowledgeProfile(), raw))
     } catch {
       // Fall through to the archive search.
     }

@@ -6,7 +6,7 @@ export const knowledgeProfile: KnowledgeProfile = {
     name: 'Alban Sumana Kingsford Bagbin',
     displayName: 'Rt. Hon. Alban Bagbin',
     description:
-      'Ghanaian lawyer, statesman and legislator — elected Speaker of the 8th Parliament in 2021 and re-elected in 2025.',
+      'Ghanaian lawyer, statesman and legislator — elected Speaker of the 8th Parliament in 2021 as the first Speaker chosen from the opposition in Ghana’s history, and re-elected to preside over the 9th Parliament in 2025.',
     portraitUrl: '/images/bagbin-speaker.jpg',
     portraitAlt: 'Alban Bagbin',
     profileLabel: 'Incumbent since',
@@ -20,7 +20,7 @@ export const knowledgeProfile: KnowledgeProfile = {
     cards: [
       {
         tag: 'Education',
-        text: 'Attended Wa Secondary School and Tamale Secondary School. Earned a Bachelor of Arts in Law and English at the University of Ghana (1980), trained at the Ghana School of Law, and was called to the bar in 1982.',
+        text: 'Attended Wa Secondary School and Tamale Secondary School. Earned a Bachelor of Arts in Law and English at the University of Ghana (1980), trained at the Ghana School of Law, and was called to the bar in 1982. Later completed an Executive Master’s in Governance and Leadership at GIMPA.',
       },
       {
         tag: 'Career',
